@@ -5,7 +5,7 @@ import { ConfigModule as NestConfigModule } from "@nestjs/config";
 
 import { validate } from "./env.validation";
 
-const appRoot = join(__dirname, "..", "..");
+const appRoot = join(__dirname, "./../..", "..");
 
 @Module({
   imports: [
