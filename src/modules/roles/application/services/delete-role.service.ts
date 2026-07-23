@@ -1,7 +1,7 @@
 import { type IRoleRepository, ROLE_REPOSITORY, RoleNotFoundError } from "../../domain/repositories/role.repository";
 import { type IUserRoleCountRepository, USER_ROLE_COUNT_REPOSITORY } from "../../domain/repositories/user-role-count.repository";
 
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 
 @Injectable()
 export class DeleteRoleService {
@@ -10,19 +10,10 @@ export class DeleteRoleService {
     @Inject(USER_ROLE_COUNT_REPOSITORY) private readonly userRoleCounts: IUserRoleCountRepository,
   ) {}
 
-  async execute(documentId: string, callerRoleSlug: string): Promise<void> {
-    const callerRole = await this.roles.findBySlug(callerRoleSlug);
-    if (!callerRole) {
-      throw new ForbiddenException("Caller's role could not be resolved");
-    }
-
+  async execute(documentId: string): Promise<void> {
     const existing = await this.roles.findById(documentId);
     if (!existing) {
       throw new NotFoundException(`Role "${documentId}" not found`);
-    }
-
-    if (existing.level >= callerRole.level) {
-      throw new ForbiddenException("Cannot delete a role at or above your own level");
     }
 
     if (existing.isDefault) {

@@ -8,7 +8,9 @@ import { RoleEntity } from "../domain/entities/role.entiry";
 
 import { Test } from "@nestjs/testing";
 
-import { AuthenticatedRequest, RolesColtroller } from "./role.controller";
+import { JwtTokenService } from "@/common/token/jwt-token.service";
+
+import { RolesColtroller } from "./role.controller";
 
 describe("RolesColtroller", () => {
   let controller: RolesColtroller;
@@ -19,8 +21,6 @@ describe("RolesColtroller", () => {
 
   const role = new RoleEntity("role-1", "Editor", "editor", [], 10, false, new Date(), new Date(), "");
 
-  const requestWithCaller = (roleSlug?: string): AuthenticatedRequest => ({ user: roleSlug ? { roleSlug } : undefined }) as AuthenticatedRequest;
-
   beforeEach(async () => {
     const module = await Test.createTestingModule({
       controllers: [RolesColtroller],
@@ -29,6 +29,7 @@ describe("RolesColtroller", () => {
         { provide: CreateRoleService, useValue: { execute: jest.fn() } },
         { provide: UpdateRoleService, useValue: { execute: jest.fn() } },
         { provide: DeleteRoleService, useValue: { execute: jest.fn() } },
+        { provide: JwtTokenService, useValue: { verifyAccessToken: jest.fn() } },
       ],
     }).compile();
 
@@ -48,40 +49,31 @@ describe("RolesColtroller", () => {
     expect(result).toEqual([role]);
   });
 
-  it("create() delegates to CreateRoleService with the caller role slug from req.user", async () => {
+  it("create() delegates to CreateRoleService", async () => {
     const dto: CreateRoleDto = { name: "Editor", slug: "editor", permissions: [], level: 10 };
     createRoleService.execute.mockResolvedValue(role);
 
-    const result = await controller.create(dto, requestWithCaller("admin"));
+    const result = await controller.create(dto);
 
-    expect(createRoleService.execute).toHaveBeenCalledWith(dto, "admin");
+    expect(createRoleService.execute).toHaveBeenCalledWith(dto);
     expect(result).toBe(role);
   });
 
-  it("create() passes an empty caller role slug when req.user is not set", async () => {
-    const dto: CreateRoleDto = { name: "Editor", slug: "editor", permissions: [], level: 10 };
-    createRoleService.execute.mockResolvedValue(role);
-
-    await controller.create(dto, requestWithCaller());
-
-    expect(createRoleService.execute).toHaveBeenCalledWith(dto, "");
-  });
-
-  it("update() delegates to UpdateRoleService with the caller role slug from req.user", async () => {
+  it("update() delegates to UpdateRoleService", async () => {
     const dto: UpdateRoleDto = { name: "Editor v2" };
     updateRoleService.execute.mockResolvedValue(role);
 
-    const result = await controller.update("role-1", dto, requestWithCaller("admin"));
+    const result = await controller.update("role-1", dto);
 
-    expect(updateRoleService.execute).toHaveBeenCalledWith("role-1", dto, "admin");
+    expect(updateRoleService.execute).toHaveBeenCalledWith("role-1", dto);
     expect(result).toBe(role);
   });
 
-  it("delete() delegates to DeleteRoleService with the caller role slug from req.user", async () => {
+  it("delete() delegates to DeleteRoleService", async () => {
     deleteRoleService.execute.mockResolvedValue(undefined);
 
-    await controller.delete("role-1", requestWithCaller("admin"));
+    await controller.delete("role-1");
 
-    expect(deleteRoleService.execute).toHaveBeenCalledWith("role-1", "admin");
+    expect(deleteRoleService.execute).toHaveBeenCalledWith("role-1");
   });
 });

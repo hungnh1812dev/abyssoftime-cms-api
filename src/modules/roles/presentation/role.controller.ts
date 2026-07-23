@@ -4,14 +4,14 @@ import { CreateRoleService } from "../application/services/create-role.service";
 import { DeleteRoleService } from "../application/services/delete-role.service";
 import { UpdateRoleService } from "../application/services/update-role.service";
 import { RoleEntity } from "../domain/entities/role.entiry";
-import { Request } from "express";
 
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, UseGuards } from "@nestjs/common";
+
+import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
+import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
+import { PermissionsGuard } from "@/common/guards/permissions.guard";
 
 import { ListRolesService } from "./../application/services/list-roles.service";
-
-/** Populated by the auth guard/middleware once real auth is implemented; empty until then. */
-export type AuthenticatedRequest = Request & { user?: { roleSlug: string } };
 
 @Controller("/api/roles")
 export class RolesColtroller {
@@ -23,27 +23,31 @@ export class RolesColtroller {
   ) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("role:read")
   async list(): Promise<RoleEntity[]> {
     return this.listRolesService.execute();
   }
 
   @Post()
-  async create(@Body() dto: CreateRoleDto, @Req() req: AuthenticatedRequest): Promise<RoleEntity> {
-    return this.createRoleService.execute(dto, this.callerRoleSlug(req));
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("role:manager")
+  async create(@Body() dto: CreateRoleDto): Promise<RoleEntity> {
+    return this.createRoleService.execute(dto);
   }
 
   @Put(":id")
-  async update(@Param("id") documentId: string, @Body() dto: UpdateRoleDto, @Req() req: AuthenticatedRequest): Promise<RoleEntity> {
-    return this.updateRoleService.execute(documentId, dto, this.callerRoleSlug(req));
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("role:manager")
+  async update(@Param("id") documentId: string, @Body() dto: UpdateRoleDto): Promise<RoleEntity> {
+    return this.updateRoleService.execute(documentId, dto);
   }
 
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param("id") documentId: string, @Req() req: AuthenticatedRequest): Promise<void> {
-    return this.dalateRoleService.execute(documentId, this.callerRoleSlug(req));
-  }
-
-  private callerRoleSlug(req: AuthenticatedRequest): string {
-    return req.user?.roleSlug ?? "";
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("role:manager")
+  async delete(@Param("id") documentId: string): Promise<void> {
+    return this.dalateRoleService.execute(documentId);
   }
 }

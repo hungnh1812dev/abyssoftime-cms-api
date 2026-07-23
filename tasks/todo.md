@@ -55,14 +55,14 @@ See `tasks/plan.md` for full context and rationale.
 - [ ] **Checkpoint 5:** manual forgot→reset round trip via console-logged token
 
 ## Phase 6 — Permission-slug authorization rollout
-- [ ] `roles`: strip level checks from create/update/delete services; add guards to `role.controller.ts`; swap in shared `AuthenticatedRequest`
-- [ ] `permissions`: add guards to `permission.controller.ts`
-- [ ] `users`: add guards to `user.controller.ts`; level-hierarchy check + super-admin-promotion rule in `update-user.service.ts`/`delete-user.service.ts` (inject `ROLE_REPOSITORY`)
-- [ ] Update all affected `*.spec.ts` (role services lose level-check cases; user services gain hierarchy/promotion cases)
+- [x] `roles`: strip level checks from create/update/delete services; add guards to `role.controller.ts`; swap in shared `AuthenticatedRequest`
+- [x] `permissions`: add guards to `permission.controller.ts`
+- [x] `users`: add guards to `user.controller.ts`; level-hierarchy check + super-admin-promotion rule in `update-user.service.ts`/`delete-user.service.ts` (inject `ROLE_REPOSITORY`) — resolved a spec ambiguity: the super_admin-slug check replaces (not stacks with) the generic level check when promoting to super_admin, since level 100 is both super_admin's level and the DTO-enforced ceiling, so "caller.level > 100" could never be satisfied otherwise (confirmed with user)
+- [x] Update all affected `*.spec.ts` (role services lose level-check cases; user services gain hierarchy/promotion cases)
 - [ ] **Checkpoint 6 (highest-risk):** full regression (`test:cov`/`build`/`lint`) + full manual end-to-end flow
 
 ## Phase 7 — Docs closeout
-- [ ] Update `docs/documents/{roles,permissions,users}.md`
+- [x] Update `docs/documents/{roles,permissions,users}.md`
 - [ ] Add `docs/documents/auth.md`
 - [ ] Update `docs/ENTRYPOINT.md`
 - [ ] Fold `SPEC.md` into docs, reset `SPEC.md` for next cycle

@@ -6,7 +6,12 @@ import { ListUserService } from "../application/services/list-user.service";
 import { UpdateUserService } from "../application/services/update-user.service";
 import { UserEntity } from "../domain/entities/user.entity";
 
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, Req, UseGuards } from "@nestjs/common";
+
+import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
+import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
+import { PermissionsGuard } from "@/common/guards/permissions.guard";
+import { type AuthenticatedRequest } from "@/common/types/authenticated-request";
 
 @Controller("/api/users")
 export class UserController {
@@ -18,23 +23,31 @@ export class UserController {
   ) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("user:read")
   async list(): Promise<UserEntity[]> {
     return this.listUsers.execute();
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("user:manager")
   async create(@Body() dto: CreateUserDto): Promise<UserEntity> {
     return this.createUser.execute(dto);
   }
 
   @Put(":id")
-  async update(@Param("id") documentId: string, @Body() dto: UpdateUserDto): Promise<UserEntity> {
-    return this.updateUser.execute(documentId, dto);
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("user:manager")
+  async update(@Param("id") documentId: string, @Body() dto: UpdateUserDto, @Req() req: AuthenticatedRequest): Promise<UserEntity> {
+    return this.updateUser.execute(documentId, dto, req.user);
   }
 
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param("id") documentId: string): Promise<void> {
-    return this.deleteUser.execute(documentId);
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("user:manager")
+  async delete(@Param("id") documentId: string, @Req() req: AuthenticatedRequest): Promise<void> {
+    return this.deleteUser.execute(documentId, req.user);
   }
 }

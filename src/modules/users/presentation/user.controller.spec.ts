@@ -8,6 +8,9 @@ import { UserEntity } from "../domain/entities/user.entity";
 
 import { Test } from "@nestjs/testing";
 
+import { JwtTokenService } from "@/common/token/jwt-token.service";
+import { type AuthenticatedRequest } from "@/common/types/authenticated-request";
+
 import { UserController } from "./user.controller";
 
 describe("UserController", () => {
@@ -18,6 +21,7 @@ describe("UserController", () => {
   let deleteUser: jest.Mocked<DeleteUserService>;
 
   const user = new UserEntity("user-1", "jane@example.com", "Jane Doe", "janedoe", "secret", true, false, "role-1", new Date(), new Date());
+  const req = { user: { sub: "caller-1", roleSlug: "admin", level: 50, permissions: ["user:manager"] } } as unknown as AuthenticatedRequest;
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({
@@ -27,6 +31,7 @@ describe("UserController", () => {
         { provide: CreateUserService, useValue: { execute: jest.fn() } },
         { provide: UpdateUserService, useValue: { execute: jest.fn() } },
         { provide: DeleteUserService, useValue: { execute: jest.fn() } },
+        { provide: JwtTokenService, useValue: { verifyAccessToken: jest.fn() } },
       ],
     }).compile();
 
@@ -56,21 +61,21 @@ describe("UserController", () => {
     expect(result).toBe(user);
   });
 
-  it("update() delegates to UpdateUserService", async () => {
+  it("update() delegates to UpdateUserService with the caller from req.user", async () => {
     const dto: UpdateUserDto = { name: "Jane Doe 2" };
     updateUser.execute.mockResolvedValue(user);
 
-    const result = await controller.update("user-1", dto);
+    const result = await controller.update("user-1", dto, req);
 
-    expect(updateUser.execute).toHaveBeenCalledWith("user-1", dto);
+    expect(updateUser.execute).toHaveBeenCalledWith("user-1", dto, req.user);
     expect(result).toBe(user);
   });
 
-  it("delete() delegates to DeleteUserService", async () => {
+  it("delete() delegates to DeleteUserService with the caller from req.user", async () => {
     deleteUser.execute.mockResolvedValue(undefined);
 
-    await controller.delete("user-1");
+    await controller.delete("user-1", req);
 
-    expect(deleteUser.execute).toHaveBeenCalledWith("user-1");
+    expect(deleteUser.execute).toHaveBeenCalledWith("user-1", req.user);
   });
 });

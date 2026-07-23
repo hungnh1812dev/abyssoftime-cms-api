@@ -2,7 +2,7 @@ import { RoleEntity } from "../../domain/entities/role.entiry";
 import { IRoleRepository, ROLE_REPOSITORY, RoleAlreadyExistsError } from "../../domain/repositories/role.repository";
 import { CreateRoleDto } from "../dto/create-role.dto";
 
-import { BadRequestException, ConflictException, ForbiddenException } from "@nestjs/common";
+import { BadRequestException, ConflictException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 
 import { PermissionEntity } from "@/modules/permissions/domain/entities/permission.entity";
@@ -15,7 +15,6 @@ describe("CreateRoleService", () => {
   let roles: jest.Mocked<IRoleRepository>;
   let permissions: jest.Mocked<IPermissionRepository>;
 
-  const callerRole = new RoleEntity("role-caller", "Admin", "admin", [], 100, false, new Date(), new Date(), "");
   const catalog = [new PermissionEntity("permission-1", "document:read", "Read document", "Allows reading a document", new Date(), new Date(), "")];
   const dto: CreateRoleDto = { name: "Editor", slug: "editor", permissions: [], level: 10 };
   const created = new RoleEntity("role-1", dto.name, dto.slug, dto.permissions, dto.level, false, new Date(), new Date(), "");
@@ -47,71 +46,50 @@ describe("CreateRoleService", () => {
     service = module.get(CreateRoleService);
   });
 
-  it("throws ForbiddenException when the caller's role cannot be resolved", async () => {
-    roles.findBySlug.mockResolvedValue(undefined as unknown as RoleEntity);
-
-    await expect(service.execute(dto, "unknown-role")).rejects.toThrow(ForbiddenException);
-    expect(roles.create).not.toHaveBeenCalled();
-  });
-
-  it("throws ForbiddenException when the requested level is not lower than the caller's", async () => {
-    roles.findBySlug.mockResolvedValue(callerRole);
-
-    await expect(service.execute({ ...dto, level: callerRole.level }, "admin")).rejects.toThrow(ForbiddenException);
-    expect(roles.create).not.toHaveBeenCalled();
-  });
-
   it("skips the permission catalog check when permissions is empty", async () => {
-    roles.findBySlug.mockResolvedValue(callerRole);
     roles.create.mockResolvedValue(created);
 
-    await service.execute(dto, "admin");
+    await service.execute(dto);
 
     expect(permissions.findAll).not.toHaveBeenCalled();
     expect(roles.create).toHaveBeenCalled();
   });
 
   it("throws BadRequestException when permissions include an unknown slug", async () => {
-    roles.findBySlug.mockResolvedValue(callerRole);
     permissions.findAll.mockResolvedValue(catalog);
 
-    await expect(service.execute({ ...dto, permissions: ["document:delete"] }, "admin")).rejects.toThrow(BadRequestException);
+    await expect(service.execute({ ...dto, permissions: ["document:delete"] })).rejects.toThrow(BadRequestException);
     expect(roles.create).not.toHaveBeenCalled();
   });
 
   it("creates the role when all permission slugs are valid", async () => {
-    roles.findBySlug.mockResolvedValue(callerRole);
     permissions.findAll.mockResolvedValue(catalog);
     roles.create.mockResolvedValue(created);
 
-    const result = await service.execute({ ...dto, permissions: ["document:read"] }, "admin");
+    const result = await service.execute({ ...dto, permissions: ["document:read"] });
 
     expect(roles.create).toHaveBeenCalledWith({ name: dto.name, slug: dto.slug, permissions: ["document:read"], level: dto.level, isDefault: false, updatedBy: "" });
     expect(result).toBe(created);
   });
 
   it("translates RoleAlreadyExistsError into ConflictException", async () => {
-    roles.findBySlug.mockResolvedValue(callerRole);
     roles.create.mockRejectedValue(new RoleAlreadyExistsError(dto.slug));
 
-    await expect(service.execute(dto, "admin")).rejects.toThrow(ConflictException);
+    await expect(service.execute(dto)).rejects.toThrow(ConflictException);
   });
 
   it("rethrows unexpected errors from the repository", async () => {
-    roles.findBySlug.mockResolvedValue(callerRole);
     const unexpected = new Error("db down");
     roles.create.mockRejectedValue(unexpected);
 
-    await expect(service.execute(dto, "admin")).rejects.toThrow(unexpected);
+    await expect(service.execute(dto)).rejects.toThrow(unexpected);
   });
 
   it("creates a role via the repository (happy path)", async () => {
-    roles.findBySlug.mockResolvedValue(callerRole);
     roles.create.mockResolvedValue(created);
 
-    const result = await service.execute(dto, "admin");
+    const result = await service.execute(dto);
 
-    expect(roles.findBySlug).toHaveBeenCalledWith("admin");
     expect(result).toBe(created);
   });
 });

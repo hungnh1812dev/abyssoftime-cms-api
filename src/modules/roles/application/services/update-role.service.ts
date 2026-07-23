@@ -2,7 +2,7 @@ import { RoleEntity } from "../../domain/entities/role.entiry";
 import { type IRoleRepository, ROLE_REPOSITORY, RoleNotFoundError } from "../../domain/repositories/role.repository";
 import { UpdateRoleDto } from "../dto/update-role.dto";
 
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 
 import { type IPermissionRepository, PERMISSSION_REPOSITORY } from "@/modules/permissions/domain/repositories/permission.repository";
 
@@ -13,22 +13,10 @@ export class UpdateRoleService {
     @Inject(PERMISSSION_REPOSITORY) private readonly permissions: IPermissionRepository,
   ) {}
 
-  async execute(documentId: string, dto: UpdateRoleDto, callerRoleSlug: string): Promise<RoleEntity> {
-    const callerRole = await this.roles.findBySlug(callerRoleSlug);
-    if (!callerRole) {
-      throw new ForbiddenException("Caller's role could not be resolved");
-    }
-
+  async execute(documentId: string, dto: UpdateRoleDto): Promise<RoleEntity> {
     const existing = await this.roles.findById(documentId);
     if (!existing) {
       throw new NotFoundException(`Role "${documentId}" not found`);
-    }
-
-    if (existing.level >= callerRole.level) {
-      throw new ForbiddenException("Cannot edit a role at or above your own level");
-    }
-    if (dto.level !== undefined && dto.level >= callerRole.level) {
-      throw new ForbiddenException(`level must be lower than your own level (${callerRole.level})`);
     }
 
     if (existing.isDefault && (dto.name !== undefined || dto.level !== undefined)) {

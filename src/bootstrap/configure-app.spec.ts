@@ -11,6 +11,9 @@ import { App } from "supertest/types";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 
+import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
+import { PermissionsGuard } from "@/common/guards/permissions.guard";
+
 import { configureApp } from "./configure-app";
 
 describe("configureApp", () => {
@@ -28,7 +31,12 @@ describe("configureApp", () => {
         { provide: UpdatePermissionService, useValue: { execute: jest.fn() } },
         { provide: DeletePermissionService, useValue: { execute: jest.fn() } },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(PermissionsGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     app = module.createNestApplication();
     configureApp(app);

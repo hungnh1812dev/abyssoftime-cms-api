@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
 
+import { RoleModule } from "@/modules/roles/role.module";
+
 import { CreateUserService } from "./application/services/create-user.service";
 import { DeleteUserService } from "./application/services/delete-user.service";
 import { ListUserService } from "./application/services/list-user.service";
@@ -9,7 +11,7 @@ import { PrismaUserRepository } from "./infrastructure/persistence/prisma-user.r
 import { UserController } from "./presentation/user.controller";
 
 @Module({
-  imports: [],
+  imports: [RoleModule],
   controllers: [UserController],
   providers: [ListUserService, CreateUserService, UpdateUserService, DeleteUserService, { provide: USER_REPOSITORY, useClass: PrismaUserRepository }],
   exports: [USER_REPOSITORY],

@@ -8,6 +8,8 @@ import { PermissionEntity } from "../domain/entities/permission.entity";
 
 import { Test } from "@nestjs/testing";
 
+import { JwtTokenService } from "@/common/token/jwt-token.service";
+
 import { PermissionController } from "./permission.controller";
 
 describe("PermissionController", () => {
@@ -27,6 +29,7 @@ describe("PermissionController", () => {
         { provide: CreatePermissionService, useValue: { execute: jest.fn() } },
         { provide: UpdatePermissionService, useValue: { execute: jest.fn() } },
         { provide: DeletePermissionService, useValue: { execute: jest.fn() } },
+        { provide: JwtTokenService, useValue: { verifyAccessToken: jest.fn() } },
       ],
     }).compile();
 

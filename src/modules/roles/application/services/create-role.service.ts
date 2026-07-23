@@ -2,7 +2,7 @@ import { RoleEntity } from "../../domain/entities/role.entiry";
 import { type IRoleRepository, ROLE_REPOSITORY, RoleAlreadyExistsError } from "../../domain/repositories/role.repository";
 import { CreateRoleDto } from "../dto/create-role.dto";
 
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable } from "@nestjs/common";
 
 import { type IPermissionRepository, PERMISSSION_REPOSITORY } from "@/modules/permissions/domain/repositories/permission.repository";
 
@@ -13,15 +13,7 @@ export class CreateRoleService {
     @Inject(PERMISSSION_REPOSITORY) private readonly permissions: IPermissionRepository,
   ) {}
 
-  async execute(dto: CreateRoleDto, callerRoleSlug: string): Promise<RoleEntity> {
-    const callerRole = await this.roles.findBySlug(callerRoleSlug);
-    if (!callerRole) {
-      throw new ForbiddenException("Caller's role could not be resolved");
-    }
-    if (dto.level >= callerRole.level) {
-      throw new ForbiddenException(`level must be lower than your own level (${callerRole.level})`);
-    }
-
+  async execute(dto: CreateRoleDto): Promise<RoleEntity> {
     await this.assertPermissionsExist(dto.permissions);
 
     try {

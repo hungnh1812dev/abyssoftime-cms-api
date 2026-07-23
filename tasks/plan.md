@@ -123,7 +123,7 @@ Schema migration (postgresql only) + ValidationPipe/cookie-parser bootstrap
 
 **Task 6.2 — Permissions module.** Same guard/decorator pattern on `permission.controller.ts`.
 
-**Task 6.3 — Users module: guard + level-hierarchy + super-admin rule.** Guards on `user.controller.ts`. In `UpdateUserService`/`DeleteUserService`: inject `ROLE_REPOSITORY`, compare caller's `level` vs target's (and new, if changing) role `level` — `403` if not strictly greater. If `dto.roleId` resolves to `super_admin`, require `req.user.roleSlug === "super_admin"`.
+**Task 6.3 — Users module: guard + level-hierarchy + super-admin rule.** Guards on `user.controller.ts`. In `UpdateUserService`/`DeleteUserService`: inject `ROLE_REPOSITORY`, compare caller's `level` vs target's (and new, if changing) role `level` — `403` if not strictly greater. If `dto.roleId` resolves to `super_admin`, require `req.user.roleSlug === "super_admin"`. **Done** — with one resolved ambiguity: `super_admin` sits at level 100, which is also the `CreateRoleDto` ceiling (`@Max(100)`), so a literal "caller.level > newRole.level" check when the new role is `super_admin` could never pass for anyone. Confirmed with the user that the `super_admin`-slug check *replaces* the generic level check for that one case, rather than stacking with it — implemented that way in `UpdateUserService`.
 
 **Task 6.4 — Full regression pass.** `bun run test:cov`/`build`/`lint`.
 
