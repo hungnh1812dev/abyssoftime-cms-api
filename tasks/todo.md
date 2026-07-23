@@ -12,12 +12,12 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 0:** `bun run build`/`lint`/`test:cov` clean, zero regressions
 
 ## Phase 1 — Boot-time default data seeding
-- [ ] `src/bootstrap/seed-default-data.service.ts` — upsert-if-missing 6 permissions + 4 roles
-- [ ] `src/bootstrap/seed.module.ts` — imports `PermissionModule`+`RoleModule`
-- [ ] Wire `SeedModule` into `AppModule`
-- [ ] `seed-default-data.service.spec.ts` (nothing/partial/full-exists branches)
-- [ ] `package.json` — `coverageThreshold` entry for `src/bootstrap/**`
-- [ ] **Checkpoint 1:** tests/build/lint clean; manual boot shows 6 permissions + 4 roles
+- [x] `src/bootstrap/seed-default-data.service.ts` — upsert-if-missing 6 permissions + 4 roles
+- [x] `src/bootstrap/seed.module.ts` — imports `PermissionModule`+`RoleModule`
+- [x] Wire `SeedModule` into `AppModule`
+- [x] `seed-default-data.service.spec.ts` (nothing/partial/full-exists branches)
+- [x] `package.json` — `coverageThreshold` entry for `src/bootstrap/**`
+- [ ] **Checkpoint 1:** tests/build/lint clean; manual boot shows 6 permissions + 4 roles (blocked on user's local env — see note below)
 
 ## Phase 2 — Shared auth primitives (`src/common/`)
 - [ ] `src/common/types/authenticated-request.ts`, `jwt-payload.ts`
