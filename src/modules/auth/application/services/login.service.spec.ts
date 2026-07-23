@@ -46,6 +46,7 @@ describe("LoginService", () => {
       delete: jest.fn(),
       count: jest.fn(),
       hasAnyVerified: jest.fn(),
+      findByResetTokenHash: jest.fn(),
     };
     roles = {
       findAll: jest.fn(),

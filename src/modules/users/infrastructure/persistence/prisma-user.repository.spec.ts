@@ -29,6 +29,8 @@ describe("PrismaUserRepository", () => {
     updatedAt: new Date("2026-01-02T00:00:00.000Z"),
     otpCodeHash: null,
     otpExpiresAt: null,
+    resetTokenHash: null,
+    resetTokenExpiresAt: null,
   };
 
   beforeEach(() => {
@@ -60,6 +62,8 @@ describe("PrismaUserRepository", () => {
     updatedAt: Date;
     otpCodeHash: string | null;
     otpExpiresAt: Date | null;
+    resetTokenHash: string | null;
+    resetTokenExpiresAt: Date | null;
   }) => {
     expect(entity).toEqual({
       documentId: record.documentId,
@@ -74,6 +78,8 @@ describe("PrismaUserRepository", () => {
       updatedAt: record.updatedAt,
       otpCodeHash: record.otpCodeHash,
       otpExpiresAt: record.otpExpiresAt,
+      resetTokenHash: record.resetTokenHash,
+      resetTokenExpiresAt: record.resetTokenExpiresAt,
     });
   };
 
@@ -177,6 +183,23 @@ describe("PrismaUserRepository", () => {
     expect(result.roleId).toBeNull();
   });
 
+  it("findByResetTokenHash() looks up by resetTokenHash via findFirst (no unique constraint)", async () => {
+    prisma.user.findFirst.mockResolvedValue(record);
+
+    const result = await repository.findByResetTokenHash("hashed-token");
+
+    expect(prisma.user.findFirst).toHaveBeenCalledWith({ where: { resetTokenHash: "hashed-token" } });
+    expectMappedEntity(result!);
+  });
+
+  it("findByResetTokenHash() returns null when no record is found", async () => {
+    prisma.user.findFirst.mockResolvedValue(null);
+
+    const result = await repository.findByResetTokenHash("missing-hash");
+
+    expect(result).toBeNull();
+  });
+
   it("create() passes all fields through to prisma and maps the result", async () => {
     prisma.user.create.mockResolvedValue(record);
 
@@ -225,6 +248,8 @@ describe("PrismaUserRepository", () => {
         roleId: undefined,
         otpCodeHash: undefined,
         otpExpiresAt: undefined,
+        resetTokenHash: undefined,
+        resetTokenExpiresAt: undefined,
       },
     });
     expectMappedEntity(result);
@@ -247,10 +272,63 @@ describe("PrismaUserRepository", () => {
         roleId: "role-1",
         otpCodeHash: null,
         otpExpiresAt: null,
+        resetTokenHash: undefined,
+        resetTokenExpiresAt: undefined,
       },
     });
     expect(result.otpCodeHash).toBeNull();
     expect(result.otpExpiresAt).toBeNull();
+  });
+
+  it("update() sets resetTokenHash and resetTokenExpiresAt when requesting a password reset", async () => {
+    const resetTokenExpiresAt = new Date("2026-01-03T00:00:00.000Z");
+    prisma.user.update.mockResolvedValue({ ...record, resetTokenHash: "hashed-token", resetTokenExpiresAt });
+
+    const result = await repository.update("user-1", { resetTokenHash: "hashed-token", resetTokenExpiresAt });
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { documentId: "user-1" },
+      data: {
+        email: undefined,
+        name: undefined,
+        username: undefined,
+        password: undefined,
+        accountType: undefined,
+        verified: undefined,
+        roleId: undefined,
+        otpCodeHash: undefined,
+        otpExpiresAt: undefined,
+        resetTokenHash: "hashed-token",
+        resetTokenExpiresAt,
+      },
+    });
+    expect(result.resetTokenHash).toBe("hashed-token");
+    expect(result.resetTokenExpiresAt).toEqual(resetTokenExpiresAt);
+  });
+
+  it("update() clears resetTokenHash and resetTokenExpiresAt after a successful password reset", async () => {
+    prisma.user.update.mockResolvedValue({ ...record, resetTokenHash: null, resetTokenExpiresAt: null });
+
+    const result = await repository.update("user-1", { password: "new-hashed-password", resetTokenHash: null, resetTokenExpiresAt: null });
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { documentId: "user-1" },
+      data: {
+        email: undefined,
+        name: undefined,
+        username: undefined,
+        password: "new-hashed-password",
+        accountType: undefined,
+        verified: undefined,
+        roleId: undefined,
+        otpCodeHash: undefined,
+        otpExpiresAt: undefined,
+        resetTokenHash: null,
+        resetTokenExpiresAt: null,
+      },
+    });
+    expect(result.resetTokenHash).toBeNull();
+    expect(result.resetTokenExpiresAt).toBeNull();
   });
 
   it("delete() removes the record by documentId", async () => {

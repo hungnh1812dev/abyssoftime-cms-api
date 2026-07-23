@@ -1,12 +1,16 @@
+import { ForgotPasswordDto } from "../application/dto/forgot-password.dto";
 import { LoginDto } from "../application/dto/login.dto";
 import { RegisterDto } from "../application/dto/register.dto";
 import { ResendOtpDto } from "../application/dto/resend-otp.dto";
+import { ResetPasswordDto } from "../application/dto/reset-password.dto";
 import { VerifyOtpDto } from "../application/dto/verify-otp.dto";
+import { ForgotPasswordService } from "../application/services/forgot-password.service";
 import { HasUsersService } from "../application/services/has-users.service";
 import { LoginService } from "../application/services/login.service";
 import { RefreshTokenService } from "../application/services/refresh-token.service";
 import { RegisterService } from "../application/services/register.service";
 import { ResendOtpService } from "../application/services/resend-otp.service";
+import { ResetPasswordService } from "../application/services/reset-password.service";
 import { VerifyOtpService } from "../application/services/verify-otp.service";
 import { type Request, type Response } from "express";
 
@@ -26,6 +30,8 @@ describe("AuthController", () => {
   let hasUsersService: jest.Mocked<HasUsersService>;
   let loginService: jest.Mocked<LoginService>;
   let refreshTokenService: jest.Mocked<RefreshTokenService>;
+  let forgotPasswordService: jest.Mocked<ForgotPasswordService>;
+  let resetPasswordService: jest.Mocked<ResetPasswordService>;
   let res: jest.Mocked<Pick<Response, "cookie" | "clearCookie">>;
 
   const configValues: Record<string, unknown> = { COOKIE_SECURE: true, COOKIE_SAMESITE: "lax" };
@@ -42,6 +48,8 @@ describe("AuthController", () => {
         { provide: HasUsersService, useValue: { execute: jest.fn() } },
         { provide: LoginService, useValue: { execute: jest.fn() } },
         { provide: RefreshTokenService, useValue: { execute: jest.fn() } },
+        { provide: ForgotPasswordService, useValue: { execute: jest.fn() } },
+        { provide: ResetPasswordService, useValue: { execute: jest.fn() } },
         { provide: ConfigService, useValue: { get: jest.fn((key: string) => configValues[key]) } },
       ],
     }).compile();
@@ -53,6 +61,8 @@ describe("AuthController", () => {
     hasUsersService = module.get(HasUsersService);
     loginService = module.get(LoginService);
     refreshTokenService = module.get(RefreshTokenService);
+    forgotPasswordService = module.get(ForgotPasswordService);
+    resetPasswordService = module.get(ResetPasswordService);
   });
 
   it("register() delegates to RegisterService", async () => {
@@ -139,5 +149,25 @@ describe("AuthController", () => {
     expect(res.clearCookie).toHaveBeenCalledWith(ACCESS_TOKEN_COOKIE);
     expect(res.clearCookie).toHaveBeenCalledWith(REFRESH_TOKEN_COOKIE);
     expect(result).toEqual({ message: "Logged out." });
+  });
+
+  it("forgotPassword() delegates to ForgotPasswordService", async () => {
+    const dto: ForgotPasswordDto = { email: "jane@example.com" };
+    forgotPasswordService.execute.mockResolvedValue(undefined);
+
+    const result = await controller.forgotPassword(dto);
+
+    expect(forgotPasswordService.execute).toHaveBeenCalledWith(dto);
+    expect(result).toEqual({ message: "If that email is registered, a password reset link has been sent." });
+  });
+
+  it("resetPassword() delegates to ResetPasswordService", async () => {
+    const dto: ResetPasswordDto = { token: "raw-token", newPassword: "new-s3cret" };
+    resetPasswordService.execute.mockResolvedValue(undefined);
+
+    const result = await controller.resetPassword(dto);
+
+    expect(resetPasswordService.execute).toHaveBeenCalledWith(dto);
+    expect(result).toEqual({ message: "Password reset successfully." });
   });
 });

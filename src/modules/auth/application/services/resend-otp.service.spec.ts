@@ -31,8 +31,9 @@ describe("ResendOtpService", () => {
       delete: jest.fn(),
       count: jest.fn(),
       hasAnyVerified: jest.fn(),
+      findByResetTokenHash: jest.fn(),
     };
-    emailSender = { sendOtpEmail: jest.fn() };
+    emailSender = { sendOtpEmail: jest.fn(), sendPasswordResetEmail: jest.fn() };
 
     users.update.mockImplementation((documentId, data) =>
       Promise.resolve(

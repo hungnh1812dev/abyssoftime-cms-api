@@ -29,6 +29,11 @@ export class PrismaUserRepository implements IUserRepository {
     return user ? this.toEntity(user) : null;
   }
 
+  async findByResetTokenHash(resetTokenHash: string): Promise<UserEntity | null> {
+    const user = await this.prisma.user.findFirst({ where: { resetTokenHash } });
+    return user ? this.toEntity(user) : null;
+  }
+
   async create(data: CreateUserData): Promise<UserEntity> {
     const user = await this.prisma.user.create({
       data: {
@@ -59,6 +64,8 @@ export class PrismaUserRepository implements IUserRepository {
         roleId: data.roleId,
         otpCodeHash: data.otpCodeHash,
         otpExpiresAt: data.otpExpiresAt,
+        resetTokenHash: data.resetTokenHash,
+        resetTokenExpiresAt: data.resetTokenExpiresAt,
       },
     });
 
@@ -91,6 +98,8 @@ export class PrismaUserRepository implements IUserRepository {
     updatedAt: Date;
     otpCodeHash?: string | null;
     otpExpiresAt?: Date | null;
+    resetTokenHash?: string | null;
+    resetTokenExpiresAt?: Date | null;
   }): UserEntity {
     return new UserEntity(
       user.documentId,
@@ -105,6 +114,8 @@ export class PrismaUserRepository implements IUserRepository {
       user.updatedAt,
       user.otpCodeHash ?? null,
       user.otpExpiresAt ?? null,
+      user.resetTokenHash ?? null,
+      user.resetTokenExpiresAt ?? null,
     );
   }
 }

@@ -1,12 +1,16 @@
+import { ForgotPasswordDto } from "../application/dto/forgot-password.dto";
 import { LoginDto } from "../application/dto/login.dto";
 import { RegisterDto } from "../application/dto/register.dto";
 import { ResendOtpDto } from "../application/dto/resend-otp.dto";
+import { ResetPasswordDto } from "../application/dto/reset-password.dto";
 import { VerifyOtpDto } from "../application/dto/verify-otp.dto";
+import { ForgotPasswordService } from "../application/services/forgot-password.service";
 import { HasUsersService } from "../application/services/has-users.service";
 import { LoginService } from "../application/services/login.service";
 import { RefreshTokenService } from "../application/services/refresh-token.service";
 import { RegisterService } from "../application/services/register.service";
 import { ResendOtpService } from "../application/services/resend-otp.service";
+import { ResetPasswordService } from "../application/services/reset-password.service";
 import { VerifyOtpService } from "../application/services/verify-otp.service";
 import { type Request, type Response } from "express";
 
@@ -30,6 +34,8 @@ export class AuthController {
     private readonly hasUsersService: HasUsersService,
     private readonly loginService: LoginService,
     private readonly refreshTokenService: RefreshTokenService,
+    private readonly forgotPasswordService: ForgotPasswordService,
+    private readonly resetPasswordService: ResetPasswordService,
     private readonly configService: ConfigService<EnvironmentVariables, true>,
   ) {}
 
@@ -90,6 +96,22 @@ export class AuthController {
     res.clearCookie(ACCESS_TOKEN_COOKIE);
     res.clearCookie(REFRESH_TOKEN_COOKIE);
     return { message: "Logged out." };
+  }
+
+  @Post("forgot-password")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ message: string }> {
+    await this.forgotPasswordService.execute(dto);
+    return { message: "If that email is registered, a password reset link has been sent." };
+  }
+
+  @Post("reset-password")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
+    await this.resetPasswordService.execute(dto);
+    return { message: "Password reset successfully." };
   }
 
   private setAuthCookies(res: Response, accessToken: string, refreshToken: string): void {

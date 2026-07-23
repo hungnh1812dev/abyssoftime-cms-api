@@ -1,4 +1,4 @@
-import { IEmailSender, SendOtpEmailParams } from "../../domain/ports/email-sender.port";
+import { IEmailSender, SendOtpEmailParams, SendPasswordResetEmailParams } from "../../domain/ports/email-sender.port";
 
 import { Injectable, Logger } from "@nestjs/common";
 
@@ -8,6 +8,11 @@ export class ConsoleEmailSender implements IEmailSender {
 
   sendOtpEmail({ email, otp }: SendOtpEmailParams): Promise<void> {
     this.logger.log(`OTP email to ${email}: ${otp}`);
+    return Promise.resolve();
+  }
+
+  sendPasswordResetEmail({ email, resetToken }: SendPasswordResetEmailParams): Promise<void> {
+    this.logger.log(`Password reset email to ${email}: ${resetToken}`);
     return Promise.resolve();
   }
 }

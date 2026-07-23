@@ -21,4 +21,11 @@ describe("ConsoleEmailSender", () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("user@example.com"));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("123456"));
   });
+
+  it("sendPasswordResetEmail() logs the recipient and reset token", async () => {
+    await sender.sendPasswordResetEmail({ email: "user@example.com", resetToken: "raw-reset-token" });
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("user@example.com"));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("raw-reset-token"));
+  });
 });

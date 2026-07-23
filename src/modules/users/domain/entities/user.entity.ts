@@ -12,5 +12,7 @@ export class UserEntity {
     public readonly updatedAt: Date,
     public readonly otpCodeHash: string | null = null,
     public readonly otpExpiresAt: Date | null = null,
+    public readonly resetTokenHash: string | null = null,
+    public readonly resetTokenExpiresAt: Date | null = null,
   ) {}
 }

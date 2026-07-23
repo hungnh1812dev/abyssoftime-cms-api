@@ -23,6 +23,7 @@ describe("DeleteUserService", () => {
       delete: jest.fn(),
       count: jest.fn(),
       hasAnyVerified: jest.fn(),
+      findByResetTokenHash: jest.fn(),
     };
 
     const module = await Test.createTestingModule({

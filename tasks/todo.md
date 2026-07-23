@@ -49,9 +49,9 @@ See `tasks/plan.md` for full context and rationale.
 - [ ] **Checkpoint 4:** manual login/refresh/logout cookie round trip
 
 ## Phase 5 — Forgot / Reset Password
-- [ ] `ForgotPasswordDto`/`ResetPasswordDto` + `ForgotPasswordService` + `ResetPasswordService`
-- [ ] Controller wiring + `RateLimitGuard`
-- [ ] Tests + coverage
+- [x] `ForgotPasswordDto`/`ResetPasswordDto` + `ForgotPasswordService` + `ResetPasswordService`
+- [x] Controller wiring + `RateLimitGuard`
+- [x] Tests + coverage (already covered by 5.1–5.2's tests; `ForgotPasswordService`/`ResetPasswordService` both 100% branches, `auth/application/services` group at 94%, well above the 80% gate)
 - [ ] **Checkpoint 5:** manual forgot→reset round trip via console-logged token
 
 ## Phase 6 — Permission-slug authorization rollout

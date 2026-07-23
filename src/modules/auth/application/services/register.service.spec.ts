@@ -36,8 +36,9 @@ describe("RegisterService", () => {
       delete: jest.fn(),
       count: jest.fn(),
       hasAnyVerified: jest.fn(),
+      findByResetTokenHash: jest.fn(),
     };
-    emailSender = { sendOtpEmail: jest.fn() };
+    emailSender = { sendOtpEmail: jest.fn(), sendPasswordResetEmail: jest.fn() };
 
     users.findByEmail.mockResolvedValue(null);
     users.findByUsername.mockResolvedValue(null);
