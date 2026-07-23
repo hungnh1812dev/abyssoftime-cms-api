@@ -1,6 +1,6 @@
 # Permissions Module
 
-`src/modules/permissions/**` — clean-architecture module for managing permission records (slug-based capability grants consumed by `roles`). Fully wired: registered in `AppModule`, all CRUD routes live, Prisma-backed.
+`src/modules/permissions/**` — clean-architecture module for managing permission records (slug-based capability grants consumed by `roles`). Fully wired: registered in `AppModule`, all CRUD routes live, Prisma-backed, and guarded by real JWT + permission-slug authorization (see [Endpoints](#endpoints)).
 
 ## Entity
 
@@ -53,14 +53,16 @@ All four services inject `@Inject(PERMISSSION_REPOSITORY)`.
 
 ## Endpoints
 
-`presentation/permission.controller.ts`, `@Controller("/api/permissions")`:
+`presentation/permission.controller.ts`, `@Controller("/api/permissions")`. Every route is guarded by `JwtAuthGuard` + `PermissionsGuard` (`src/common/guards/`), which validate the `access_token` httpOnly cookie and check `req.user.permissions` against each route's `@RequirePermissions` metadata (read-implies-manager):
 
-| Method   | Path                         | Service                   |
-| -------- | ---------------------------- | ------------------------- |
-| `GET`    | `/api/permissions`           | `ListPermissionService`   |
-| `POST`   | `/api/permissions`           | `CreatePermissionService` |
-| `PUT`    | `/api/permissions/:id`       | `UpdatePermissionService` |
-| `DELETE` | `/api/permissions/:id` (204) | `DeletePermissionService` |
+| Method   | Path                         | Service                   | Required permission        |
+| -------- | ---------------------------- | ------------------------- | --------------------------- |
+| `GET`    | `/api/permissions`           | `ListPermissionService`   | `permission:read`           |
+| `POST`   | `/api/permissions`           | `CreatePermissionService` | `permission:manager`        |
+| `PUT`    | `/api/permissions/:id`       | `UpdatePermissionService` | `permission:manager`        |
+| `DELETE` | `/api/permissions/:id` (204) | `DeletePermissionService` | `permission:manager`        |
+
+None of the four services take a caller parameter or perform authorization themselves — that's entirely the guards' job at the controller layer, same pattern as `roles` and `users`.
 
 ## Module wiring
 
@@ -74,8 +76,8 @@ All four services inject `@Inject(PERMISSSION_REPOSITORY)`.
 
 ## Tests
 
-Unit tests (Jest, mocked repository, ≥80% branch coverage) live next to each source file: `create-permission.service.spec.ts`, `update-permission.service.spec.ts`, `delete-permission.service.spec.ts`, `list-permission.service.spec.ts`, `permission.controller.spec.ts`, `prisma-permission.repository.spec.ts`.
+Unit tests (Jest, mocked repository, ≥80% branch coverage) live next to each source file: `create-permission.service.spec.ts`, `update-permission.service.spec.ts`, `delete-permission.service.spec.ts`, `list-permission.service.spec.ts`, `permission.controller.spec.ts` (provides a mocked `JwtTokenService` so the testing module can instantiate `JwtAuthGuard`, referenced via `@UseGuards`), `prisma-permission.repository.spec.ts`.
 
 ## Verified state (2026-07-23)
 
-`bun run build`, `bunx tsc --noEmit`, `bunx eslint`, and `bun run test` all pass with zero errors for this module.
+`bun run build`, `bunx tsc --noEmit`, `bunx eslint`, and `bun run test:cov` all pass with zero errors for this module.

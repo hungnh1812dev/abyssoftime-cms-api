@@ -63,7 +63,7 @@ See `tasks/plan.md` for full context and rationale.
 
 ## Phase 7 — Docs closeout
 - [x] Update `docs/documents/{roles,permissions,users}.md`
-- [ ] Add `docs/documents/auth.md`
-- [ ] Update `docs/ENTRYPOINT.md`
-- [ ] Fold `SPEC.md` into docs, reset `SPEC.md` for next cycle
+- [x] Add `docs/documents/auth.md`
+- [x] Update `docs/ENTRYPOINT.md`
+- [x] Fold `SPEC.md` into docs, reset `SPEC.md` for next cycle
 - [ ] **Checkpoint 7 (final):** all `SPEC.md` success criteria verified true
