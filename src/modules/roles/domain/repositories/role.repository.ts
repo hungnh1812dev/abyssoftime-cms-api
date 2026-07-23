@@ -6,7 +6,7 @@ export interface CreateRoleData {
   permissions: string[];
   level: number;
   isDefault: boolean;
-  updatedBy: string;
+  updatedBy: string | null;
 }
 
 export interface UpdateRoleData {

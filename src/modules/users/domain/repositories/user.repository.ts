@@ -7,7 +7,7 @@ export interface CreateUserData {
   password: string;
   accountType: boolean;
   verified: boolean;
-  roleId: string;
+  roleId: string | null;
 }
 
 export interface UpdateUserData {
@@ -17,7 +17,7 @@ export interface UpdateUserData {
   password?: string;
   accountType?: boolean;
   verified?: boolean;
-  roleId?: string;
+  roleId?: string | null;
 }
 
 export interface IUserRepository {

@@ -6,6 +6,6 @@ export class PermissionEntity {
     public readonly description: string | undefined,
     public readonly createdAt: Date,
     public readonly updatedAt: Date,
-    public readonly updatedBy: string,
+    public readonly updatedBy: string | null,
   ) {}
 }

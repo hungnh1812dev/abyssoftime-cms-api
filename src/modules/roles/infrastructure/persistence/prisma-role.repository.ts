@@ -79,7 +79,7 @@ export class PrismaRoleRepository implements IRoleRepository {
     isDefault: boolean;
     createdAt: Date;
     updatedAt: Date;
-    updatedBy: string;
+    updatedBy: string | null;
   }): RoleEntity {
     return new RoleEntity(role.documentId, role.name, role.slug, role.permissions as string[], role.level, role.isDefault, role.createdAt, role.updatedAt, role.updatedBy);
   }

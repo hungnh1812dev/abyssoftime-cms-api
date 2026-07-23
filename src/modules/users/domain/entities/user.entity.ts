@@ -7,7 +7,7 @@ export class UserEntity {
     public readonly password: string,
     public readonly accountType: boolean,
     public readonly verified: boolean,
-    public readonly roleId: string,
+    public readonly roleId: string | null,
     public readonly createdAt: Date,
     public readonly updatedAt: Date,
   ) {}

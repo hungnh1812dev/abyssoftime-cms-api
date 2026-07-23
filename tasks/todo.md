@@ -1,53 +1,69 @@
-# Todo — User Module Fix + Roles/Permissions/Users Unit Tests
+# Todo — Default Seeding + Auth + Permission-Slug Authorization
 
 See `tasks/plan.md` for full context and rationale.
 
-## Phase 0 — Schema (blocks everything)
-- [x] Add `updatedAt DateTime @updatedAt @map("updated_at")` to `User` model in `prisma/postgresql/schema.prisma`
-- [x] Run `bun run prisma:generate`
-- [x] Verify: `grep -A 20 "model User" src/prisma/application/client/schema.prisma` shows `username`, `accountType`, `verified`, `updatedAt`
+## Phase 0 — Foundation
+- [x] Add deps: `@nestjs/jwt`, `cookie-parser`, `@types/cookie-parser`
+- [x] `src/main.ts` — global `ValidationPipe` + `cookieParser()` middleware
+- [x] Schema: `Role.updatedBy`/`Permission.updatedBy` → nullable, `User.roleId` → nullable, add `otpCodeHash`/`otpExpiresAt`/`resetTokenHash`/`resetTokenExpiresAt` to `User` (`prisma/postgresql/schema.prisma` only)
+- [x] Update `PermissionEntity`/`RoleEntity`/`UserEntity` + repository interfaces + Prisma repo `toEntity()` mappers for the nullable-field widening
+- [x] `bun run prisma:generate`
+- [x] Ask before `bun run prisma:migrate` against local dev DB (user will run it manually — no `datasource.url` wired for the Prisma CLI yet)
+- [x] **Checkpoint 0:** `bun run build`/`lint`/`test:cov` clean, zero regressions
 
-## Phase 1 — Fix `users` module
-- [x] `user.entity.ts` — 10-field entity (drop `updatedBy`, `accountType: boolean`)
-- [x] `user.repository.ts` — fix `CreateUserData`/`UpdateUserData` interfaces
-- [x] `prisma-user.repository.ts` — fix `toEntity()` (10 fields, correct order), implement `findByEmail` (`findUnique`), `findByUsername` (`findFirst`), `count`
-- [x] `create-user.dto.ts` / `update-user.dto.ts` — full field set with correct validators
-- [x] `create-user.service.ts` — email conflict + username conflict checks, `verified` defaults to `false`
-- [x] `update-user.service.ts` — not-found check, email/username re-uniqueness checks only when changed
-- [x] `delete-user.service.ts` — confirm unchanged (not-found + delete)
-- [x] `list-user.service.ts` — confirm unchanged (passthrough)
-- [x] `user.controller.ts` — confirm compiles against new DTOs/entity (likely no change)
-- [x] `app.module.ts` — import `UserModule` alongside `PermissionModule`
-- [x] **Checkpoint:** `bun run build` — zero TypeScript errors
+## Phase 1 — Boot-time default data seeding
+- [ ] `src/bootstrap/seed-default-data.service.ts` — upsert-if-missing 6 permissions + 4 roles
+- [ ] `src/bootstrap/seed.module.ts` — imports `PermissionModule`+`RoleModule`
+- [ ] Wire `SeedModule` into `AppModule`
+- [ ] `seed-default-data.service.spec.ts` (nothing/partial/full-exists branches)
+- [ ] `package.json` — `coverageThreshold` entry for `src/bootstrap/**`
+- [ ] **Checkpoint 1:** tests/build/lint clean; manual boot shows 6 permissions + 4 roles
 
-## Phase 2 — Tests: `users`
-- [x] `create-user.service.spec.ts` (happy path, email conflict, username conflict, verified-default)
-- [x] `update-user.service.spec.ts` (not-found, email taken/free/unchanged, username taken/free/unchanged, happy path)
-- [x] `delete-user.service.spec.ts` (not-found, happy path)
-- [x] `list-user.service.spec.ts` (passthrough)
-- [x] `user.controller.spec.ts` (one test per route)
-- [x] `prisma-user.repository.spec.ts` (one test per method, mocked `PrismaService`)
+## Phase 2 — Shared auth primitives (`src/common/`)
+- [ ] `src/common/types/authenticated-request.ts`, `jwt-payload.ts`
+- [ ] `src/common/token/jwt-token.service.ts` + `token.module.ts` (`@Global()`)
+- [ ] `src/common/decorators/require-permissions.decorator.ts`
+- [ ] `src/common/guards/permissions.guard.ts` (read-implies-manager)
+- [ ] `src/common/guards/jwt-auth.guard.ts`
+- [ ] `src/common/guards/rate-limit.guard.ts` (token bucket, `RATE_LIMIT_FPS`/`RATE_LIMIT_BURST`)
+- [ ] Tests for all of the above + `coverageThreshold` entry for `src/common/**`
+- [ ] **Checkpoint 2:** tests/build/lint clean (nothing wired into controllers yet)
 
-## Phase 3 — Tests: `permissions`
-- [x] `create-permission.service.spec.ts` (conflict, happy path)
-- [x] `update-permission.service.spec.ts` (not-found, happy path)
-- [x] `delete-permission.service.spec.ts` (not-found, roleCount>0, accessTokenCount truthy, happy path)
-- [x] `list-permission.service.spec.ts` (passthrough)
-- [x] `permission.controller.spec.ts` (one test per route)
-- [x] `prisma-permission.repository.spec.ts` (one test per method incl. `countReferences`)
-- [x] **Checkpoint:** `bun run test:cov` — sanity-check `permissions` coverage before starting `roles`
+## Phase 3 — Register + Verify-OTP + has-users
+- [ ] `src/modules/auth/domain/ports/email-sender.port.ts` (`IEmailSender`)
+- [ ] `src/modules/auth/infrastructure/email/console-email.sender.ts`
+- [ ] `IUserRepository.hasAnyVerified()` + Prisma impl + spec
+- [ ] `RegisterDto` + `RegisterService` (roleId: null, verified: false, hash+send OTP)
+- [ ] `HasUsersService`
+- [ ] `VerifyOtpDto`/`ResendOtpDto` + `VerifyOtpService` (assign role, verified: true) + `ResendOtpService`
+- [ ] `auth.controller.ts` (register/verify-otp/resend-otp/has-users, public, rate-limited) + `auth.module.ts`
+- [ ] Wire `AuthModule` into `AppModule`
+- [ ] Tests + `coverageThreshold` entry for `src/modules/auth/application/**`
+- [ ] **Checkpoint 3:** manual register → verify-otp → first user gets `super_admin`, subsequent get `guest`
 
-## Phase 4 — Tests: `roles` (no source changes)
-- [x] `create-role.service.spec.ts` (forbidden×2, empty-permissions skip, unknown-slug, valid, RoleAlreadyExistsError→Conflict, other-error rethrow, happy path)
-- [x] `update-role.service.spec.ts` (forbidden×3 variants, not-found, default-role guard, permissions-provided vs undefined, RoleNotFoundError→NotFound, other-error rethrow, happy path)
-- [x] `delete-role.service.spec.ts` (forbidden×2, not-found, default-role guard, assigned-count conflict, RoleNotFoundError→NotFound, other-error rethrow, happy path)
-- [x] `list-roles.service.spec.ts` (passthrough)
-- [x] `role.controller.spec.ts` (only `list()` — no create/update/delete routes exist)
+## Phase 4 — Login + Refresh + Logout
+- [ ] `LoginDto` + `LoginService` (verified check with distinct 403 message, issue tokens)
+- [ ] `RefreshTokenService` (re-fetch fresh role from DB, rotate refresh token)
+- [ ] Controller wiring: login/refresh/logout routes, cookie set/clear, `RateLimitGuard` on login
+- [ ] Tests + coverage
+- [ ] **Checkpoint 4:** manual login/refresh/logout cookie round trip
 
-## Phase 5 — Coverage gate + final verification
-- [x] Add scoped `coverageThreshold` (branches ≥80%) to `jest` block in `package.json` for `users`/`roles`/`permissions` (scoped to `application`/`domain`/`infrastructure` — `presentation` excluded, see note below)
-- [x] `bun run build` — zero errors
-- [x] `bun run test:cov` — all green, branch coverage ≥80% for `application`/`domain`/`infrastructure` in all three modules
-- [x] `bun run lint` — zero new errors (added a spec-file-scoped override for `@typescript-eslint/unbound-method`, a known false-positive on `expect(mock.method).toHaveBeenCalled...()`)
+## Phase 5 — Forgot / Reset Password
+- [ ] `ForgotPasswordDto`/`ResetPasswordDto` + `ForgotPasswordService` + `ResetPasswordService`
+- [ ] Controller wiring + `RateLimitGuard`
+- [ ] Tests + coverage
+- [ ] **Checkpoint 5:** manual forgot→reset round trip via console-logged token
 
-**Note:** Controllers (`presentation/*.controller.ts`) are excluded from the branch threshold. All three sit at a hard 75% ceiling from TypeScript's `__decorate`/`__param` helper emitting an unreachable `typeof Reflect.metadata === "function"` branch on every parameter-decorated method — not a test gap (confirmed via HTML coverage report: every real branch in every controller is covered). Decision made with the user during Phase 5.
+## Phase 6 — Permission-slug authorization rollout
+- [ ] `roles`: strip level checks from create/update/delete services; add guards to `role.controller.ts`; swap in shared `AuthenticatedRequest`
+- [ ] `permissions`: add guards to `permission.controller.ts`
+- [ ] `users`: add guards to `user.controller.ts`; level-hierarchy check + super-admin-promotion rule in `update-user.service.ts`/`delete-user.service.ts` (inject `ROLE_REPOSITORY`)
+- [ ] Update all affected `*.spec.ts` (role services lose level-check cases; user services gain hierarchy/promotion cases)
+- [ ] **Checkpoint 6 (highest-risk):** full regression (`test:cov`/`build`/`lint`) + full manual end-to-end flow
+
+## Phase 7 — Docs closeout
+- [ ] Update `docs/documents/{roles,permissions,users}.md`
+- [ ] Add `docs/documents/auth.md`
+- [ ] Update `docs/ENTRYPOINT.md`
+- [ ] Fold `SPEC.md` into docs, reset `SPEC.md` for next cycle
+- [ ] **Checkpoint 7 (final):** all `SPEC.md` success criteria verified true

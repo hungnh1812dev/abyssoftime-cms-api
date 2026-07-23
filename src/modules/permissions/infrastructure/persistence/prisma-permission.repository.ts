@@ -50,7 +50,15 @@ export class PrismaPermissionRepository implements IPermissionRepository {
     return { roleCount, accessTokenCount: 0 };
   }
 
-  private toEntity(permission: { documentId: string; slug: string; name: string; description: string; createdAt: Date; updatedAt: Date; updatedBy: string }): PermissionEntity {
+  private toEntity(permission: {
+    documentId: string;
+    slug: string;
+    name: string;
+    description: string;
+    createdAt: Date;
+    updatedAt: Date;
+    updatedBy: string | null;
+  }): PermissionEntity {
     return new PermissionEntity(permission.documentId, permission.slug, permission.name, permission.description, permission.createdAt, permission.updatedAt, permission.updatedBy);
   }
 }

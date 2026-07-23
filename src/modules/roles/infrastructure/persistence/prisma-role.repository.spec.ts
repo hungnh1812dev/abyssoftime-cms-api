@@ -54,7 +54,7 @@ describe("PrismaRoleRepository", () => {
     isDefault: boolean;
     createdAt: Date;
     updatedAt: Date;
-    updatedBy: string;
+    updatedBy: string | null;
   }) => {
     expect(entity).toEqual({
       documentId: record.documentId,
@@ -131,6 +131,33 @@ describe("PrismaRoleRepository", () => {
       data: { name: "Content Manager", slug: "content-manager", permissions: ["document:read", "document:write"], level: 10, isDefault: false, updatedBy: "user-1" },
     });
     expectMappedEntity(result);
+  });
+
+  it("findAll() maps a record with updatedBy: null through to the entity", async () => {
+    const orphaned = { ...record, updatedBy: null };
+    prisma.role.findMany.mockResolvedValue([orphaned]);
+
+    const result = await repository.findAll();
+
+    expect(result[0].updatedBy).toBeNull();
+  });
+
+  it("create() accepts updatedBy: null and passes it through to prisma", async () => {
+    prisma.role.create.mockResolvedValue({ ...record, updatedBy: null });
+
+    const result = await repository.create({
+      name: "Content Manager",
+      slug: "content-manager",
+      permissions: ["document:read", "document:write"],
+      level: 10,
+      isDefault: false,
+      updatedBy: null,
+    });
+
+    expect(prisma.role.create).toHaveBeenCalledWith({
+      data: { name: "Content Manager", slug: "content-manager", permissions: ["document:read", "document:write"], level: 10, isDefault: false, updatedBy: null },
+    });
+    expect(result.updatedBy).toBeNull();
   });
 
   it("create() translates a P2002 unique-constraint error into RoleAlreadyExistsError", async () => {

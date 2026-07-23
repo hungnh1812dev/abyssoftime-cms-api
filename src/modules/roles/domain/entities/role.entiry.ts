@@ -8,6 +8,6 @@ export class RoleEntity {
     public readonly isDefault: boolean,
     public readonly createdAt: Date,
     public readonly updatedAt: Date,
-    public readonly updatedBy: string,
+    public readonly updatedBy: string | null,
   ) {}
 }

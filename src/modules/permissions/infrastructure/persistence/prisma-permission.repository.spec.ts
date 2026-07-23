@@ -44,7 +44,15 @@ describe("PrismaPermissionRepository", () => {
     repository = new PrismaPermissionRepository(prisma as unknown as PrismaService);
   });
 
-  const expectMappedEntity = (entity: { documentId: string; slug: string; name: string; description: string | undefined; createdAt: Date; updatedAt: Date; updatedBy: string }) => {
+  const expectMappedEntity = (entity: {
+    documentId: string;
+    slug: string;
+    name: string;
+    description: string | undefined;
+    createdAt: Date;
+    updatedAt: Date;
+    updatedBy: string | null;
+  }) => {
     expect(entity).toEqual({
       documentId: record.documentId,
       slug: record.slug,
@@ -122,6 +130,26 @@ describe("PrismaPermissionRepository", () => {
     await repository.delete("permission-1");
 
     expect(prisma.permission.delete).toHaveBeenCalledWith({ where: { documentId: "permission-1" } });
+  });
+
+  it("findAll() maps a record with updatedBy: null through to the entity", async () => {
+    const orphaned = { ...record, updatedBy: null };
+    prisma.permission.findMany.mockResolvedValue([orphaned]);
+
+    const result = await repository.findAll();
+
+    expect(result[0].updatedBy).toBeNull();
+  });
+
+  it("create() accepts updatedBy: null and passes it through to prisma", async () => {
+    prisma.permission.create.mockResolvedValue({ ...record, updatedBy: null });
+
+    const result = await repository.create({ slug: "document:read", name: "Read document", description: "Allows reading a document", updatedBy: null });
+
+    expect(prisma.permission.create).toHaveBeenCalledWith({
+      data: { slug: "document:read", name: "Read document", description: "Allows reading a document", updatedBy: null },
+    });
+    expect(result.updatedBy).toBeNull();
   });
 
   it("countReferences() returns the role reference count and a zero access token count", async () => {

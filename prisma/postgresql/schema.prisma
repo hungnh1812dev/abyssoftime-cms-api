@@ -17,8 +17,8 @@ model Permission {
     updatedAt   DateTime    @updatedAt @map("updated_at")
 
     // Who updated this Permission
-    user        User        @relation("PermissionUpdatedBy", fields: [updatedBy], references: [documentId])
-    updatedBy   String      @map("updated_by")
+    user        User?       @relation("PermissionUpdatedBy", fields: [updatedBy], references: [documentId])
+    updatedBy   String?     @map("updated_by")
 
     @@map("permissions")
 }
@@ -35,8 +35,8 @@ model Role {
     updatedAt   DateTime    @updatedAt @map("updated_at")
 
     // Who updated this Role
-    user        User        @relation("RoleUpdatedBy", fields: [updatedBy], references: [documentId])
-    updatedBy   String      @map("updated_by")
+    user        User?       @relation("RoleUpdatedBy", fields: [updatedBy], references: [documentId])
+    updatedBy   String?     @map("updated_by")
 
     users       User[]      @relation("UserRole")
 
@@ -52,10 +52,15 @@ model User {
     password    String      @map("password_hash")
     accountType Boolean     @map("account_type")
     verified    Boolean
-    role        Role        @relation("UserRole", fields: [roleId], references: [documentId])
-    roleId      String      @map("role_id")
+    role        Role?       @relation("UserRole", fields: [roleId], references: [documentId])
+    roleId      String?     @map("role_id")
     createdAt   DateTime    @default(now()) @map("created_at")
     updatedAt   DateTime    @updatedAt @map("updated_at")
+
+    otpCodeHash          String?   @map("otp_code_hash")
+    otpExpiresAt         DateTime? @map("otp_expires_at")
+    resetTokenHash       String?   @map("reset_token_hash")
+    resetTokenExpiresAt  DateTime? @map("reset_token_expires_at")
 
     updatedRoles       Role[]       @relation("RoleUpdatedBy") @ignore
     updatedPermissions Permission[] @relation("PermissionUpdatedBy") @ignore

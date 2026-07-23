@@ -53,7 +53,7 @@ describe("PrismaUserRepository", () => {
     password: string;
     accountType: boolean;
     verified: boolean;
-    roleId: string;
+    roleId: string | null;
     createdAt: Date;
     updatedAt: Date;
   }) => {
@@ -131,6 +131,42 @@ describe("PrismaUserRepository", () => {
     const result = await repository.findByUsername("missing");
 
     expect(result).toBeNull();
+  });
+
+  it("findAll() maps a record with roleId: null through to the entity", async () => {
+    const unassigned = { ...record, roleId: null };
+    prisma.user.findMany.mockResolvedValue([unassigned]);
+
+    const result = await repository.findAll();
+
+    expect(result[0].roleId).toBeNull();
+  });
+
+  it("create() accepts roleId: null and passes it through to prisma", async () => {
+    prisma.user.create.mockResolvedValue({ ...record, roleId: null });
+
+    const result = await repository.create({
+      email: "jane@example.com",
+      name: "Jane Doe",
+      username: "janedoe",
+      password: "secret",
+      accountType: true,
+      verified: false,
+      roleId: null,
+    });
+
+    expect(prisma.user.create).toHaveBeenCalledWith({
+      data: {
+        email: "jane@example.com",
+        name: "Jane Doe",
+        username: "janedoe",
+        password: "secret",
+        accountType: true,
+        verified: false,
+        roleId: null,
+      },
+    });
+    expect(result.roleId).toBeNull();
   });
 
   it("create() passes all fields through to prisma and maps the result", async () => {

@@ -77,7 +77,7 @@ export class PrismaUserRepository implements IUserRepository {
     password: string;
     accountType: boolean;
     verified: boolean;
-    roleId: string;
+    roleId: string | null;
     createdAt: Date;
     updatedAt: Date;
   }): UserEntity {

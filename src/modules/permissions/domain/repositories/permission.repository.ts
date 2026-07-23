@@ -4,13 +4,13 @@ export interface CreatePermissionData {
   slug: string;
   name: string;
   description: string;
-  updatedBy: string;
+  updatedBy: string | null;
 }
 
 export interface UpdatePermissionData {
   name?: string;
   description?: string;
-  updatedBy: string;
+  updatedBy: string | null;
 }
 
 export interface PermissionReferenceCount {
