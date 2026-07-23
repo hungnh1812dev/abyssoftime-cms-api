@@ -21,7 +21,7 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint:** `bun run build` — zero TypeScript errors
 
 ## Phase 2 — Tests: `users`
-- [ ] `create-user.service.spec.ts` (happy path, email conflict, username conflict, verified-default)
+- [x] `create-user.service.spec.ts` (happy path, email conflict, username conflict, verified-default)
 - [ ] `update-user.service.spec.ts` (not-found, email taken/free/unchanged, username taken/free/unchanged, happy path)
 - [ ] `delete-user.service.spec.ts` (not-found, happy path)
 - [ ] `list-user.service.spec.ts` (passthrough)
