@@ -76,7 +76,9 @@ All four services inject `@Inject(USER_REPOSITORY)`; `UpdateUserService`/`Delete
 
 ## Endpoints
 
-`presentation/user.controller.ts`, `@Controller("/api/users")`. Every route is guarded by `JwtAuthGuard` + `PermissionsGuard`; `update`/`delete` additionally take `@Req() req: AuthenticatedRequest` and pass `req.user` straight through as the `caller` argument (no extra DB lookup — the JWT payload already carries the caller's own `level`/`roleSlug`):
+`presentation/user.controller.ts`, `@Controller("/api/users")`. Every route is guarded by `JwtAuthGuard` + `PermissionsGuard`; `update`/`delete` additionally take `@Req() req: AuthenticatedRequest` and pass `req.user` straight through as the `caller` argument (no extra DB lookup — the JWT payload already carries the caller's own `level`/`roleSlug`).
+
+`list`/`create`/`update` map their `UserEntity` result through `presentation/user-response.dto.ts` (`UserResponseDto.fromEntity`) before returning it — a manual E2E pass caught this controller returning the raw entity, which leaked `password` (the bcrypt hash), `otpCodeHash`, `otpExpiresAt`, `resetTokenHash`, and `resetTokenExpiresAt` directly in API responses, violating the "never return password/OTP/reset-token hashes" rule that the `auth` module's own routes already honored correctly. `UserResponseDto` only carries `documentId`/`email`/`name`/`username`/`accountType`/`verified`/`roleId`/`createdAt`/`updatedAt`.
 
 | Method   | Path                   | Service             | Required permission |
 | -------- | ---------------------- | -------------------- | --------------------- |
@@ -100,7 +102,7 @@ Holding `user:manager` is necessary but not sufficient for `update`/`delete` —
 
 ## Tests
 
-Unit tests (Jest, mocked `IUserRepository`/`IRoleRepository`, ≥80% branch coverage) live next to each source file: `create-user.service.spec.ts`, `update-user.service.spec.ts` (now covers the hierarchy check, the new-role check, and the super-admin-promotion carve-out), `delete-user.service.spec.ts` (hierarchy check), `list-user.service.spec.ts`, `user.controller.spec.ts` (provides a mocked `JwtTokenService` for `JwtAuthGuard` instantiation, and asserts `req.user` is forwarded as the `caller` arg), `prisma-user.repository.spec.ts` (covers `findByUsername`/`findByResetTokenHash` → `findFirst` no-unique-constraint behavior, and the OTP/reset-token field pass-through).
+Unit tests (Jest, mocked `IUserRepository`/`IRoleRepository`, ≥80% branch coverage) live next to each source file: `create-user.service.spec.ts`, `update-user.service.spec.ts` (now covers the hierarchy check, the new-role check, and the super-admin-promotion carve-out), `delete-user.service.spec.ts` (hierarchy check), `list-user.service.spec.ts`, `user.controller.spec.ts` (provides a mocked `JwtTokenService` for `JwtAuthGuard` instantiation, asserts `req.user` is forwarded as the `caller` arg, and asserts every response is the mapped `UserResponseDto` shape with no `password` property), `user-response.dto.spec.ts` (asserts `fromEntity` strips all five sensitive fields), `prisma-user.repository.spec.ts` (covers `findByUsername`/`findByResetTokenHash` → `findFirst` no-unique-constraint behavior, and the OTP/reset-token field pass-through).
 
 ## Verified state (2026-07-23)
 

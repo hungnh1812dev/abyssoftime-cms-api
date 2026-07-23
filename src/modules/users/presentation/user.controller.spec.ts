@@ -11,6 +11,7 @@ import { Test } from "@nestjs/testing";
 import { JwtTokenService } from "@/common/token/jwt-token.service";
 import { type AuthenticatedRequest } from "@/common/types/authenticated-request";
 
+import { UserResponseDto } from "./user-response.dto";
 import { UserController } from "./user.controller";
 
 describe("UserController", () => {
@@ -42,33 +43,36 @@ describe("UserController", () => {
     deleteUser = module.get(DeleteUserService);
   });
 
-  it("list() delegates to ListUserService", async () => {
+  it("list() delegates to ListUserService and strips sensitive fields from the response", async () => {
     listUsers.execute.mockResolvedValue([user]);
 
     const result = await controller.list();
 
     expect(listUsers.execute).toHaveBeenCalled();
-    expect(result).toEqual([user]);
+    expect(result).toEqual([UserResponseDto.fromEntity(user)]);
+    expect(result[0]).not.toHaveProperty("password");
   });
 
-  it("create() delegates to CreateUserService", async () => {
+  it("create() delegates to CreateUserService and strips sensitive fields from the response", async () => {
     const dto: CreateUserDto = { email: "jane@example.com", name: "Jane Doe", username: "janedoe", password: "secret", accountType: true, roleId: "role-1" };
     createUser.execute.mockResolvedValue(user);
 
     const result = await controller.create(dto);
 
     expect(createUser.execute).toHaveBeenCalledWith(dto);
-    expect(result).toBe(user);
+    expect(result).toEqual(UserResponseDto.fromEntity(user));
+    expect(result).not.toHaveProperty("password");
   });
 
-  it("update() delegates to UpdateUserService with the caller from req.user", async () => {
+  it("update() delegates to UpdateUserService with the caller from req.user and strips sensitive fields from the response", async () => {
     const dto: UpdateUserDto = { name: "Jane Doe 2" };
     updateUser.execute.mockResolvedValue(user);
 
     const result = await controller.update("user-1", dto, req);
 
     expect(updateUser.execute).toHaveBeenCalledWith("user-1", dto, req.user);
-    expect(result).toBe(user);
+    expect(result).toEqual(UserResponseDto.fromEntity(user));
+    expect(result).not.toHaveProperty("password");
   });
 
   it("delete() delegates to DeleteUserService with the caller from req.user", async () => {
