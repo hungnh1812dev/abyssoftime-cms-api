@@ -31,6 +31,7 @@ For any new feature/page/module:
 ## Commit rules
 
 - Always ask the user before committing — never run `git commit` without explicit confirmation for that commit. Confirmation means showing the exact staged file list and the full commit message and getting a yes on that — agreeing to a commit *strategy* (e.g. how many commits, how they're grouped) is not the same as confirming the commit itself.
+- Ask that confirmation as an actual Yes/No question (e.g. via the question-asking tool), not a free-text prompt — the user should be able to select an option instead of having to type "yes"/"y"/etc.
 - Always remove `Co-Authored-By` from commit messages.
 - Reference the `/git-commit` skill for commit message format.
 - During `/build`, don't commit after every single spec/task file — batch commits at feature/checkpoint boundaries (e.g. a "Checkpoint" line in `tasks/plan.md`/`tasks/todo.md`, or a full Phase) instead. Still verify (tests, build) after each task; only the commit frequency is batched.
