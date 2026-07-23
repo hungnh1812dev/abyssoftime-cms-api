@@ -37,6 +37,11 @@ For any new feature/page/module:
 - During `/build`, don't commit after every single spec/task file — batch commits at feature/checkpoint boundaries (e.g. a "Checkpoint" line in `tasks/plan.md`/`tasks/todo.md`, or a full Phase) instead. Still verify (tests, build) after each task; only the commit frequency is batched.
 - Checkpoint commit timing: if a checkpoint is automatically verifiable (e.g. `test:cov`/`build`/`lint` passing), commit once that checkpoint's automated checks pass. If a checkpoint requires manual verification (e.g. a live app/DB walkthrough) that can't be done headlessly, commit as soon as the last task *before* that checkpoint is complete — don't hold the commit open waiting on manual verification that may not happen for a while.
 
+## Test coverage
+
+- `coverageThreshold` in `package.json` is a per-path whitelist: add an entry (`"branches": 80`) only when a file/folder gets a dedicated spec suite — don't switch to a `global` threshold + exclude-list model (Jest's `coverageThreshold` keys are inclusion globs only; there's no negation syntax).
+- Do not add `coverageThreshold` entries for Prisma service/repository files or controller (`presentation/*.controller.ts`) files, even once they have spec files with high branch coverage.
+
 ## Formatting
 
 - All changed `.js`, `.ts`, `.tsx` files must be run through Prettier before testing or committing.
