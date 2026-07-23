@@ -106,6 +106,9 @@
       "src/modules/roles/domain/**/*.ts": {
         "branches": 80
       },
+      "src/modules/roles/infrastructure/persistence/prisma-role.repository.ts": {
+        "branches": 80
+      },
       "src/modules/permissions/application/**/*.ts": {
         "branches": 80
       },

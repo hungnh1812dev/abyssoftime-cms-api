@@ -44,7 +44,7 @@ describe("PrismaPermissionRepository", () => {
     repository = new PrismaPermissionRepository(prisma as unknown as PrismaService);
   });
 
-  const expectMappedEntity = (entity: { documentId: string; slug: string; name: string; description: string; createdAt: Date; updatedAt: Date; updatedBy: string }) => {
+  const expectMappedEntity = (entity: { documentId: string; slug: string; name: string; description: string | undefined; createdAt: Date; updatedAt: Date; updatedBy: string }) => {
     expect(entity).toEqual({
       documentId: record.documentId,
       slug: record.slug,

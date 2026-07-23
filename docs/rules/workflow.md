@@ -15,7 +15,7 @@ For any new feature/page/module:
 ## Module rules
 
 - Build each feature as its own module (same convention as `src/modules/*`).
-- A module file must be **max 1000 lines**. If it grows past that, break it into smaller files.
+- A module file must be **max 500 lines**. If it grows past that, break it into smaller files.
 - Each module must be independent of other modules (no tight coupling between module internals).
 
 ## Root docs
@@ -24,6 +24,7 @@ For any new feature/page/module:
 
 ## Commit rules
 
+- Always ask the user before committing — never run `git commit` without explicit confirmation for that commit.
 - Always remove `Co-Authored-By` from commit messages.
 - Reference the `/git-commit` skill for commit message format.
 - During `/build`, don't commit after every single spec/task file — batch commits at feature/checkpoint boundaries (e.g. a "Checkpoint" line in `tasks/plan.md`/`tasks/todo.md`, or a full Phase) instead. Still verify (tests, build) after each task; only the commit frequency is batched.
