@@ -25,7 +25,7 @@ See `tasks/plan.md` for full context and rationale.
 - [x] `update-user.service.spec.ts` (not-found, email taken/free/unchanged, username taken/free/unchanged, happy path)
 - [x] `delete-user.service.spec.ts` (not-found, happy path)
 - [x] `list-user.service.spec.ts` (passthrough)
-- [ ] `user.controller.spec.ts` (one test per route)
+- [x] `user.controller.spec.ts` (one test per route)
 - [ ] `prisma-user.repository.spec.ts` (one test per method, mocked `PrismaService`)
 
 ## Phase 3 — Tests: `permissions`
