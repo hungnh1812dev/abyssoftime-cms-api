@@ -123,6 +123,12 @@
       },
       "src/bootstrap/**/*.ts": {
         "branches": 80
+      },
+      "src/common/decorators/**/*.ts": {
+        "branches": 80
+      },
+      "src/common/guards/**/*.ts": {
+        "branches": 80
       }
     }
   }

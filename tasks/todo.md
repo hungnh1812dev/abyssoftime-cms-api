@@ -20,14 +20,14 @@ See `tasks/plan.md` for full context and rationale.
 - [ ] **Checkpoint 1:** tests/build/lint clean; manual boot shows 6 permissions + 4 roles (blocked on user's local env — see note below)
 
 ## Phase 2 — Shared auth primitives (`src/common/`)
-- [ ] `src/common/types/authenticated-request.ts`, `jwt-payload.ts`
-- [ ] `src/common/token/jwt-token.service.ts` + `token.module.ts` (`@Global()`)
-- [ ] `src/common/decorators/require-permissions.decorator.ts`
-- [ ] `src/common/guards/permissions.guard.ts` (read-implies-manager)
-- [ ] `src/common/guards/jwt-auth.guard.ts`
-- [ ] `src/common/guards/rate-limit.guard.ts` (token bucket, `RATE_LIMIT_FPS`/`RATE_LIMIT_BURST`)
-- [ ] Tests for all of the above + `coverageThreshold` entry for `src/common/**`
-- [ ] **Checkpoint 2:** tests/build/lint clean (nothing wired into controllers yet)
+- [x] `src/common/types/authenticated-request.ts`, `jwt-payload.ts`
+- [x] `src/common/token/jwt-token.service.ts` + `token.module.ts` (`@Global()`, wired into `AppModule`)
+- [x] `src/common/decorators/require-permissions.decorator.ts`
+- [x] `src/common/guards/permissions.guard.ts` (read-implies-manager)
+- [x] `src/common/guards/jwt-auth.guard.ts`
+- [x] `src/common/guards/rate-limit.guard.ts` (token bucket, `RATE_LIMIT_FPS`/`RATE_LIMIT_BURST`)
+- [x] Tests for all of the above + `coverageThreshold` entry for `src/common/decorators/**` and `src/common/guards/**` (`src/common/token/jwt-token.service.ts` left ungated — same untestable ts-jest decorator-metadata branch quirk as the pre-existing `prisma.service.ts`)
+- [x] **Checkpoint 2:** tests/build/lint clean (nothing wired into controllers yet)
 
 ## Phase 3 — Register + Verify-OTP + has-users
 - [ ] `src/modules/auth/domain/ports/email-sender.port.ts` (`IEmailSender`)
