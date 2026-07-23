@@ -10,14 +10,14 @@ See `SPEC.md` for the full approved spec. This plan implements it.
 
 1. **`mysql`/`sqlite` schema files have zero models today** (just `generator`/`datasource` stubs) — `Permission`/`Role`/`User` only exist in `prisma/postgresql/schema.prisma`. The existing `permissions`/`roles`/`users` modules were never backfilled into mysql/sqlite either. **Plan deviates from SPEC.md's "all three files" wording: schema changes land in `prisma/postgresql/schema.prisma` only**, matching how every prior module was actually built.
 2. **No global `ValidationPipe` exists anywhere** (`src/main.ts` is 5 lines: `NestFactory.create` + `listen`). Every DTO's `class-validator` decorators are currently inert. This plan adds `app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))` as a small prerequisite step — a behavior change to every existing endpoint (previously-permissive requests will start getting rejected), low risk since nothing in the repo currently depends on that leniency.
-3. **Bun has a built-in `Bun.password` API** (bcrypt by default, no native dependency) — since this project runs on Bun and already committed to bcrypt as the hashing algorithm, **the plan uses `Bun.password.hash()`/`Bun.password.verify()` instead of adding the `bcrypt` npm package**. This replaces the previously-approved "add `bcrypt`" line item. `@nestjs/jwt` and `cookie-parser` (+`@types/cookie-parser`) are still needed as new dependencies.
+3. **`Bun.password` is unusable in this project's test suite.** `bun run test` runs Jest, and Jest's `testEnvironment: "node"` executes every test file under a real Node.js process (confirmed empirically: `process.execPath` resolves to the system Node binary, and `Bun` is `undefined` inside test files) — regardless of the fact that `bun run test` itself is invoked via the Bun CLI. Any application code calling `Bun.password.hash()`/`.verify()` throws `ReferenceError: Bun is not defined` the moment a unit test exercises it. **Plan reverts to the originally-approved `bcryptjs` npm package** (pure-JS, no native compilation, portable across Bun and Node) instead of `Bun.password`. `@nestjs/jwt`, `cookie-parser` (+`@types/cookie-parser`), `bcryptjs` (+`@types/bcryptjs`) are the new dependencies.
 4. **Access tokens embed `roleSlug`, `level`, and `permissions[]` in the JWT payload** (signed at login/refresh, verified by `JwtAuthGuard` with zero DB calls per request). A role's permission changes take up to ~15 min (access-token TTL) to apply to already-logged-in users of that role; refresh tokens carry only `{ sub: documentId }` and `RefreshTokenService` re-fetches the user+role fresh from DB on every refresh.
 5. **`JwtTokenService` lives in `src/common/token/`**, not under `auth/infrastructure/` — putting it inside `auth` would force `src/common/guards/jwt-auth.guard.ts` to import from inside the `auth` module, violating "each module independent." `AuthModule` uses the shared service to sign, `JwtAuthGuard` uses the same instance to verify.
 
 ## Architecture Decisions
 
 - **Schema scope**: postgresql only (see finding 1).
-- **Password/OTP hashing**: `Bun.password` (bcrypt algorithm), no new dependency. Reset tokens stay SHA-256 (Node `crypto`, already a global).
+- **Password/OTP hashing**: `bcryptjs` (see finding 3 — `Bun.password` doesn't work under Jest). Reset tokens stay SHA-256 (Node `crypto`, already a global).
 - **New dependencies**: `@nestjs/jwt`, `cookie-parser`, `@types/cookie-parser`.
 - **Shared kernel**: new `src/common/` directory (guards, decorators, the JWT token service, the `AuthenticatedRequest`/`JwtPayload` types) — owned by neither `auth` nor `users`/`roles`/`permissions`, importable via the existing `@/` path alias.
 - **OTP/reset-token storage**: plain nullable columns on `User` (`otpCodeHash`, `otpExpiresAt`, `resetTokenHash`, `resetTokenExpiresAt`) — no new Prisma models.
@@ -86,7 +86,7 @@ Schema migration (postgresql only) + ValidationPipe/cookie-parser bootstrap
 **Task 3.2 — `hasAnyVerified()` on the users repository.** `IUserRepository.hasAnyVerified(): Promise<boolean>` (`prisma.user.count({ where: { verified: true } }) > 0`).
 - Files: `user.repository.ts`, `prisma-user.repository.ts`, `prisma-user.repository.spec.ts`.
 
-**Task 3.3 — Register + has-users.** `RegisterDto` (email, name, username, password, accountType — no `verified`/`roleId`), `RegisterService` (uniqueness checks, `Bun.password.hash`, generate+hash 6-digit OTP, `roleId: null`, `verified: false`, calls `IEmailSender.sendOtpEmail`), `HasUsersService` (`count() === 0`).
+**Task 3.3 — Register + has-users.** `RegisterDto` (email, name, username, password, accountType — no `verified`/`roleId`), `RegisterService` (uniqueness checks, `bcryptjs.hash`, generate+hash 6-digit OTP, `roleId: null`, `verified: false`, calls `IEmailSender.sendOtpEmail`), `HasUsersService` (`count() === 0`). **Done** — see finding 3 for why this uses `bcryptjs` instead of the originally-planned `Bun.password`.
 
 **Task 3.4 — Verify-OTP + resend-OTP.** `VerifyOtpService` (compare hashed OTP + expiry, on success resolve role via `hasAnyVerified()` → `super_admin`/`guest`, set `verified: true`, clear OTP fields), `ResendOtpService`.
 - Dependencies: Task 3.2, 3.3, Phase 1.
@@ -99,7 +99,7 @@ Schema migration (postgresql only) + ValidationPipe/cookie-parser bootstrap
 
 ### Phase 4: Login + Refresh + Logout
 
-**Task 4.1 — LoginService.** `LoginDto` (email + password), `Bun.password.verify`, `!verified` → `403` with explicit "email not verified" message (distinct from `401` invalid-credentials), else issue tokens via `JwtTokenService`.
+**Task 4.1 — LoginService.** `LoginDto` (email + password), `bcryptjs.compare`, `!verified` → `403` with explicit "email not verified" message (distinct from `401` invalid-credentials), else issue tokens via `JwtTokenService`.
 
 **Task 4.2 — RefreshTokenService.** Verify refresh cookie, re-fetch user+role fresh from DB, issue new access token + rotate refresh token.
 
@@ -111,7 +111,7 @@ Schema migration (postgresql only) + ValidationPipe/cookie-parser bootstrap
 
 ### Phase 5: Forgot / Reset Password
 
-**Task 5.1 — Services + DTOs.** `ForgotPasswordService` (random token, SHA-256 hash stored, 1h expiry, always returns success to avoid enumeration), `ResetPasswordService` (hash+compare, expiry check, `Bun.password.hash` new password).
+**Task 5.1 — Services + DTOs.** `ForgotPasswordService` (random token, SHA-256 hash stored, 1h expiry, always returns success to avoid enumeration), `ResetPasswordService` (hash+compare, expiry check, `bcryptjs.hash` new password).
 
 **Task 5.2 — Controller wiring + tests + coverage.** `RateLimitGuard` on both routes.
 

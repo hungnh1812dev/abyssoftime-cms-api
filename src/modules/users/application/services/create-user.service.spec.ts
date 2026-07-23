@@ -32,6 +32,7 @@ describe("CreateUserService", () => {
       update: jest.fn(),
       delete: jest.fn(),
       count: jest.fn(),
+      hasAnyVerified: jest.fn(),
     };
 
     const module = await Test.createTestingModule({

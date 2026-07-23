@@ -30,22 +30,22 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 2:** tests/build/lint clean (nothing wired into controllers yet)
 
 ## Phase 3 — Register + Verify-OTP + has-users
-- [ ] `src/modules/auth/domain/ports/email-sender.port.ts` (`IEmailSender`)
-- [ ] `src/modules/auth/infrastructure/email/console-email.sender.ts`
-- [ ] `IUserRepository.hasAnyVerified()` + Prisma impl + spec
-- [ ] `RegisterDto` + `RegisterService` (roleId: null, verified: false, hash+send OTP)
-- [ ] `HasUsersService`
-- [ ] `VerifyOtpDto`/`ResendOtpDto` + `VerifyOtpService` (assign role, verified: true) + `ResendOtpService`
-- [ ] `auth.controller.ts` (register/verify-otp/resend-otp/has-users, public, rate-limited) + `auth.module.ts`
-- [ ] Wire `AuthModule` into `AppModule`
-- [ ] Tests + `coverageThreshold` entry for `src/modules/auth/application/**`
+- [x] `src/modules/auth/domain/ports/email-sender.port.ts` (`IEmailSender`)
+- [x] `src/modules/auth/infrastructure/email/console-email.sender.ts`
+- [x] `IUserRepository.hasAnyVerified()` + Prisma impl + spec
+- [x] `RegisterDto` + `RegisterService` (roleId: null, verified: false, hash+send OTP) — uses `bcryptjs`, not `Bun.password` (see plan.md finding 3)
+- [x] `HasUsersService`
+- [x] `VerifyOtpDto`/`ResendOtpDto` + `VerifyOtpService` (assign role, verified: true) + `ResendOtpService`
+- [x] `auth.controller.ts` (register/verify-otp/resend-otp/has-users, public, rate-limited) + `auth.module.ts`
+- [x] Wire `AuthModule` into `AppModule`
+- [x] Tests + `coverageThreshold` entry for `src/modules/auth/application/**`
 - [ ] **Checkpoint 3:** manual register → verify-otp → first user gets `super_admin`, subsequent get `guest`
 
 ## Phase 4 — Login + Refresh + Logout
-- [ ] `LoginDto` + `LoginService` (verified check with distinct 403 message, issue tokens)
-- [ ] `RefreshTokenService` (re-fetch fresh role from DB, rotate refresh token)
-- [ ] Controller wiring: login/refresh/logout routes, cookie set/clear, `RateLimitGuard` on login
-- [ ] Tests + coverage
+- [x] `LoginDto` + `LoginService` (verified check with distinct 403 message, issue tokens)
+- [x] `RefreshTokenService` (re-fetch fresh role from DB, rotate refresh token)
+- [x] Controller wiring: login/refresh/logout routes, cookie set/clear, `RateLimitGuard` on login
+- [x] Tests + coverage (already covered by 4.1–4.3's tests; `auth/application/services` branch coverage 92.85%, well above the 80% gate — the two remaining "uncovered" lines are constructor-parameter decorator-metadata artifacts, same known ts-jest quirk as `jwt-token.service.ts`)
 - [ ] **Checkpoint 4:** manual login/refresh/logout cookie round trip
 
 ## Phase 5 — Forgot / Reset Password

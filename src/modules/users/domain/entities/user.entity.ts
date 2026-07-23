@@ -10,5 +10,7 @@ export class UserEntity {
     public readonly roleId: string | null,
     public readonly createdAt: Date,
     public readonly updatedAt: Date,
+    public readonly otpCodeHash: string | null = null,
+    public readonly otpExpiresAt: Date | null = null,
   ) {}
 }

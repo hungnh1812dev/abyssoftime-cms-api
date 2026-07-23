@@ -39,6 +39,8 @@ export class PrismaUserRepository implements IUserRepository {
         accountType: data.accountType,
         verified: data.verified,
         roleId: data.roleId,
+        otpCodeHash: data.otpCodeHash,
+        otpExpiresAt: data.otpExpiresAt,
       },
     });
     return this.toEntity(user);
@@ -55,6 +57,8 @@ export class PrismaUserRepository implements IUserRepository {
         accountType: data.accountType,
         verified: data.verified,
         roleId: data.roleId,
+        otpCodeHash: data.otpCodeHash,
+        otpExpiresAt: data.otpExpiresAt,
       },
     });
 
@@ -69,6 +73,11 @@ export class PrismaUserRepository implements IUserRepository {
     return this.prisma.user.count();
   }
 
+  async hasAnyVerified(): Promise<boolean> {
+    const count = await this.prisma.user.count({ where: { verified: true } });
+    return count > 0;
+  }
+
   private toEntity(user: {
     documentId: string;
     email: string;
@@ -80,7 +89,22 @@ export class PrismaUserRepository implements IUserRepository {
     roleId: string | null;
     createdAt: Date;
     updatedAt: Date;
+    otpCodeHash?: string | null;
+    otpExpiresAt?: Date | null;
   }): UserEntity {
-    return new UserEntity(user.documentId, user.email, user.name, user.username, user.password, user.accountType, user.verified, user.roleId, user.createdAt, user.updatedAt);
+    return new UserEntity(
+      user.documentId,
+      user.email,
+      user.name,
+      user.username,
+      user.password,
+      user.accountType,
+      user.verified,
+      user.roleId,
+      user.createdAt,
+      user.updatedAt,
+      user.otpCodeHash ?? null,
+      user.otpExpiresAt ?? null,
+    );
   }
 }

@@ -8,6 +8,8 @@ export interface CreateUserData {
   accountType: boolean;
   verified: boolean;
   roleId: string | null;
+  otpCodeHash?: string | null;
+  otpExpiresAt?: Date | null;
 }
 
 export interface UpdateUserData {
@@ -18,6 +20,8 @@ export interface UpdateUserData {
   accountType?: boolean;
   verified?: boolean;
   roleId?: string | null;
+  otpCodeHash?: string | null;
+  otpExpiresAt?: Date | null;
 }
 
 export interface IUserRepository {
@@ -29,6 +33,7 @@ export interface IUserRepository {
   update(documentId: string, data: UpdateUserData): Promise<UserEntity>;
   delete(documentId: string): Promise<void>;
   count(): Promise<number>;
+  hasAnyVerified(): Promise<boolean>;
 }
 
 export const USER_REPOSITORY = Symbol("USER_REPOSITORY");

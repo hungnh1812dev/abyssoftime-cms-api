@@ -27,6 +27,8 @@ describe("PrismaUserRepository", () => {
     roleId: "role-1",
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+    otpCodeHash: null,
+    otpExpiresAt: null,
   };
 
   beforeEach(() => {
@@ -56,6 +58,8 @@ describe("PrismaUserRepository", () => {
     roleId: string | null;
     createdAt: Date;
     updatedAt: Date;
+    otpCodeHash: string | null;
+    otpExpiresAt: Date | null;
   }) => {
     expect(entity).toEqual({
       documentId: record.documentId,
@@ -68,6 +72,8 @@ describe("PrismaUserRepository", () => {
       roleId: record.roleId,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
+      otpCodeHash: record.otpCodeHash,
+      otpExpiresAt: record.otpExpiresAt,
     });
   };
 
@@ -164,6 +170,8 @@ describe("PrismaUserRepository", () => {
         accountType: true,
         verified: false,
         roleId: null,
+        otpCodeHash: undefined,
+        otpExpiresAt: undefined,
       },
     });
     expect(result.roleId).toBeNull();
@@ -180,6 +188,8 @@ describe("PrismaUserRepository", () => {
       accountType: true,
       verified: false,
       roleId: "role-1",
+      otpCodeHash: null,
+      otpExpiresAt: null,
     });
 
     expect(prisma.user.create).toHaveBeenCalledWith({
@@ -191,6 +201,8 @@ describe("PrismaUserRepository", () => {
         accountType: true,
         verified: false,
         roleId: "role-1",
+        otpCodeHash: null,
+        otpExpiresAt: null,
       },
     });
     expectMappedEntity(result);
@@ -211,9 +223,34 @@ describe("PrismaUserRepository", () => {
         accountType: undefined,
         verified: undefined,
         roleId: undefined,
+        otpCodeHash: undefined,
+        otpExpiresAt: undefined,
       },
     });
     expectMappedEntity(result);
+  });
+
+  it("update() clears otpCodeHash and otpExpiresAt when explicitly set to null", async () => {
+    prisma.user.update.mockResolvedValue({ ...record, otpCodeHash: null, otpExpiresAt: null });
+
+    const result = await repository.update("user-1", { verified: true, roleId: "role-1", otpCodeHash: null, otpExpiresAt: null });
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { documentId: "user-1" },
+      data: {
+        email: undefined,
+        name: undefined,
+        username: undefined,
+        password: undefined,
+        accountType: undefined,
+        verified: true,
+        roleId: "role-1",
+        otpCodeHash: null,
+        otpExpiresAt: null,
+      },
+    });
+    expect(result.otpCodeHash).toBeNull();
+    expect(result.otpExpiresAt).toBeNull();
   });
 
   it("delete() removes the record by documentId", async () => {
@@ -231,5 +268,22 @@ describe("PrismaUserRepository", () => {
 
     expect(prisma.user.count).toHaveBeenCalled();
     expect(result).toBe(3);
+  });
+
+  it("hasAnyVerified() returns true when at least one verified user exists", async () => {
+    prisma.user.count.mockResolvedValue(1);
+
+    const result = await repository.hasAnyVerified();
+
+    expect(prisma.user.count).toHaveBeenCalledWith({ where: { verified: true } });
+    expect(result).toBe(true);
+  });
+
+  it("hasAnyVerified() returns false when no verified user exists", async () => {
+    prisma.user.count.mockResolvedValue(0);
+
+    const result = await repository.hasAnyVerified();
+
+    expect(result).toBe(false);
   });
 });
