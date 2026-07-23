@@ -23,7 +23,7 @@ See `tasks/plan.md` for full context and rationale.
 ## Phase 2 — Tests: `users`
 - [x] `create-user.service.spec.ts` (happy path, email conflict, username conflict, verified-default)
 - [x] `update-user.service.spec.ts` (not-found, email taken/free/unchanged, username taken/free/unchanged, happy path)
-- [ ] `delete-user.service.spec.ts` (not-found, happy path)
+- [x] `delete-user.service.spec.ts` (not-found, happy path)
 - [ ] `list-user.service.spec.ts` (passthrough)
 - [ ] `user.controller.spec.ts` (one test per route)
 - [ ] `prisma-user.repository.spec.ts` (one test per method, mocked `PrismaService`)
