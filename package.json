@@ -85,7 +85,8 @@
       "^@/(.*)$": "<rootDir>/$1"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!prisma/application/client/**"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
