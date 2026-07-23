@@ -21,6 +21,7 @@ For any new feature/page/module:
 ## Root docs
 
 - `SPEC.md` and `CLAUDE.md` only contain guidance pointing to module files — not the module details themselves.
+- Keep `SPEC.md` as small as possible: once a feature's details are fully captured in `/docs/documents/*`, remove that feature's section from `SPEC.md` rather than letting it accumulate already-documented content.
 
 ## Commit rules
 
