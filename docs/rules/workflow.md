@@ -23,6 +23,11 @@ For any new feature/page/module:
 - `SPEC.md` and `CLAUDE.md` only contain guidance pointing to module files — not the module details themselves.
 - Keep `SPEC.md` as small as possible: once a feature's details are fully captured in `/docs/documents/*`, remove that feature's section from `SPEC.md` rather than letting it accumulate already-documented content.
 
+## Decision rationale
+
+- Whenever a task involves choosing among multiple viable tech-stack options, libraries, patterns, or designs, show a comparison table (options vs. criteria — fit for this repo, complexity, maintenance cost, existing precedent, etc.) explaining why the chosen option wins over the alternatives, not just a one-line justification.
+- Save that comparison table to `docs/documents/<module-name>-techstack.md` (one file per module the decision belongs to) rather than leaving it only in conversation or buried in the spec/plan.
+
 ## Commit rules
 
 - Always ask the user before committing — never run `git commit` without explicit confirmation for that commit. Confirmation means showing the exact staged file list and the full commit message and getting a yes on that — agreeing to a commit *strategy* (e.g. how many commits, how they're grouped) is not the same as confirming the commit itself.
