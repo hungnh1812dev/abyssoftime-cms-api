@@ -38,11 +38,11 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint:** `bun run test:cov` — sanity-check `permissions` coverage before starting `roles`
 
 ## Phase 4 — Tests: `roles` (no source changes)
-- [ ] `create-role.service.spec.ts` (forbidden×2, empty-permissions skip, unknown-slug, valid, RoleAlreadyExistsError→Conflict, other-error rethrow, happy path)
-- [ ] `update-role.service.spec.ts` (forbidden×3 variants, not-found, default-role guard, permissions-provided vs undefined, RoleNotFoundError→NotFound, other-error rethrow, happy path)
-- [ ] `delete-role.service.spec.ts` (forbidden×2, not-found, default-role guard, assigned-count conflict, RoleNotFoundError→NotFound, other-error rethrow, happy path)
-- [ ] `list-roles.service.spec.ts` (passthrough)
-- [ ] `role.controller.spec.ts` (only `list()` — no create/update/delete routes exist)
+- [x] `create-role.service.spec.ts` (forbidden×2, empty-permissions skip, unknown-slug, valid, RoleAlreadyExistsError→Conflict, other-error rethrow, happy path)
+- [x] `update-role.service.spec.ts` (forbidden×3 variants, not-found, default-role guard, permissions-provided vs undefined, RoleNotFoundError→NotFound, other-error rethrow, happy path)
+- [x] `delete-role.service.spec.ts` (forbidden×2, not-found, default-role guard, assigned-count conflict, RoleNotFoundError→NotFound, other-error rethrow, happy path)
+- [x] `list-roles.service.spec.ts` (passthrough)
+- [x] `role.controller.spec.ts` (only `list()` — no create/update/delete routes exist)
 
 ## Phase 5 — Coverage gate + final verification
 - [ ] Add scoped `coverageThreshold` (branches ≥80%) to `jest` block in `package.json` for `users`/`roles`/`permissions`
