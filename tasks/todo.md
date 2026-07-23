@@ -8,17 +8,17 @@ See `tasks/plan.md` for full context and rationale.
 - [x] Verify: `grep -A 20 "model User" src/prisma/application/client/schema.prisma` shows `username`, `accountType`, `verified`, `updatedAt`
 
 ## Phase 1 — Fix `users` module
-- [ ] `user.entity.ts` — 10-field entity (drop `updatedBy`, `accountType: boolean`)
-- [ ] `user.repository.ts` — fix `CreateUserData`/`UpdateUserData` interfaces
-- [ ] `prisma-user.repository.ts` — fix `toEntity()` (10 fields, correct order), implement `findByEmail` (`findUnique`), `findByUsername` (`findFirst`), `count`
-- [ ] `create-user.dto.ts` / `update-user.dto.ts` — full field set with correct validators
-- [ ] `create-user.service.ts` — email conflict + username conflict checks, `verified` defaults to `false`
-- [ ] `update-user.service.ts` — not-found check, email/username re-uniqueness checks only when changed
-- [ ] `delete-user.service.ts` — confirm unchanged (not-found + delete)
-- [ ] `list-user.service.ts` — confirm unchanged (passthrough)
-- [ ] `user.controller.ts` — confirm compiles against new DTOs/entity (likely no change)
-- [ ] `app.module.ts` — import `UserModule` alongside `PermissionModule`
-- [ ] **Checkpoint:** `bun run build` — zero TypeScript errors
+- [x] `user.entity.ts` — 10-field entity (drop `updatedBy`, `accountType: boolean`)
+- [x] `user.repository.ts` — fix `CreateUserData`/`UpdateUserData` interfaces
+- [x] `prisma-user.repository.ts` — fix `toEntity()` (10 fields, correct order), implement `findByEmail` (`findUnique`), `findByUsername` (`findFirst`), `count`
+- [x] `create-user.dto.ts` / `update-user.dto.ts` — full field set with correct validators
+- [x] `create-user.service.ts` — email conflict + username conflict checks, `verified` defaults to `false`
+- [x] `update-user.service.ts` — not-found check, email/username re-uniqueness checks only when changed
+- [x] `delete-user.service.ts` — confirm unchanged (not-found + delete)
+- [x] `list-user.service.ts` — confirm unchanged (passthrough)
+- [x] `user.controller.ts` — confirm compiles against new DTOs/entity (likely no change)
+- [x] `app.module.ts` — import `UserModule` alongside `PermissionModule`
+- [x] **Checkpoint:** `bun run build` — zero TypeScript errors
 
 ## Phase 2 — Tests: `users`
 - [ ] `create-user.service.spec.ts` (happy path, email conflict, username conflict, verified-default)
