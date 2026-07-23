@@ -1,0 +1,40 @@
+import { Create{{pascalCase name}}Dto } from "../application/dto/create-{{kebabCase name}}.dto";
+import { Update{{pascalCase name}}Dto } from "../application/dto/update-{{kebabCase name}}.dto";
+import { Create{{pascalCase name}}Service } from "../application/services/create-{{kebabCase name}}.service";
+import { Delete{{pascalCase name}}Service } from "../application/services/delete-{{kebabCase name}}.service";
+import { List{{pascalCase name}}Service } from "../application/services/list-{{kebabCase name}}.service";
+import { Update{{pascalCase name}}Service } from "../application/services/update-{{kebabCase name}}.service";
+import { {{pascalCase name}}Entity } from "../domain/entities/{{kebabCase name}}.entity";
+
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put } from "@nestjs/common";
+
+@Controller("/api/{{pluralKebab name}}")
+export class {{pascalCase name}}Controller {
+  constructor(
+    private readonly list{{pluralPascal name}}: List{{pascalCase name}}Service,
+    private readonly create{{pascalCase name}}: Create{{pascalCase name}}Service,
+    private readonly update{{pascalCase name}}: Update{{pascalCase name}}Service,
+    private readonly delete{{pascalCase name}}: Delete{{pascalCase name}}Service,
+  ) {}
+
+  @Get()
+  async list(): Promise<{{pascalCase name}}Entity[]> {
+    return this.list{{pluralPascal name}}.execute();
+  }
+
+  @Post()
+  async create(@Body() dto: Create{{pascalCase name}}Dto): Promise<{{pascalCase name}}Entity> {
+    return this.create{{pascalCase name}}.execute(dto);
+  }
+
+  @Put(":id")
+  async update(@Param("id") documentId: string, @Body() dto: Update{{pascalCase name}}Dto): Promise<{{pascalCase name}}Entity> {
+    return this.update{{pascalCase name}}.execute(documentId, dto);
+  }
+
+  @Delete(":id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async delete(@Param("id") documentId: string): Promise<void> {
+    return this.delete{{pascalCase name}}.execute(documentId);
+  }
+}
