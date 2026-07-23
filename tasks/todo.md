@@ -29,7 +29,7 @@ See `tasks/plan.md` for full context and rationale.
 - [x] `prisma-user.repository.spec.ts` (one test per method, mocked `PrismaService`)
 
 ## Phase 3 — Tests: `permissions`
-- [ ] `create-permission.service.spec.ts` (conflict, happy path)
+- [x] `create-permission.service.spec.ts` (conflict, happy path)
 - [ ] `update-permission.service.spec.ts` (not-found, happy path)
 - [ ] `delete-permission.service.spec.ts` (not-found, roleCount>0, accessTokenCount truthy, happy path)
 - [ ] `list-permission.service.spec.ts` (passthrough)
