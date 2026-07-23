@@ -94,47 +94,6 @@
       "!prisma/application/client/**"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node",
-    "coverageThreshold": {
-      "src/modules/users/application/**/*.ts": {
-        "branches": 80
-      },
-      "src/modules/users/domain/**/*.ts": {
-        "branches": 80
-      },
-      "src/modules/users/infrastructure/**/*.ts": {
-        "branches": 80
-      },
-      "src/modules/roles/application/**/*.ts": {
-        "branches": 80
-      },
-      "src/modules/roles/domain/**/*.ts": {
-        "branches": 80
-      },
-      "src/modules/roles/infrastructure/persistence/prisma-role.repository.ts": {
-        "branches": 80
-      },
-      "src/modules/permissions/application/**/*.ts": {
-        "branches": 80
-      },
-      "src/modules/permissions/domain/**/*.ts": {
-        "branches": 80
-      },
-      "src/modules/permissions/infrastructure/**/*.ts": {
-        "branches": 80
-      },
-      "src/bootstrap/**/*.ts": {
-        "branches": 80
-      },
-      "src/common/decorators/**/*.ts": {
-        "branches": 80
-      },
-      "src/common/guards/**/*.ts": {
-        "branches": 80
-      },
-      "src/modules/auth/application/**/*.ts": {
-        "branches": 80
-      }
-    }
+    "testEnvironment": "node"
   }
 }

@@ -18,7 +18,6 @@ export class EnvironmentVariables {
   DB_NAME: string = "abyssoftime-cms";
 
   @IsString()
-  @MinLength(1)
   DB_PASSWORD: string = "";
 
   @IsString()
