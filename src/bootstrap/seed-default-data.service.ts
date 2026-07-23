@@ -15,7 +15,7 @@ const DEFAULT_PERMISSIONS: Omit<CreatePermissionData, "updatedBy">[] = [
 const DEFAULT_ROLES: Omit<CreateRoleData, "updatedBy">[] = [
   { name: "Super Admin", slug: "super_admin", permissions: ["user:manager", "role:manager", "permission:manager"], level: 100, isDefault: true },
   { name: "Admin", slug: "admin", permissions: ["user:read", "role:read", "permission:read"], level: 50, isDefault: true },
-  { name: "Editor", slug: "editor", permissions: [], level: 0, isDefault: true },
+  { name: "Editor", slug: "editor", permissions: [], level: 20, isDefault: true },
   { name: "Guest", slug: "guest", permissions: [], level: 0, isDefault: true },
 ];
 
