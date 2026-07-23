@@ -26,7 +26,7 @@ See `tasks/plan.md` for full context and rationale.
 - [x] `delete-user.service.spec.ts` (not-found, happy path)
 - [x] `list-user.service.spec.ts` (passthrough)
 - [x] `user.controller.spec.ts` (one test per route)
-- [ ] `prisma-user.repository.spec.ts` (one test per method, mocked `PrismaService`)
+- [x] `prisma-user.repository.spec.ts` (one test per method, mocked `PrismaService`)
 
 ## Phase 3 — Tests: `permissions`
 - [ ] `create-permission.service.spec.ts` (conflict, happy path)
