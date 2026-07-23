@@ -45,7 +45,18 @@ describe("PrismaUserRepository", () => {
     repository = new PrismaUserRepository(prisma as unknown as PrismaService);
   });
 
-  const expectMappedEntity = (entity: { documentId: string; email: string; name: string; username: string; password: string; accountType: boolean; verified: boolean; roleId: string; createdAt: Date; updatedAt: Date }) => {
+  const expectMappedEntity = (entity: {
+    documentId: string;
+    email: string;
+    name: string;
+    username: string;
+    password: string;
+    accountType: boolean;
+    verified: boolean;
+    roleId: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }) => {
     expect(entity).toEqual({
       documentId: record.documentId,
       email: record.email,
@@ -96,6 +107,14 @@ describe("PrismaUserRepository", () => {
     expectMappedEntity(result!);
   });
 
+  it("findByEmail() returns null when no record is found", async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+
+    const result = await repository.findByEmail("missing@example.com");
+
+    expect(result).toBeNull();
+  });
+
   it("findByUsername() looks up by username via findFirst (no unique constraint)", async () => {
     prisma.user.findFirst.mockResolvedValue(record);
 
@@ -104,6 +123,14 @@ describe("PrismaUserRepository", () => {
     expect(prisma.user.findFirst).toHaveBeenCalledWith({ where: { username: "janedoe" } });
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
     expectMappedEntity(result!);
+  });
+
+  it("findByUsername() returns null when no record is found", async () => {
+    prisma.user.findFirst.mockResolvedValue(null);
+
+    const result = await repository.findByUsername("missing");
+
+    expect(result).toBeNull();
   });
 
   it("create() passes all fields through to prisma and maps the result", async () => {

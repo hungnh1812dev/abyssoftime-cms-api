@@ -1,10 +1,11 @@
-import { Test } from "@nestjs/testing";
-
 import { CreateRoleService } from "../application/services/create-role.service";
 import { DeleteRoleService } from "../application/services/delete-role.service";
 import { ListRolesService } from "../application/services/list-roles.service";
 import { UpdateRoleService } from "../application/services/update-role.service";
 import { RoleEntity } from "../domain/entities/role.entiry";
+
+import { Test } from "@nestjs/testing";
+
 import { RolesColtroller } from "./role.controller";
 
 describe("RolesColtroller", () => {

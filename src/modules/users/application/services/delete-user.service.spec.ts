@@ -1,8 +1,9 @@
+import { UserEntity } from "../../domain/entities/user.entity";
+import { IUserRepository, USER_REPOSITORY } from "../../domain/repositories/user.repository";
+
 import { NotFoundException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 
-import { UserEntity } from "../../domain/entities/user.entity";
-import { IUserRepository, USER_REPOSITORY } from "../../domain/repositories/user.repository";
 import { DeleteUserService } from "./delete-user.service";
 
 describe("DeleteUserService", () => {

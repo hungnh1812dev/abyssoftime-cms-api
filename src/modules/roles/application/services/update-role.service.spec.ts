@@ -1,13 +1,14 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
-
 import { RoleEntity } from "../../domain/entities/role.entiry";
 import { IRoleRepository, ROLE_REPOSITORY, RoleNotFoundError } from "../../domain/repositories/role.repository";
 import { UpdateRoleDto } from "../dto/update-role.dto";
-import { UpdateRoleService } from "./update-role.service";
+
+import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
 
 import { PermissionEntity } from "@/modules/permissions/domain/entities/permission.entity";
 import { IPermissionRepository, PERMISSSION_REPOSITORY } from "@/modules/permissions/domain/repositories/permission.repository";
+
+import { UpdateRoleService } from "./update-role.service";
 
 describe("UpdateRoleService", () => {
   let service: UpdateRoleService;

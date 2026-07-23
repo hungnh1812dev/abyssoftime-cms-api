@@ -1,9 +1,10 @@
-import { ConflictException } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
-
 import { UserEntity } from "../../domain/entities/user.entity";
 import { IUserRepository, USER_REPOSITORY } from "../../domain/repositories/user.repository";
 import { CreateUserDto } from "../dto/create-user.dto";
+
+import { ConflictException } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
+
 import { CreateUserService } from "./create-user.service";
 
 describe("CreateUserService", () => {

@@ -1,9 +1,10 @@
-import { ConflictException } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
-
 import { PermissionEntity } from "../../domain/entities/permission.entity";
 import { IPermissionRepository, PERMISSSION_REPOSITORY } from "../../domain/repositories/permission.repository";
 import { CreatePermissionDto } from "../dto/create-permission.dto";
+
+import { ConflictException } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
+
 import { CreatePermissionService } from "./create-permission.service";
 
 describe("CreatePermissionService", () => {

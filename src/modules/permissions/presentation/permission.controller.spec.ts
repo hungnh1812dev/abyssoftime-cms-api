@@ -1,5 +1,3 @@
-import { Test } from "@nestjs/testing";
-
 import { CreatePermissionDto } from "../application/dto/create-permission.dto";
 import { UpdatePermissionDto } from "../application/dto/update-permission.dto";
 import { CreatePermissionService } from "../application/services/create-permission.service";
@@ -7,6 +5,9 @@ import { DeletePermissionService } from "../application/services/delete-permissi
 import { ListPermissionService } from "../application/services/list-permission.service";
 import { UpdatePermissionService } from "../application/services/update-permission.service";
 import { PermissionEntity } from "../domain/entities/permission.entity";
+
+import { Test } from "@nestjs/testing";
+
 import { PermissionController } from "./permission.controller";
 
 describe("PermissionController", () => {

@@ -1,9 +1,10 @@
-import { ConflictException, NotFoundException } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
-
 import { UserEntity } from "../../domain/entities/user.entity";
 import { IUserRepository, USER_REPOSITORY } from "../../domain/repositories/user.repository";
 import { UpdateUserDto } from "../dto/update-user.dto";
+
+import { ConflictException, NotFoundException } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
+
 import { UpdateUserService } from "./update-user.service";
 
 describe("UpdateUserService", () => {

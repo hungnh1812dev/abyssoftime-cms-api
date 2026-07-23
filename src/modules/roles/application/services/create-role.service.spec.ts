@@ -1,13 +1,14 @@
-import { BadRequestException, ConflictException, ForbiddenException } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
-
 import { RoleEntity } from "../../domain/entities/role.entiry";
 import { IRoleRepository, ROLE_REPOSITORY, RoleAlreadyExistsError } from "../../domain/repositories/role.repository";
 import { CreateRoleDto } from "../dto/create-role.dto";
-import { CreateRoleService } from "./create-role.service";
+
+import { BadRequestException, ConflictException, ForbiddenException } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
 
 import { PermissionEntity } from "@/modules/permissions/domain/entities/permission.entity";
 import { IPermissionRepository, PERMISSSION_REPOSITORY } from "@/modules/permissions/domain/repositories/permission.repository";
+
+import { CreateRoleService } from "./create-role.service";
 
 describe("CreateRoleService", () => {
   let service: CreateRoleService;

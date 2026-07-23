@@ -1,7 +1,8 @@
-import { Test } from "@nestjs/testing";
-
 import { RoleEntity } from "../../domain/entities/role.entiry";
 import { IRoleRepository, ROLE_REPOSITORY } from "../../domain/repositories/role.repository";
+
+import { Test } from "@nestjs/testing";
+
 import { ListRolesService } from "./list-roles.service";
 
 describe("ListRolesService", () => {

@@ -1,7 +1,8 @@
-import { Test } from "@nestjs/testing";
-
 import { PermissionEntity } from "../../domain/entities/permission.entity";
 import { IPermissionRepository, PERMISSSION_REPOSITORY } from "../../domain/repositories/permission.repository";
+
+import { Test } from "@nestjs/testing";
+
 import { ListPermissionService } from "./list-permission.service";
 
 describe("ListPermissionService", () => {

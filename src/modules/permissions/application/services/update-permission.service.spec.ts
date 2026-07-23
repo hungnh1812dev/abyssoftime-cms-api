@@ -1,9 +1,10 @@
-import { NotFoundException } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
-
 import { PermissionEntity } from "../../domain/entities/permission.entity";
 import { IPermissionRepository, PERMISSSION_REPOSITORY } from "../../domain/repositories/permission.repository";
 import { UpdatePermissionDto } from "../dto/update-permission.dto";
+
+import { NotFoundException } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
+
 import { UpdatePermissionService } from "./update-permission.service";
 
 describe("UpdatePermissionService", () => {

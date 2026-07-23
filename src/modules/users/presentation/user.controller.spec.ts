@@ -1,5 +1,3 @@
-import { Test } from "@nestjs/testing";
-
 import { CreateUserDto } from "../application/dto/create-user.dto";
 import { UpdateUserDto } from "../application/dto/update-user.dto";
 import { CreateUserService } from "../application/services/create-user.service";
@@ -7,6 +5,9 @@ import { DeleteUserService } from "../application/services/delete-user.service";
 import { ListUserService } from "../application/services/list-user.service";
 import { UpdateUserService } from "../application/services/update-user.service";
 import { UserEntity } from "../domain/entities/user.entity";
+
+import { Test } from "@nestjs/testing";
+
 import { UserController } from "./user.controller";
 
 describe("UserController", () => {

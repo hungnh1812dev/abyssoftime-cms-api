@@ -45,7 +45,9 @@ See `tasks/plan.md` for full context and rationale.
 - [x] `role.controller.spec.ts` (only `list()` — no create/update/delete routes exist)
 
 ## Phase 5 — Coverage gate + final verification
-- [ ] Add scoped `coverageThreshold` (branches ≥80%) to `jest` block in `package.json` for `users`/`roles`/`permissions`
-- [ ] `bun run build` — zero errors
-- [ ] `bun run test:cov` — all green, branch coverage ≥80% for all three modules
-- [ ] `bun run lint` — zero new errors
+- [x] Add scoped `coverageThreshold` (branches ≥80%) to `jest` block in `package.json` for `users`/`roles`/`permissions` (scoped to `application`/`domain`/`infrastructure` — `presentation` excluded, see note below)
+- [x] `bun run build` — zero errors
+- [x] `bun run test:cov` — all green, branch coverage ≥80% for `application`/`domain`/`infrastructure` in all three modules
+- [x] `bun run lint` — zero new errors (added a spec-file-scoped override for `@typescript-eslint/unbound-method`, a known false-positive on `expect(mock.method).toHaveBeenCalled...()`)
+
+**Note:** Controllers (`presentation/*.controller.ts`) are excluded from the branch threshold. All three sit at a hard 75% ceiling from TypeScript's `__decorate`/`__param` helper emitting an unreachable `typeof Reflect.metadata === "function"` branch on every parameter-decorated method — not a test gap (confirmed via HTML coverage report: every real branch in every controller is covered). Decision made with the user during Phase 5.
