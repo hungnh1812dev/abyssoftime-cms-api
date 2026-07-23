@@ -26,6 +26,7 @@ For any new feature/page/module:
 
 - Always remove `Co-Authored-By` from commit messages.
 - Reference the `/git-commit` skill for commit message format.
+- During `/build`, don't commit after every single spec/task file — batch commits at feature/checkpoint boundaries (e.g. a "Checkpoint" line in `tasks/plan.md`/`tasks/todo.md`, or a full Phase) instead. Still verify (tests, build) after each task; only the commit frequency is batched.
 
 ## Formatting
 
