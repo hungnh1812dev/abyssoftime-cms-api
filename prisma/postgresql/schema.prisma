@@ -6,3 +6,47 @@ generator client {
 datasource db {
     provider = "postgresql"
 }
+
+model Permission {
+    id          Int         @default(autoincrement())
+    documentId  String      @id @unique @default(uuid()) @map("document_id")
+    slug        String      @unique
+    name        String
+    description String
+    createdAt   DateTime    @default(now()) @map("created_at")
+    updatedAt   DateTime    @updatedAt @map("updated_at")
+    user        User        @relation(fields: [updatedBy], references: [documentId])
+    updatedBy   String      @map("updated_by")
+
+    @@map("permissions")
+}
+
+model Role {
+    id          Int         @default(autoincrement())
+    documentId  String      @id @unique @default(uuid()) @map("document_id")
+    name        String
+    slug        String      @unique
+    permissions Json
+    level       Int
+    isDefault   Boolean     @map("is_default")
+    createdAt   DateTime    @default(now()) @map("created_at")
+    updatedAt   DateTime    @updatedAt @map("updated_at")
+    user        User        @relation(fields: [updatedBy], references: [documentId])
+    updatedBy   String      @map("updated_by")
+
+    @@map("roles")
+}
+
+model User {
+    id          Int         @default(autoincrement())
+    documentId  String      @id @unique @default(uuid()) @map("document_id")
+    email       String      @unique
+    displayName  String     @map("display_name")
+    passwordHash String     @map("password_hash")
+    roles       Role        @relate(fields: [roleId], references: [documentId])
+    roleId      String      @map("role_id")
+    createdAt   DateTime    @map("created_at")
+
+    @@index([roleId])
+    @@map(users)
+}
