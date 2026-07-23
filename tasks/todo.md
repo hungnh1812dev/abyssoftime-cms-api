@@ -31,7 +31,7 @@ See `tasks/plan.md` for full context and rationale.
 ## Phase 3 — Tests: `permissions`
 - [x] `create-permission.service.spec.ts` (conflict, happy path)
 - [x] `update-permission.service.spec.ts` (not-found, happy path)
-- [ ] `delete-permission.service.spec.ts` (not-found, roleCount>0, accessTokenCount truthy, happy path)
+- [x] `delete-permission.service.spec.ts` (not-found, roleCount>0, accessTokenCount truthy, happy path)
 - [ ] `list-permission.service.spec.ts` (passthrough)
 - [ ] `permission.controller.spec.ts` (one test per route)
 - [ ] `prisma-permission.repository.spec.ts` (one test per method incl. `countReferences`)
