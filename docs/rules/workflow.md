@@ -29,6 +29,7 @@ For any new feature/page/module:
 - Always remove `Co-Authored-By` from commit messages.
 - Reference the `/git-commit` skill for commit message format.
 - During `/build`, don't commit after every single spec/task file — batch commits at feature/checkpoint boundaries (e.g. a "Checkpoint" line in `tasks/plan.md`/`tasks/todo.md`, or a full Phase) instead. Still verify (tests, build) after each task; only the commit frequency is batched.
+- Checkpoint commit timing: if a checkpoint is automatically verifiable (e.g. `test:cov`/`build`/`lint` passing), commit once that checkpoint's automated checks pass. If a checkpoint requires manual verification (e.g. a live app/DB walkthrough) that can't be done headlessly, commit as soon as the last task *before* that checkpoint is complete — don't hold the commit open waiting on manual verification that may not happen for a while.
 
 ## Formatting
 
