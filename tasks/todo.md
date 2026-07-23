@@ -33,7 +33,7 @@ See `tasks/plan.md` for full context and rationale.
 - [x] `update-permission.service.spec.ts` (not-found, happy path)
 - [x] `delete-permission.service.spec.ts` (not-found, roleCount>0, accessTokenCount truthy, happy path)
 - [x] `list-permission.service.spec.ts` (passthrough)
-- [ ] `permission.controller.spec.ts` (one test per route)
+- [x] `permission.controller.spec.ts` (one test per route)
 - [ ] `prisma-permission.repository.spec.ts` (one test per method incl. `countReferences`)
 - [ ] **Checkpoint:** `bun run test:cov` — sanity-check `permissions` coverage before starting `roles`
 
