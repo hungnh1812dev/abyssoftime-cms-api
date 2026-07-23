@@ -1,0 +1,70 @@
+generator client {
+    provider = "prisma-client-js"
+    output = "./../../src/prisma/application/client"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+model Permission {
+    id          Int         @default(autoincrement())
+    documentId  String      @id @unique @default(uuid()) @map("document_id")
+    slug        String      @unique
+    name        String
+    description String
+    createdAt   DateTime    @default(now()) @map("created_at")
+    updatedAt   DateTime    @updatedAt @map("updated_at")
+
+    // Who updated this Permission
+    user        User?       @relation("PermissionUpdatedBy", fields: [updatedBy], references: [documentId])
+    updatedBy   String?     @map("updated_by")
+
+    @@map("permissions")
+}
+
+model Role {
+    id          Int         @default(autoincrement())
+    documentId  String      @id @unique @default(uuid()) @map("document_id")
+    name        String
+    slug        String      @unique
+    permissions Json
+    level       Int
+    isDefault   Boolean     @map("is_default")
+    createdAt   DateTime    @default(now()) @map("created_at")
+    updatedAt   DateTime    @updatedAt @map("updated_at")
+
+    // Who updated this Role
+    user        User?       @relation("RoleUpdatedBy", fields: [updatedBy], references: [documentId])
+    updatedBy   String?     @map("updated_by")
+
+    users       User[]      @relation("UserRole")
+
+    @@map("roles")
+}
+
+model User {
+    id          Int         @default(autoincrement())
+    documentId  String      @id @unique @default(uuid()) @map("document_id")
+    email       String      @unique
+    name        String      @map("display_name")
+    username    String
+    password    String      @map("password_hash")
+    accountType Boolean     @map("account_type")
+    verified    Boolean
+    role        Role?       @relation("UserRole", fields: [roleId], references: [documentId])
+    roleId      String?     @map("role_id")
+    createdAt   DateTime    @default(now()) @map("created_at")
+    updatedAt   DateTime    @updatedAt @map("updated_at")
+
+    otpCodeHash          String?   @map("otp_code_hash")
+    otpExpiresAt         DateTime? @map("otp_expires_at")
+    resetTokenHash       String?   @map("reset_token_hash")
+    resetTokenExpiresAt  DateTime? @map("reset_token_expires_at")
+
+    updatedRoles       Role[]       @relation("RoleUpdatedBy") @ignore
+    updatedPermissions Permission[] @relation("PermissionUpdatedBy") @ignore
+
+    @@index([roleId])
+    @@map("users")
+}

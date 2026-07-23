@@ -1,0 +1,13 @@
+import { {{pascalCase name}}Entity } from "../../domain/entities/{{kebabCase name}}.entity";
+import { {{constantCase name}}_REPOSITORY, type I{{pascalCase name}}Repository } from "../../domain/repositories/{{kebabCase name}}.repository";
+
+import { Inject, Injectable } from "@nestjs/common";
+
+@Injectable()
+export class List{{pascalCase name}}Service {
+  constructor(@Inject({{constantCase name}}_REPOSITORY) private readonly {{pluralCamel name}}: I{{pascalCase name}}Repository) {}
+
+  async execute(): Promise<{{pascalCase name}}Entity[]> {
+    return this.{{pluralCamel name}}.findAll();
+  }
+}
