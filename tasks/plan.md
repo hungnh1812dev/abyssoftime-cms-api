@@ -1,176 +1,163 @@
-# User Module Fix + Roles/Permissions/Users Unit Test Coverage
+# Plan: Default Seeding + Auth (Register/Verify/Login/Forgot-Password) + Permission-Slug Authorization
+
+See `SPEC.md` for the full approved spec. This plan implements it.
 
 ## Context
 
-The `users` module is structurally broken relative to `prisma/postgresql/schema.prisma` and inconsistent with the sibling `permissions` module (the established "gold standard" clean-architecture pattern: `domain → application → infrastructure → presentation`): `UserEntity` doesn't match the schema, `PrismaUserRepository.toEntity()` passes only 5 positional args into an entity constructor, `findByEmail`/`findByUsername` are declared on `IUserRepository` but never implemented, and `UserModule` is never imported into `AppModule`. Separately, `users`, `roles`, and `permissions` have zero test files, and the goal is ≥80% branch coverage on all three via pure unit tests (mocked repository interfaces, no DB).
+`SPEC.md` asks for three connected things on top of the existing `permissions`/`roles`/`users` modules: (1) idempotent boot-time seeding of 6 default permissions + 4 default roles, (2) a full auth lifecycle (register → OTP-verify → login → forgot/reset password, all JWT/cookie-based, email deferred to a console stub), and (3) a permission-slug authorization system that replaces the `roles` module's current numeric-`level` checks and newly gates the previously-unguarded `permissions`/`users` write and read routes. Codebase research turned up a few facts that refine — but don't contradict — the spec, and one currently-open gap (no global `ValidationPipe`) that this work depends on being fixed to function correctly.
 
-Two schema questions came up during exploration and were resolved with the user:
-1. **`User.updatedAt`** — schema currently has no `updatedAt` column on `User` (unlike `Role`/`Permission`, which both have it). Decision: **add `updatedAt DateTime @updatedAt @map("updated_at")` to the schema**, matching the Role/Permission pattern and satisfying SPEC.md's literal field list.
-2. **`User.updatedBy`** — the currently-broken `UserEntity` has an 11th field, `updatedBy: string`, with no backing column (would require a self-referential FK with a bootstrap problem for the first user). Decision: **drop `updatedBy` from `UserEntity` entirely** — final entity has 10 fields, no schema change needed for this one.
+## Research findings that change the plan
 
-Also confirmed via schema read: `username` has **no** `@unique` constraint (only `email` does) — `findByUsername` will use `findFirst`, not `findUnique`.
+1. **`mysql`/`sqlite` schema files have zero models today** (just `generator`/`datasource` stubs) — `Permission`/`Role`/`User` only exist in `prisma/postgresql/schema.prisma`. The existing `permissions`/`roles`/`users` modules were never backfilled into mysql/sqlite either. **Plan deviates from SPEC.md's "all three files" wording: schema changes land in `prisma/postgresql/schema.prisma` only**, matching how every prior module was actually built.
+2. **No global `ValidationPipe` exists anywhere** (`src/main.ts` is 5 lines: `NestFactory.create` + `listen`). Every DTO's `class-validator` decorators are currently inert. This plan adds `app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))` as a small prerequisite step — a behavior change to every existing endpoint (previously-permissive requests will start getting rejected), low risk since nothing in the repo currently depends on that leniency.
+3. **Bun has a built-in `Bun.password` API** (bcrypt by default, no native dependency) — since this project runs on Bun and already committed to bcrypt as the hashing algorithm, **the plan uses `Bun.password.hash()`/`Bun.password.verify()` instead of adding the `bcrypt` npm package**. This replaces the previously-approved "add `bcrypt`" line item. `@nestjs/jwt` and `cookie-parser` (+`@types/cookie-parser`) are still needed as new dependencies.
+4. **Access tokens embed `roleSlug`, `level`, and `permissions[]` in the JWT payload** (signed at login/refresh, verified by `JwtAuthGuard` with zero DB calls per request). A role's permission changes take up to ~15 min (access-token TTL) to apply to already-logged-in users of that role; refresh tokens carry only `{ sub: documentId }` and `RefreshTokenService` re-fetches the user+role fresh from DB on every refresh.
+5. **`JwtTokenService` lives in `src/common/token/`**, not under `auth/infrastructure/` — putting it inside `auth` would force `src/common/guards/jwt-auth.guard.ts` to import from inside the `auth` module, violating "each module independent." `AuthModule` uses the shared service to sign, `JwtAuthGuard` uses the same instance to verify.
 
-Per SPEC.md Assumptions (already resolved, not re-litigated here): Jest/ts-jest stays as the test runner despite the repo's Bun-first CLAUDE.md rule; Role module infra (module file, Prisma repo) is explicitly out of scope — role services/controller are tested by mocking the domain interfaces directly, no DB, no `AppModule` wiring; no password hashing/auth logic is added.
+## Architecture Decisions
 
-## Task Breakdown
+- **Schema scope**: postgresql only (see finding 1).
+- **Password/OTP hashing**: `Bun.password` (bcrypt algorithm), no new dependency. Reset tokens stay SHA-256 (Node `crypto`, already a global).
+- **New dependencies**: `@nestjs/jwt`, `cookie-parser`, `@types/cookie-parser`.
+- **Shared kernel**: new `src/common/` directory (guards, decorators, the JWT token service, the `AuthenticatedRequest`/`JwtPayload` types) — owned by neither `auth` nor `users`/`roles`/`permissions`, importable via the existing `@/` path alias.
+- **OTP/reset-token storage**: plain nullable columns on `User` (`otpCodeHash`, `otpExpiresAt`, `resetTokenHash`, `resetTokenExpiresAt`) — no new Prisma models.
+- **Role assignment timing**: `RegisterService` creates `roleId: null`; `VerifyOtpService` assigns the role. "First user" = first user whose `verified` flips `true` (new `IUserRepository.hasAnyVerified()` method).
+- **Authorization**: `PermissionsGuard` + `@RequirePermissions(slug)` fully replaces the level-based `403` checks in `CreateRoleService`/`UpdateRoleService`/`DeleteRoleService`; newly applied to `permissions` and `users` controllers. `users` module additionally gets a level-hierarchy check (caller's role `level` must be strictly greater than the target user's current — and, if changing, new — role `level`) and a super-admin-only-promotes-to-super_admin rule, both live inside `UpdateUserService`/`DeleteUserService`.
 
-### Phase 0 — Schema change (foundation, blocks everything else)
+## Dependency Graph
 
-**Task 0.1: Update `prisma/postgresql/schema.prisma`**
-- Add `updatedAt DateTime @updatedAt @map("updated_at")` to the `User` model (right after `createdAt`, mirroring `Role`/`Permission`).
-- No other schema changes (no `@unique` added to `username`, no `updatedBy` added to `User`).
-
-**Task 0.2: Regenerate Prisma client**
-- Run `bun run prisma:generate` (→ `bun run scripts/prisma.ts generate`, defaults to `DB_DRIVER=postgresql`, schema-only generation, no DB connection needed).
-- Verify `src/prisma/application/client/schema.prisma`'s `User` model now shows `username`, `accountType`, `verified`, `updatedAt` (currently stale — still shows old `displayName`/`passwordHash` fields, confirmed by reading the generated client).
-
-**Verification:** `grep -A 20 "model User" src/prisma/application/client/schema.prisma` shows the regenerated shape matching source schema.
-
----
-
-### Phase 1 — Fix the `users` module (vertical slice: domain → infra → application → presentation → wiring)
-
-**Task 1.1: `src/modules/users/domain/entities/user.entity.ts`**
-Final 10-field entity (drop `updatedBy`):
-```ts
-export class UserEntity {
-  constructor(
-    public readonly documentId: string,
-    public readonly email: string,
-    public readonly name: string,
-    public readonly username: string,
-    public readonly password: string,
-    public readonly accountType: boolean,
-    public readonly verified: boolean,
-    public readonly roleId: string,
-    public readonly createdAt: Date,
-    public readonly updatedAt: Date,
-  ) {}
-}
 ```
-Note `accountType: boolean` (schema type is `Boolean`, not `string` as the current broken entity has it).
-
-**Task 1.2: `src/modules/users/domain/repositories/user.repository.ts`**
-Keep `USER_REPOSITORY` token and existing method set (`findAll`, `findById`, `findByEmail`, `findByUsername`, `create`, `update`, `delete`, `count`) — these are already correctly declared, just fix the data interfaces:
-```ts
-export interface CreateUserData {
-  email: string;
-  name: string;
-  username: string;
-  password: string;
-  accountType: boolean;
-  verified: boolean;
-  roleId: string;
-}
-
-export interface UpdateUserData {
-  email?: string;
-  name?: string;
-  username?: string;
-  password?: string;
-  accountType?: boolean;
-  verified?: boolean;
-  roleId?: string;
-}
+Schema migration (postgresql only) + ValidationPipe/cookie-parser bootstrap
+    │
+    ├── Boot-time seeder (needs nullable updatedBy to seed before any User exists)
+    │       │
+    │       └── (roles/permissions catalog now exists for everything below)
+    │
+    └── src/common/ (JwtTokenService, JwtAuthGuard, PermissionsGuard, RateLimitGuard)
+            │
+            ├── auth: register + verify-otp + has-users (needs seeded roles to assign)
+            │       │
+            │       ├── auth: login + refresh + logout (needs verified users to exist)
+            │       │
+            │       └── auth: forgot/reset password (independent of login, needs email port)
+            │
+            └── Permission-slug guard rollout onto roles/permissions/users controllers
+                    (needs JwtAuthGuard functional — i.e. login working — to test end-to-end)
 ```
 
-**Task 1.3: `src/modules/users/infrastructure/persistence/prisma-user.repository.ts`**
-Rewrite `toEntity()` to map all 10 fields in the entity's exact constructor order, and implement all 8 interface methods:
-- `findAll`, `findById` — unchanged shape, just fixed `toEntity`.
-- `findByEmail(email)` → `this.prisma.user.findUnique({ where: { email } })` (email is `@unique`).
-- `findByUsername(username)` → `this.prisma.user.findFirst({ where: { username } })` (no `@unique` on username → `findFirst`, not `findUnique`).
-- `create(data)` → pass all `CreateUserData` fields through (`email, name, username, password, accountType, verified, roleId` — `roleId` settable directly as the FK scalar, same style as `PrismaPermissionRepository`).
-- `update(documentId, data)` → spread whichever `UpdateUserData` fields are present.
-- `delete(documentId)` → unchanged.
-- `count()` → `this.prisma.user.count()` (new, was missing).
+## Task List
 
-**Task 1.4: DTOs**
-- `create-user.dto.ts`: `email` (`@IsEmail()`), `name` (`@IsString() @IsNotEmpty()`), `username` (`@IsString() @IsNotEmpty()`), `password` (`@IsString() @IsNotEmpty()` — plain string, no hashing per SPEC), `accountType` (`@IsBoolean()`), `verified` (`@IsOptional() @IsBoolean()` — service defaults to `false` if omitted), `roleId` (`@IsString() @IsNotEmpty()`).
-- `update-user.dto.ts`: same fields, all `@IsOptional()`.
+### Phase 0: Foundation
 
-**Task 1.5: Services** (`src/modules/users/application/services/*.ts`)
-- `create-user.service.ts`: check `findByEmail(dto.email)` → `ConflictException('Email "${dto.email}" is already in use')` if found; check `findByUsername(dto.username)` → `ConflictException('Username "${dto.username}" is already in use')` if found; else `create({ ...dto, verified: dto.verified ?? false })`.
-- `update-user.service.ts`: `findById(documentId)` → `NotFoundException` if missing; if `dto.email` provided and differs from `existing.email`, check `findByEmail` for a different-user collision → `ConflictException`; same pattern for `dto.username`/`findByUsername`; else `update(documentId, dto)`.
-- `delete-user.service.ts`: unchanged pattern (`findById` → `NotFoundException` if missing, else `delete`).
-- `list-user.service.ts`: unchanged passthrough.
+**Task 0.1 — Bootstrap wiring + new dependencies.** Add `@nestjs/jwt`, `cookie-parser`, `@types/cookie-parser` via `bun add`. Register `app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))` and `app.use(cookieParser())` in `src/main.ts`.
+- Acceptance: `bun run build` succeeds; a malformed body against an existing endpoint now returns `400` instead of passing through.
+- Files: `package.json`, `src/main.ts`.
 
-**Task 1.6: Controller** — `src/modules/users/presentation/user.controller.ts` likely needs no structural change (routes already match the Permission controller's shape); just confirm it still compiles against the updated DTOs/entity.
+**Task 0.2 — Schema migration.** In `prisma/postgresql/schema.prisma`: make `Role.updatedBy`/`Permission.updatedBy` optional (`String?`, relation optional); make `User.roleId` optional (`String?`, relation optional); add `otpCodeHash String?`, `otpExpiresAt DateTime?`, `resetTokenHash String?`, `resetTokenExpiresAt DateTime?` to `User`. Update domain layer to match: `PermissionEntity.updatedBy`/`RoleEntity.updatedBy` → `string | null`; `UserEntity.roleId` → `string | null`; the `Create*Data`/`Update*Data` interfaces' `updatedBy`/`roleId` widened accordingly; `toEntity()` mappers in all three Prisma repos updated. Run `bun run prisma:generate`, then **ask before** running `bun run prisma:migrate` against the local dev DB.
+- Acceptance: `bun run build`/`bunx tsc --noEmit` compiles clean; existing `permissions`/`roles`/`users` test suites still pass.
+- Files: `prisma/postgresql/schema.prisma`, `permission.entity.ts`, `permission.repository.ts`, `prisma-permission.repository.ts`, `role.entiry.ts`, `role.repository.ts`, `prisma-role.repository.ts`, `user.entity.ts`, `user.repository.ts`, `prisma-user.repository.ts`.
 
-**Task 1.7: Wire `UserModule` into `AppModule`**
-`src/app.module.ts`: add `import { UserModule } from "./modules/users/user.module";` and include `UserModule` in the `imports` array alongside `PermissionModule`.
+**Checkpoint 0:** `bun run build`, `bun run lint`, `bun run test:cov` all pass, zero regressions. Confirm with human before migrating any real database.
 
-**Verification (end of Phase 1):** `bun run build` compiles with zero TypeScript errors. This is the hard checkpoint — do not proceed to Phase 2 until this passes, since broken types will make every subsequent test file fail to compile too.
+### Phase 1: Boot-time default data seeding
 
----
+**Task 1.1 — Seeder.** `src/bootstrap/seed-default-data.service.ts` (`OnApplicationBootstrap`, injects `PERMISSSION_REPOSITORY`/`ROLE_REPOSITORY`): upsert-if-missing 6 permissions (`user:manager`, `user:read`, `role:manager`, `role:read`, `permission:manager`, `permission:read`) then 4 roles (`super_admin` → all 3 `:manager`, `admin` → all 3 `:read`, `editor`/`guest` → `[]`), `updatedBy: null`, `isDefault: true`, levels `guest=0, editor=0, admin=50, super_admin=100` (confirm exact numbers during build). `src/bootstrap/seed.module.ts` imports `PermissionModule` + `RoleModule`. Add to `AppModule`.
+- Files: `src/bootstrap/seed-default-data.service.ts`, `src/bootstrap/seed.module.ts`, `src/app.module.ts`.
 
-### Phase 2 — Unit tests for `users`
+**Task 1.2 — Seeder tests + coverage gate.** Mock repositories; cover nothing-exists / partially-exists / fully-exists branches. Add `src/bootstrap/**` to `package.json` `coverageThreshold`.
+- Files: `src/bootstrap/seed-default-data.service.spec.ts`, `package.json`.
 
-Tests live next to source as `*.spec.ts` (Jest `testRegex: .*\.spec\.ts$`, `rootDir: src`).
+**Checkpoint 1:** `bun run test:cov`/`build`/`lint` clean. Manual: `bun run start:dev`, confirm 6 permissions + 4 roles exist.
 
-- `create-user.service.spec.ts` — happy path; email-conflict branch; username-conflict branch; verified-defaults-to-false-when-omitted branch.
-- `update-user.service.spec.ts` — not-found branch; email-changed-and-taken branch; email-changed-and-free branch; email-unchanged (skip check) branch; same three for username; happy path.
-- `delete-user.service.spec.ts` — not-found branch; happy path.
-- `list-user.service.spec.ts` — passthrough.
-- `user.controller.spec.ts` — one test per route, mocking the four services (not the repository).
-- `prisma-user.repository.spec.ts` — mock `PrismaService` as a plain object (`{ user: { findMany: jest.fn(), findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn(), count: jest.fn() } }` cast to `PrismaService`), one test per method, confirming `toEntity` maps all 10 fields correctly and `findByUsername` calls `findFirst` (not `findUnique`).
+### Phase 2: Shared auth primitives (`src/common/`)
 
-Follow the mocked-repository pattern already given in SPEC.md's example test block for the service specs.
+**Task 2.1 — Types + JwtTokenService.** `src/common/types/authenticated-request.ts` (supersedes the inline type in `role.controller.ts`), `src/common/types/jwt-payload.ts` (`AccessTokenPayload { sub, roleSlug, level, permissions }`, `RefreshTokenPayload { sub }`), `src/common/token/jwt-token.service.ts` (wraps `@nestjs/jwt`, reads `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` via `ConfigService`), `src/common/token/token.module.ts` (`@Global()`).
 
----
+**Task 2.2 — Guards + decorator.** `src/common/decorators/require-permissions.decorator.ts`, `src/common/guards/permissions.guard.ts` (read-implies-manager mapping), `src/common/guards/jwt-auth.guard.ts`, `src/common/guards/rate-limit.guard.ts` (in-memory token bucket, `RATE_LIMIT_FPS`/`RATE_LIMIT_BURST`).
 
-### Phase 3 — Unit tests for `permissions`
+**Task 2.3 — Tests + coverage gate for `src/common/`.**
 
-No source changes needed here — module is already correctly wired ("gold standard"). Just add tests:
-- `create-permission.service.spec.ts` — conflict branch (slug exists); happy path.
-- `update-permission.service.spec.ts` — not-found branch (empty `findByIds` result); happy path.
-- `delete-permission.service.spec.ts` — not-found branch; still-referenced branch (`roleCount > 0`); still-referenced branch (`accessTokenCount` truthy, `roleCount` 0 — hits the `||` second operand); happy path (both zero).
-- `list-permission.service.spec.ts` — passthrough.
-- `permission.controller.spec.ts` — one test per route.
-- `prisma-permission.repository.spec.ts` — mock `PrismaService`, one test per method including `countReferences`.
+**Checkpoint 2:** `bun run test:cov`/`build`/`lint` clean. Purely additive, inert primitives — nothing user-facing changed yet.
 
-**Checkpoint:** run `bun run test:cov` after Phase 3 and sanity-check the coverage report for `permissions` before moving on to the more branch-heavy `roles` module — confirms the mocking pattern and Jest config changes (Phase 5) are working before tackling the hardest module.
+### Phase 3: Register + Verify-OTP + has-users
 
----
+**Task 3.1 — Email port + stub.** `src/modules/auth/domain/ports/email-sender.port.ts` (`IEmailSender`), `src/modules/auth/infrastructure/email/console-email.sender.ts` (logs via Nest `Logger`).
 
-### Phase 4 — Unit tests for `roles`
+**Task 3.2 — `hasAnyVerified()` on the users repository.** `IUserRepository.hasAnyVerified(): Promise<boolean>` (`prisma.user.count({ where: { verified: true } }) > 0`).
+- Files: `user.repository.ts`, `prisma-user.repository.ts`, `prisma-user.repository.spec.ts`.
 
-No source changes (explicitly out of scope per SPEC — no `role.module.ts`, no `PrismaRoleRepository`). Tests construct services directly with mocked `IRoleRepository` / `IPermissionRepository` / `IUserRoleCountRepository` (via `Test.createTestingModule` + `provide: ROLE_REPOSITORY/PERMISSSION_REPOSITORY/USER_ROLE_COUNT_REPOSITORY, useValue: mock`, or plain `new Service(mockA, mockB)` — either works since there's no module file to instantiate).
+**Task 3.3 — Register + has-users.** `RegisterDto` (email, name, username, password, accountType — no `verified`/`roleId`), `RegisterService` (uniqueness checks, `Bun.password.hash`, generate+hash 6-digit OTP, `roleId: null`, `verified: false`, calls `IEmailSender.sendOtpEmail`), `HasUsersService` (`count() === 0`).
 
-- `create-role.service.spec.ts`: caller-role-unresolved (Forbidden); `dto.level >= callerRole.level` (Forbidden); empty `permissions` array (skips catalog check); non-empty with unknown slug(s) (BadRequest); non-empty all valid (passes); repo throws `RoleAlreadyExistsError` on create (Conflict); repo throws other error (rethrow); happy path.
-- `update-role.service.spec.ts`: caller-role-unresolved (Forbidden); target-not-found (NotFound); `existing.level >= callerRole.level` (Forbidden); `dto.level` provided and `>= callerRole.level` (Forbidden); `existing.isDefault` + name/level provided (BadRequest); `dto.permissions` provided (runs assertion, plus its own empty/invalid/valid sub-branches) vs undefined (skipped); repo throws `RoleNotFoundError` on update (NotFound) vs other (rethrow); happy path.
-- `delete-role.service.spec.ts`: caller-role-unresolved (Forbidden); target-not-found (NotFound); `existing.level >= callerRole.level` (Forbidden); `existing.isDefault` (BadRequest); `assignedUserCount > 0` (Conflict); repo throws `RoleNotFoundError` on delete (NotFound) vs other (rethrow); happy path.
-- `list-roles.service.spec.ts`: passthrough.
-- `role.controller.spec.ts`: only tests the existing `list()` method — `RolesColtroller` currently has no routes wired for create/update/delete (those services are injected but unused/dead code; SPEC's Assumptions confirm this is intentionally out of scope, not something this task adds routes for).
+**Task 3.4 — Verify-OTP + resend-OTP.** `VerifyOtpService` (compare hashed OTP + expiry, on success resolve role via `hasAnyVerified()` → `super_admin`/`guest`, set `verified: true`, clear OTP fields), `ResendOtpService`.
+- Dependencies: Task 3.2, 3.3, Phase 1.
 
-**Do not touch** `role.entiry.ts`, `RolesColtroller`, `PERMISSSION_REPOSITORY`, `dalateRoleService` typos — test against the symbols as they exist today.
+**Task 3.5 — AuthController + AuthModule wiring (partial).** `/api/auth/{register,verify-otp,resend-otp,has-users}` (public, `RateLimitGuard` on register/verify-otp/resend-otp). Register in `AppModule`.
 
----
+**Task 3.6 — Tests + coverage.**
 
-### Phase 5 — Coverage gate + final verification
+**Checkpoint 3:** Manual: register → DB row `roleId: null`, `verified: false`; console logs OTP; verify-otp → `verified: true`, `roleId` = `super_admin` (first) or `guest` (subsequent).
 
-**Task 5.1:** Add a scoped `coverageThreshold` to the `jest` block in `package.json` for branches only, targeting the three module paths (relative to `rootDir: src`):
-```json
-"coverageThreshold": {
-  "./modules/users/**/*.ts": { "branches": 80 },
-  "./modules/roles/**/*.ts": { "branches": 80 },
-  "./modules/permissions/**/*.ts": { "branches": 80 }
-}
-```
-Adjust glob syntax if Jest's threshold matcher needs a different form once run (verify against actual `test:cov` output — Jest resolves threshold keys as path globs relative to rootDir).
+### Phase 4: Login + Refresh + Logout
 
-**Task 5.2:** Run full verification suite:
-- `bun run build` — zero TypeScript errors.
-- `bun run test:cov` — all tests pass, branch coverage ≥80% for `src/modules/users`, `src/modules/roles`, `src/modules/permissions`.
-- `bun run lint` — zero new errors.
+**Task 4.1 — LoginService.** `LoginDto` (email + password), `Bun.password.verify`, `!verified` → `403` with explicit "email not verified" message (distinct from `401` invalid-credentials), else issue tokens via `JwtTokenService`.
 
-**Final checkpoint:** All three commands green. If branch coverage falls short on any module, add targeted tests for the specific uncovered branches shown in the coverage report — never weaken a test or delete an assertion to hit the number (per SPEC boundary).
+**Task 4.2 — RefreshTokenService.** Verify refresh cookie, re-fetch user+role fresh from DB, issue new access token + rotate refresh token.
 
-## Files Touched (summary)
+**Task 4.3 — Controller wiring for login/refresh/logout.** Cookie set/clear in controller (`httpOnly`, `secure: COOKIE_SECURE`, `sameSite: COOKIE_SAMESITE`, access ~15min/refresh ~7d). Logout inline, no service. `RateLimitGuard` on login.
 
-- `prisma/postgresql/schema.prisma` (1 field added)
-- `src/prisma/application/client/**` (regenerated, gitignored)
-- `src/modules/users/**` (entity, repository interface, Prisma repo, DTOs, 4 services rewritten to match schema; controller likely untouched)
-- `src/app.module.ts` (add `UserModule` import)
-- `package.json` (`coverageThreshold` added to `jest` block)
-- New `*.spec.ts` files across `src/modules/users`, `src/modules/roles`, `src/modules/permissions` (~18 files, one per service/controller/Prisma-repo)
-- No changes to `src/modules/roles/**` source, no new `role.module.ts`, no `PrismaRoleRepository`
+**Task 4.4 — Tests + coverage.**
+
+**Checkpoint 4:** Manual: login before verify → `403` distinct message; login after verify → cookies set; refresh → new access cookie; logout → cookies cleared.
+
+### Phase 5: Forgot / Reset Password
+
+**Task 5.1 — Services + DTOs.** `ForgotPasswordService` (random token, SHA-256 hash stored, 1h expiry, always returns success to avoid enumeration), `ResetPasswordService` (hash+compare, expiry check, `Bun.password.hash` new password).
+
+**Task 5.2 — Controller wiring + tests + coverage.** `RateLimitGuard` on both routes.
+
+**Checkpoint 5:** Manual round-trip via console-logged token.
+
+### Phase 6: Permission-slug authorization rollout
+
+**Task 6.1 — Roles module.** Strip level-based `403` blocks from `CreateRoleService`/`UpdateRoleService`/`DeleteRoleService` (drop `callerRoleSlug` param). `role.controller.ts`: swap inline `AuthenticatedRequest` for shared one, add `@UseGuards(JwtAuthGuard, PermissionsGuard)` + `@RequirePermissions("role:manager")` on writes, `"role:read"` on `GET`.
+
+**Task 6.2 — Permissions module.** Same guard/decorator pattern on `permission.controller.ts`.
+
+**Task 6.3 — Users module: guard + level-hierarchy + super-admin rule.** Guards on `user.controller.ts`. In `UpdateUserService`/`DeleteUserService`: inject `ROLE_REPOSITORY`, compare caller's `level` vs target's (and new, if changing) role `level` — `403` if not strictly greater. If `dto.roleId` resolves to `super_admin`, require `req.user.roleSlug === "super_admin"`.
+
+**Task 6.4 — Full regression pass.** `bun run test:cov`/`build`/`lint`.
+
+**Checkpoint 6 (highest-risk):** Full manual end-to-end (register+verify first user → `super_admin` → login → roles readable; second user → `guest` → `403` everywhere; promote to `admin` → reads ok, writes `403`).
+
+### Phase 7: Docs closeout (per `docs/rules/workflow.md`)
+
+**Task 7.1** — Update `docs/documents/{roles,permissions,users}.md`; add `docs/documents/auth.md`; update `docs/ENTRYPOINT.md`.
+**Task 7.2** — Fold `SPEC.md` into docs, then reset `SPEC.md` for the next cycle.
+
+**Checkpoint 7 (final):** `bun run test:cov`/`build`/`lint` clean; every `SPEC.md` success-criteria checkbox verified true.
+
+## Risks and Mitigations
+
+| Risk | Impact | Mitigation |
+|---|---|---|
+| Global `ValidationPipe` turned on for the first time changes behavior of every existing endpoint | Med | Called out in Task 0.1; checkpoint 0 catches regressions. |
+| Schema migration ripples into 3 already-shipped entities' types | Med | Scoped as its own task (0.2) with its own checkpoint before new feature code lands. |
+| Phase 6 changes authorization behavior of already-working endpoints | High | Done last, after login works, verified manually + full regression (6.4). |
+| `bun run prisma:migrate` against a real/shared DB | Med | Explicit "ask first" step in Task 0.2. |
+| JWT payload staleness (~15 min lag on permission changes) | Low | Accepted tradeoff of the stateless design; refresh cycle re-syncs faster. |
+
+## Open Questions (confirm during build)
+
+- Exact `level` values for the 4 default roles (assumed `guest=0, editor=0, admin=50, super_admin=100`).
+- Login identifier — email only, or username too (assumed email-only).
+- `isDefault: true` on all 4 seeded roles (assumed yes, for documentation even though authorization no longer reads it).
+
+## Verification (end-to-end)
+
+1. Boot log/DB shows 6 permissions + 4 roles seeded.
+2. Register → verify-otp (OTP from console) → first user gets `super_admin`.
+3. Login → cookies set → `GET /api/roles` succeeds.
+4. Second account registers+verifies → gets `guest` → `403` on `/api/roles`, `/api/permissions`, `/api/users`.
+5. `super_admin` promotes guest to `admin` → succeeds; `admin` reads succeed, writes `403`.
+6. Forgot-password → reset-password round trip via console-logged token.
+7. `bun run test:cov`, `bun run build`, `bun run lint` all clean.
