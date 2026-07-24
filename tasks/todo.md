@@ -64,10 +64,10 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 9:** full-suite `test:cov` (281 tests) green; seed idempotency verified across two boots (seeded once, no-op/no errors on rerun); manual `DELETE /api/permissions/:id` 409 walkthrough deferred to Phase 10's end-to-end checkpoint (409 branch already covered by `DeletePermissionService` unit tests)
 
 ## Phase 10 — Final full-stack checkpoint
-- [ ] `bun run format` — clean diff
-- [ ] `bun run lint` — zero errors
-- [ ] `bun run build` — succeeds
-- [ ] `bun run test:cov` — full suite green
-- [ ] Manual end-to-end: login → create → list (no hash) → revoke (new token, same id) → delete (204, then 404) → DB spot-check
-- [ ] Grep sanity: `cms_` only in util/tests; `ApiTokenGuard` never in `@UseGuards`; `accessTokenCount: 0` gone
-- [ ] **Checkpoint 10 (final):** every `SPEC.md` success-criteria item verified true
+- [x] `bun run format` — clean diff
+- [x] `bun run lint` — zero errors (pre-existing unrelated warning in `main.ts`)
+- [x] `bun run build` — succeeds
+- [x] `bun run test:cov` — full suite green (58 suites, 281 tests)
+- [x] Manual end-to-end (live curl against a fresh test user promoted to `super_admin`, cleaned up afterward): login → create → list (no `token` field) → revoke via empty body (secret rotates, same `documentId`, fields preserved) → delete (204, then 404 on re-delete) → bonus: deleting a permission referenced by a live access token now 409s with a real, non-zero `accessTokenCount`
+- [x] Grep sanity: `cms_` only in util/tests; `ApiTokenGuard` never in `@UseGuards`; `accessTokenCount: 0` gone from production code (only in test fixtures)
+- [x] **Checkpoint 10 (final):** every `SPEC.md` success-criteria item verified true
