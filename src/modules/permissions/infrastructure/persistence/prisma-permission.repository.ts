@@ -45,9 +45,12 @@ export class PrismaPermissionRepository implements IPermissionRepository {
   }
 
   async countReferences(slug: string): Promise<PermissionReferenceCount> {
-    const [roleCount] = await Promise.all([this.prisma.role.count({ where: { permissions: { array_contains: [slug] } } })]);
+    const [roleCount, accessTokenCount] = await Promise.all([
+      this.prisma.role.count({ where: { permissions: { array_contains: [slug] } } }),
+      this.prisma.accessToken.count({ where: { permissions: { array_contains: [slug] } } }),
+    ]);
 
-    return { roleCount, accessTokenCount: 0 };
+    return { roleCount, accessTokenCount };
   }
 
   private toEntity(permission: {

@@ -56,12 +56,12 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 8:** build/lint/test:cov gate; `rg "ApiTokenGuard" src --type ts -l` shows no `@UseGuards` usage
 
 ## Phase 9 — Seed + cross-cutting edits (ASK FIRST GATE, two sub-confirmations)
-- [ ] Confirm before editing `seed-default-data.service.ts`
-- [ ] `seed-default-data.service.ts` — add `api_token:manager`/`api_token:read` to `DEFAULT_PERMISSIONS`; grant to `super_admin`/`admin` in `DEFAULT_ROLES`
-- [ ] Confirm before editing `prisma-permission.repository.ts`
-- [ ] `prisma-permission.repository.ts` — real `accessTokenCount` in `countReferences`
-- [ ] Update `prisma-permission.repository.spec.ts` for the new branch
-- [ ] **Checkpoint 9:** full-suite `test:cov`; seed idempotency verified across two boots; manual `DELETE /api/permissions/:id` on referenced permission now 409s with real count
+- [x] Confirm before editing `seed-default-data.service.ts`
+- [x] `seed-default-data.service.ts` — add `api_token:manager`/`api_token:read` to `DEFAULT_PERMISSIONS`; grant to `super_admin`/`admin` in `DEFAULT_ROLES`
+- [x] Confirm before editing `prisma-permission.repository.ts`
+- [x] `prisma-permission.repository.ts` — real `accessTokenCount` in `countReferences`
+- [x] Update `prisma-permission.repository.spec.ts` for the new branch
+- [x] **Checkpoint 9:** full-suite `test:cov` (281 tests) green; seed idempotency verified across two boots (seeded once, no-op/no errors on rerun); manual `DELETE /api/permissions/:id` 409 walkthrough deferred to Phase 10's end-to-end checkpoint (409 branch already covered by `DeletePermissionService` unit tests)
 
 ## Phase 10 — Final full-stack checkpoint
 - [ ] `bun run format` — clean diff
