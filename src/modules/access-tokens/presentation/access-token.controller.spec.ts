@@ -1,7 +1,9 @@
 import { CreateAccessTokenDto } from "../application/dto/create-access-token.dto";
+import { RevokeAccessTokenDto } from "../application/dto/revoke-access-token.dto";
 import { CreateAccessTokenService } from "../application/services/create-access-token.service";
 import { DeleteAccessTokenService } from "../application/services/delete-access-token.service";
 import { ListAccessTokensService } from "../application/services/list-access-token.service";
+import { RevokeAccessTokenService } from "../application/services/revoke-access-token.service";
 import { AccessTokenEntity } from "../domain/entities/access-token.entity";
 
 import { Test } from "@nestjs/testing";
@@ -16,6 +18,7 @@ describe("AccessTokenController", () => {
   let createAccessTokenService: jest.Mocked<CreateAccessTokenService>;
   let listAccessTokensService: jest.Mocked<ListAccessTokensService>;
   let deleteAccessTokenService: jest.Mocked<DeleteAccessTokenService>;
+  let revokeAccessTokenService: jest.Mocked<RevokeAccessTokenService>;
 
   const entity = new AccessTokenEntity("token-1", "CI deploy token", "hash", [], null, new Date(), new Date(), "caller-1");
   const req = { user: { sub: "caller-1" } } as AuthenticatedRequest;
@@ -27,6 +30,7 @@ describe("AccessTokenController", () => {
         { provide: CreateAccessTokenService, useValue: { execute: jest.fn() } },
         { provide: ListAccessTokensService, useValue: { execute: jest.fn() } },
         { provide: DeleteAccessTokenService, useValue: { execute: jest.fn() } },
+        { provide: RevokeAccessTokenService, useValue: { execute: jest.fn() } },
         { provide: JwtTokenService, useValue: { verifyAccessToken: jest.fn() } },
       ],
     }).compile();
@@ -35,6 +39,7 @@ describe("AccessTokenController", () => {
     createAccessTokenService = module.get(CreateAccessTokenService);
     listAccessTokensService = module.get(ListAccessTokensService);
     deleteAccessTokenService = module.get(DeleteAccessTokenService);
+    revokeAccessTokenService = module.get(RevokeAccessTokenService);
   });
 
   it("create() delegates to CreateAccessTokenService with the caller id and returns the plaintext token once", async () => {
@@ -81,5 +86,23 @@ describe("AccessTokenController", () => {
     await controller.delete("token-1");
 
     expect(deleteAccessTokenService.execute).toHaveBeenCalledWith("token-1");
+  });
+
+  it("revoke() delegates to RevokeAccessTokenService with the caller id and returns the plaintext token once", async () => {
+    const dto: RevokeAccessTokenDto = {};
+    revokeAccessTokenService.execute.mockResolvedValue({ entity, plaintext: "cms_rotated" });
+
+    const result = await controller.revoke("token-1", dto, req);
+
+    expect(revokeAccessTokenService.execute).toHaveBeenCalledWith("token-1", dto, "caller-1");
+    expect(result).toEqual({
+      documentId: entity.documentId,
+      name: entity.name,
+      permissions: entity.permissions,
+      expiresAt: entity.expiresAt,
+      token: "cms_rotated",
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
+    });
   });
 });

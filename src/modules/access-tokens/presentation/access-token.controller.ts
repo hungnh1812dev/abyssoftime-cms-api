@@ -1,7 +1,9 @@
 import { CreateAccessTokenDto } from "../application/dto/create-access-token.dto";
+import { RevokeAccessTokenDto } from "../application/dto/revoke-access-token.dto";
 import { CreateAccessTokenService } from "../application/services/create-access-token.service";
 import { DeleteAccessTokenService } from "../application/services/delete-access-token.service";
 import { ListAccessTokensService } from "../application/services/list-access-token.service";
+import { RevokeAccessTokenService } from "../application/services/revoke-access-token.service";
 import { AccessTokenEntity } from "../domain/entities/access-token.entity";
 
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Req, UseGuards } from "@nestjs/common";
@@ -37,6 +39,7 @@ export class AccessTokenController {
     private readonly createAccessTokenService: CreateAccessTokenService,
     private readonly listAccessTokensService: ListAccessTokensService,
     private readonly deleteAccessTokenService: DeleteAccessTokenService,
+    private readonly revokeAccessTokenService: RevokeAccessTokenService,
   ) {}
 
   @Get()
@@ -61,6 +64,14 @@ export class AccessTokenController {
   @RequirePermissions("api_token:manager")
   async delete(@Param("id") documentId: string): Promise<void> {
     return this.deleteAccessTokenService.execute(documentId);
+  }
+
+  @Post(":id/revoke")
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("api_token:manager")
+  async revoke(@Param("id") documentId: string, @Body() dto: RevokeAccessTokenDto, @Req() req: AuthenticatedRequest): Promise<AccessTokenSecretResponse> {
+    const { entity, plaintext } = await this.revokeAccessTokenService.execute(documentId, dto, req.user.sub);
+    return this.toSecretResponse(entity, plaintext);
   }
 
   private toResponse(entity: AccessTokenEntity): AccessTokenResponse {
