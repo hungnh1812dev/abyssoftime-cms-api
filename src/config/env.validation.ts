@@ -73,6 +73,12 @@ export class EnvironmentVariables {
   @IsInt()
   @Min(1)
   SERVER_PORT: number = 8080;
+
+  // Express "trust proxy" setting — how many hops of X-Forwarded-For to trust in front of this app.
+  // Default "1" assumes a single reverse-proxy hop (e.g. Render's edge). See docs/documents/auth.md.
+  @IsString()
+  @MinLength(1)
+  TRUST_PROXY: string = "1";
 }
 
 export function validate(config: Record<string, unknown>): EnvironmentVariables {

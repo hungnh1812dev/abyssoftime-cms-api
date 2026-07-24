@@ -65,7 +65,7 @@ model User {
     documentId  String      @id @unique @default(uuid()) @map("document_id")
     email       String      @unique
     name        String      @map("display_name")
-    username    String
+    username    String      @unique
     password    String      @map("password_hash")
     accountType Boolean     @map("account_type")
     verified    Boolean

@@ -32,6 +32,7 @@ describe("DeleteUserService", () => {
       delete: jest.fn(),
       count: jest.fn(),
       hasAnyVerified: jest.fn(),
+      completeVerification: jest.fn(),
       findByResetTokenHash: jest.fn(),
     };
     roles = {
