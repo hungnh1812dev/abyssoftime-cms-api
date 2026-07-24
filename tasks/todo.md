@@ -21,11 +21,11 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 2:** file-scoped tests green, `tsc --noEmit` clean
 
 ## Phase 3 — Create flow
-- [ ] `application/dto/create-access-token.dto.ts`
-- [ ] `application/services/access-token-secret.util.ts` (`generateAccessTokenSecret`, `resolveExpiresAt`)
-- [ ] `application/services/create-access-token.service.ts` (+ `.spec.ts`)
-- [ ] `presentation/access-token.controller.ts` — `POST /api/access-tokens` (`api_token:manager`, first `req.user.sub` consumer)
-- [ ] **Checkpoint 3:** `bun run build && bun run lint && bun run test:cov` (module) green; manual `curl` create returns `token` once
+- [x] `application/dto/create-access-token.dto.ts`
+- [x] `application/services/access-token-secret.util.ts` (`generateAccessTokenSecret`, `resolveExpiresAt`)
+- [x] `application/services/create-access-token.service.ts` (+ `.spec.ts`)
+- [x] `presentation/access-token.controller.ts` — `POST /api/access-tokens` (`api_token:manager`, first `req.user.sub` consumer)
+- [x] **Checkpoint 3:** `bun run build && bun run lint && bun run test:cov` (module) green; manual `curl` create returns `token` once (deferred — module not yet wired into app.module.ts, no route to hit until Phase 7)
 
 ## Phase 4 — List flow
 - [ ] `application/services/list-access-token.service.ts` (+ `.spec.ts`)
