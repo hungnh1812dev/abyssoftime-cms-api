@@ -71,3 +71,11 @@ See `tasks/plan.md` for full context and rationale.
 - [x] Manual end-to-end (live curl against a fresh test user promoted to `super_admin`, cleaned up afterward): login → create → list (no `token` field) → revoke via empty body (secret rotates, same `documentId`, fields preserved) → delete (204, then 404 on re-delete) → bonus: deleting a permission referenced by a live access token now 409s with a real, non-zero `accessTokenCount`
 - [x] Grep sanity: `cms_` only in util/tests; `ApiTokenGuard` never in `@UseGuards`; `accessTokenCount: 0` gone from production code (only in test fixtures)
 - [x] **Checkpoint 10 (final):** every `SPEC.md` success-criteria item verified true
+
+## Phase 11 — Docs closeout + review (added retroactively; not in the original plan)
+- [x] Add `docs/documents/access-tokens.md`
+- [x] Update `docs/documents/permissions.md` (remove stale "`accessTokenCount` hardcoded `0`" notes)
+- [x] Update `docs/ENTRYPOINT.md` index
+- [x] Fold `SPEC.md` into docs, reset `SPEC.md` for next cycle
+- [x] Five-axis code review (`agent-skills:code-reviewer`) — APPROVE, no Critical/Important findings; extracted duplicated `assertPermissionsExist` into a shared helper (with its own spec), documented the two accepted tradeoffs (missing GIN index, check-then-act race) in `access-tokens.md`
+- [x] **Checkpoint 11 (final):** workflow's Spec → Build → Update spec/docs → Review → Clean up cycle fully closed
