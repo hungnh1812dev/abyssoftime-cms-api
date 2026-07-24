@@ -38,15 +38,15 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 5:** 404-on-missing / 404-on-redelete tests; manual DB check confirms hard delete (deferred — no live route until Phase 7 wiring; repo's `delete()` uses Prisma's hard `delete`, no soft-delete column exists)
 
 ## Phase 6 — Revoke flow
-- [ ] `application/dto/revoke-access-token.dto.ts`
-- [ ] `application/services/revoke-access-token.service.ts` (+ `.spec.ts`)
-- [ ] Controller — `POST /api/access-tokens/:id/revoke`
-- [ ] **Checkpoint 6:** tests cover rotate-with-empty-body, partial-field merge, unknown-slug rejection (no rotation on rejected validation); full `test:cov` on `access-tokens` tree
+- [x] `application/dto/revoke-access-token.dto.ts`
+- [x] `application/services/revoke-access-token.service.ts` (+ `.spec.ts`)
+- [x] Controller — `POST /api/access-tokens/:id/revoke`
+- [x] **Checkpoint 6:** tests cover rotate-with-empty-body, partial-field merge, unknown-slug rejection (no rotation on rejected validation); full `test:cov` on `access-tokens` tree
 
 ## Phase 7 — Module + app wiring
-- [ ] `access-token.module.ts` (+ `.spec.ts`)
-- [ ] Register `AccessTokenModule` in `src/app.module.ts`
-- [ ] **Checkpoint 7:** full build/lint/test:cov; app boots without DI errors (note: `GET` end-to-end manual check blocked until Phase 9 seeds permissions)
+- [x] `access-token.module.ts` (+ `.spec.ts`) — `ApiTokenGuard` deliberately omitted from providers/exports until Phase 8 builds it
+- [x] Register `AccessTokenModule` in `src/app.module.ts`
+- [x] **Checkpoint 7:** full build/lint/test:cov; app boots without DI errors, all 4 routes mapped (note: `GET` end-to-end manual check blocked until Phase 9 seeds permissions)
 
 ## Phase 8 — `ApiTokenGuard` (standalone, unwired)
 - [ ] `src/common/types/api-token-payload.ts`
