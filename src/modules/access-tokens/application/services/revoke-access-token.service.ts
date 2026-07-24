@@ -2,11 +2,12 @@ import { AccessTokenEntity } from "../../domain/entities/access-token.entity";
 import { ACCESS_TOKEN_REPOSITORY, type IAccessTokenRepository } from "../../domain/repositories/access-token.repository";
 import { RevokeAccessTokenDto } from "../dto/revoke-access-token.dto";
 
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 
 import { type IPermissionRepository, PERMISSSION_REPOSITORY } from "@/modules/permissions/domain/repositories/permission.repository";
 
 import { generateAccessTokenSecret, resolveExpiresAt } from "./access-token-secret.util";
+import { assertPermissionsExist } from "./assert-permissions-exist.util";
 
 @Injectable()
 export class RevokeAccessTokenService {
@@ -22,7 +23,7 @@ export class RevokeAccessTokenService {
     }
 
     if (dto.permissions !== undefined) {
-      await this.assertPermissionsExist(dto.permissions);
+      await assertPermissionsExist(this.permissions, dto.permissions);
     }
 
     const { plaintext, hash } = generateAccessTokenSecret();
@@ -37,17 +38,5 @@ export class RevokeAccessTokenService {
     });
 
     return { entity, plaintext };
-  }
-
-  private async assertPermissionsExist(permissionSlugs: string[]): Promise<void> {
-    if (permissionSlugs.length === 0) {
-      return;
-    }
-    const catalog = await this.permissions.findAll();
-    const validSlugs = new Set(catalog.map((permission) => permission.slug));
-    const invalidSlugs = permissionSlugs.filter((slug) => !validSlugs.has(slug));
-    if (invalidSlugs.length > 0) {
-      throw new BadRequestException(`Unknown permission slug(s): ${invalidSlugs.join(", ")}`);
-    }
   }
 }
