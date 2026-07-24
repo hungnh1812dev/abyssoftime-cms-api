@@ -33,9 +33,9 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 4:** test proves response objects have no `token` key
 
 ## Phase 5 — Delete flow
-- [ ] `application/services/delete-access-token.service.ts` (+ `.spec.ts`)
-- [ ] Controller — `DELETE /api/access-tokens/:id` → 204 (`api_token:manager`)
-- [ ] **Checkpoint 5:** 404-on-missing / 404-on-redelete tests; manual DB check confirms hard delete
+- [x] `application/services/delete-access-token.service.ts` (+ `.spec.ts`)
+- [x] Controller — `DELETE /api/access-tokens/:id` → 204 (`api_token:manager`)
+- [x] **Checkpoint 5:** 404-on-missing / 404-on-redelete tests; manual DB check confirms hard delete (deferred — no live route until Phase 7 wiring; repo's `delete()` uses Prisma's hard `delete`, no soft-delete column exists)
 
 ## Phase 6 — Revoke flow
 - [ ] `application/dto/revoke-access-token.dto.ts`

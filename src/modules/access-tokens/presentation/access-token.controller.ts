@@ -1,9 +1,10 @@
 import { CreateAccessTokenDto } from "../application/dto/create-access-token.dto";
 import { CreateAccessTokenService } from "../application/services/create-access-token.service";
+import { DeleteAccessTokenService } from "../application/services/delete-access-token.service";
 import { ListAccessTokensService } from "../application/services/list-access-token.service";
 import { AccessTokenEntity } from "../domain/entities/access-token.entity";
 
-import { Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Req, UseGuards } from "@nestjs/common";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
@@ -35,6 +36,7 @@ export class AccessTokenController {
   constructor(
     private readonly createAccessTokenService: CreateAccessTokenService,
     private readonly listAccessTokensService: ListAccessTokensService,
+    private readonly deleteAccessTokenService: DeleteAccessTokenService,
   ) {}
 
   @Get()
@@ -51,6 +53,14 @@ export class AccessTokenController {
   async create(@Body() dto: CreateAccessTokenDto, @Req() req: AuthenticatedRequest): Promise<AccessTokenSecretResponse> {
     const { entity, plaintext } = await this.createAccessTokenService.execute(dto, req.user.sub);
     return this.toSecretResponse(entity, plaintext);
+  }
+
+  @Delete(":id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("api_token:manager")
+  async delete(@Param("id") documentId: string): Promise<void> {
+    return this.deleteAccessTokenService.execute(documentId);
   }
 
   private toResponse(entity: AccessTokenEntity): AccessTokenResponse {

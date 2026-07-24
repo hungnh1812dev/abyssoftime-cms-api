@@ -1,5 +1,6 @@
 import { CreateAccessTokenDto } from "../application/dto/create-access-token.dto";
 import { CreateAccessTokenService } from "../application/services/create-access-token.service";
+import { DeleteAccessTokenService } from "../application/services/delete-access-token.service";
 import { ListAccessTokensService } from "../application/services/list-access-token.service";
 import { AccessTokenEntity } from "../domain/entities/access-token.entity";
 
@@ -14,6 +15,7 @@ describe("AccessTokenController", () => {
   let controller: AccessTokenController;
   let createAccessTokenService: jest.Mocked<CreateAccessTokenService>;
   let listAccessTokensService: jest.Mocked<ListAccessTokensService>;
+  let deleteAccessTokenService: jest.Mocked<DeleteAccessTokenService>;
 
   const entity = new AccessTokenEntity("token-1", "CI deploy token", "hash", [], null, new Date(), new Date(), "caller-1");
   const req = { user: { sub: "caller-1" } } as AuthenticatedRequest;
@@ -24,6 +26,7 @@ describe("AccessTokenController", () => {
       providers: [
         { provide: CreateAccessTokenService, useValue: { execute: jest.fn() } },
         { provide: ListAccessTokensService, useValue: { execute: jest.fn() } },
+        { provide: DeleteAccessTokenService, useValue: { execute: jest.fn() } },
         { provide: JwtTokenService, useValue: { verifyAccessToken: jest.fn() } },
       ],
     }).compile();
@@ -31,6 +34,7 @@ describe("AccessTokenController", () => {
     controller = module.get(AccessTokenController);
     createAccessTokenService = module.get(CreateAccessTokenService);
     listAccessTokensService = module.get(ListAccessTokensService);
+    deleteAccessTokenService = module.get(DeleteAccessTokenService);
   });
 
   it("create() delegates to CreateAccessTokenService with the caller id and returns the plaintext token once", async () => {
@@ -69,5 +73,13 @@ describe("AccessTokenController", () => {
       },
     ]);
     expect("token" in result[0]).toBe(false);
+  });
+
+  it("delete() delegates to DeleteAccessTokenService", async () => {
+    deleteAccessTokenService.execute.mockResolvedValue(undefined);
+
+    await controller.delete("token-1");
+
+    expect(deleteAccessTokenService.execute).toHaveBeenCalledWith("token-1");
   });
 });
