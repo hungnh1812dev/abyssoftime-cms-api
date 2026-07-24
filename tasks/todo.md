@@ -16,9 +16,9 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 1:** `bunx tsc --noEmit` clean
 
 ## Phase 2 — Prisma repository
-- [ ] `src/modules/access-tokens/infrastructure/persistence/prisma-access-token.repository.ts`
-- [ ] `prisma-access-token.repository.spec.ts` (found/not-found `findByTokenHash`, `permissions` JSON round-trip)
-- [ ] **Checkpoint 2:** file-scoped tests green, `tsc --noEmit` clean
+- [x] `src/modules/access-tokens/infrastructure/persistence/prisma-access-token.repository.ts`
+- [x] `prisma-access-token.repository.spec.ts` (found/not-found `findByTokenHash`, `permissions` JSON round-trip)
+- [x] **Checkpoint 2:** file-scoped tests green, `tsc --noEmit` clean
 
 ## Phase 3 — Create flow
 - [ ] `application/dto/create-access-token.dto.ts`
