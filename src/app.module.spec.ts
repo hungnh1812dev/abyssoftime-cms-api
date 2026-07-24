@@ -6,6 +6,7 @@ import { AppService } from "./app.service";
 import { SeedModule } from "./bootstrap/seed.module";
 import { TokenModule } from "./common/token/token.module";
 import { ConfigModule } from "./config/config.module";
+import { AccessTokenModule } from "./modules/access-tokens/access-token.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { PermissionModule } from "./modules/permissions/permission.module";
 import { RoleModule } from "./modules/roles/role.module";
@@ -23,6 +24,7 @@ describe("AppModule", () => {
       PermissionModule,
       RoleModule,
       UserModule,
+      AccessTokenModule,
       AuthModule,
       SeedModule,
     ]);

@@ -1,69 +1,81 @@
-# Todo — Default Seeding + Auth + Permission-Slug Authorization
+# Todo — Access Token Feature (CRUD + standalone ApiTokenGuard)
 
 See `tasks/plan.md` for full context and rationale.
 
-## Phase 0 — Foundation
-- [x] Add deps: `@nestjs/jwt`, `cookie-parser`, `@types/cookie-parser`
-- [x] `src/main.ts` — global `ValidationPipe` + `cookieParser()` middleware
-- [x] Schema: `Role.updatedBy`/`Permission.updatedBy` → nullable, `User.roleId` → nullable, add `otpCodeHash`/`otpExpiresAt`/`resetTokenHash`/`resetTokenExpiresAt` to `User` (`prisma/postgresql/schema.prisma` only)
-- [x] Update `PermissionEntity`/`RoleEntity`/`UserEntity` + repository interfaces + Prisma repo `toEntity()` mappers for the nullable-field widening
+## Phase 0 — Schema + migration (ASK FIRST GATE)
+- [x] Confirm with user before touching schema (postgres-only deviation, already discussed)
+- [x] `prisma/postgresql/schema.prisma` — add `AccessToken` model (after `Role`, before `User`)
+- [x] `prisma/postgresql/schema.prisma` — add `User.updatedAccessTokens` back-relation
+- [x] `bun run prisma:migrate` — new migration `add_access_tokens`
 - [x] `bun run prisma:generate`
-- [x] Ask before `bun run prisma:migrate` against local dev DB (user will run it manually — no `datasource.url` wired for the Prisma CLI yet)
-- [x] **Checkpoint 0:** `bun run build`/`lint`/`test:cov` clean, zero regressions
+- [x] **Checkpoint 0:** `bun run build` clean
 
-## Phase 1 — Boot-time default data seeding
-- [x] `src/bootstrap/seed-default-data.service.ts` — upsert-if-missing 6 permissions + 4 roles
-- [x] `src/bootstrap/seed.module.ts` — imports `PermissionModule`+`RoleModule`
-- [x] Wire `SeedModule` into `AppModule`
-- [x] `seed-default-data.service.spec.ts` (nothing/partial/full-exists branches)
-- [x] `package.json` — `coverageThreshold` entry for `src/bootstrap/**`
-- [ ] **Checkpoint 1:** tests/build/lint clean; manual boot shows 6 permissions + 4 roles (blocked on user's local env — see note below)
+## Phase 1 — Domain layer
+- [x] `src/modules/access-tokens/domain/entities/access-token.entity.ts`
+- [x] `src/modules/access-tokens/domain/repositories/access-token.repository.ts` (`IAccessTokenRepository`, `ACCESS_TOKEN_REPOSITORY`)
+- [x] **Checkpoint 1:** `bunx tsc --noEmit` clean
 
-## Phase 2 — Shared auth primitives (`src/common/`)
-- [x] `src/common/types/authenticated-request.ts`, `jwt-payload.ts`
-- [x] `src/common/token/jwt-token.service.ts` + `token.module.ts` (`@Global()`, wired into `AppModule`)
-- [x] `src/common/decorators/require-permissions.decorator.ts`
-- [x] `src/common/guards/permissions.guard.ts` (read-implies-manager)
-- [x] `src/common/guards/jwt-auth.guard.ts`
-- [x] `src/common/guards/rate-limit.guard.ts` (token bucket, `RATE_LIMIT_FPS`/`RATE_LIMIT_BURST`)
-- [x] Tests for all of the above + `coverageThreshold` entry for `src/common/decorators/**` and `src/common/guards/**` (`src/common/token/jwt-token.service.ts` left ungated — same untestable ts-jest decorator-metadata branch quirk as the pre-existing `prisma.service.ts`)
-- [x] **Checkpoint 2:** tests/build/lint clean (nothing wired into controllers yet)
+## Phase 2 — Prisma repository
+- [x] `src/modules/access-tokens/infrastructure/persistence/prisma-access-token.repository.ts`
+- [x] `prisma-access-token.repository.spec.ts` (found/not-found `findByTokenHash`, `permissions` JSON round-trip)
+- [x] **Checkpoint 2:** file-scoped tests green, `tsc --noEmit` clean
 
-## Phase 3 — Register + Verify-OTP + has-users
-- [x] `src/modules/auth/domain/ports/email-sender.port.ts` (`IEmailSender`)
-- [x] `src/modules/auth/infrastructure/email/console-email.sender.ts`
-- [x] `IUserRepository.hasAnyVerified()` + Prisma impl + spec
-- [x] `RegisterDto` + `RegisterService` (roleId: null, verified: false, hash+send OTP) — uses `bcryptjs`, not `Bun.password` (see plan.md finding 3)
-- [x] `HasUsersService`
-- [x] `VerifyOtpDto`/`ResendOtpDto` + `VerifyOtpService` (assign role, verified: true) + `ResendOtpService`
-- [x] `auth.controller.ts` (register/verify-otp/resend-otp/has-users, public, rate-limited) + `auth.module.ts`
-- [x] Wire `AuthModule` into `AppModule`
-- [x] Tests + `coverageThreshold` entry for `src/modules/auth/application/**`
-- [ ] **Checkpoint 3:** manual register → verify-otp → first user gets `super_admin`, subsequent get `guest`
+## Phase 3 — Create flow
+- [x] `application/dto/create-access-token.dto.ts`
+- [x] `application/services/access-token-secret.util.ts` (`generateAccessTokenSecret`, `resolveExpiresAt`)
+- [x] `application/services/create-access-token.service.ts` (+ `.spec.ts`)
+- [x] `presentation/access-token.controller.ts` — `POST /api/access-tokens` (`api_token:manager`, first `req.user.sub` consumer)
+- [x] **Checkpoint 3:** `bun run build && bun run lint && bun run test:cov` (module) green; manual `curl` create returns `token` once (deferred — module not yet wired into app.module.ts, no route to hit until Phase 7)
 
-## Phase 4 — Login + Refresh + Logout
-- [x] `LoginDto` + `LoginService` (verified check with distinct 403 message, issue tokens)
-- [x] `RefreshTokenService` (re-fetch fresh role from DB, rotate refresh token)
-- [x] Controller wiring: login/refresh/logout routes, cookie set/clear, `RateLimitGuard` on login
-- [x] Tests + coverage (already covered by 4.1–4.3's tests; `auth/application/services` branch coverage 92.85%, well above the 80% gate — the two remaining "uncovered" lines are constructor-parameter decorator-metadata artifacts, same known ts-jest quirk as `jwt-token.service.ts`)
-- [ ] **Checkpoint 4:** manual login/refresh/logout cookie round trip
+## Phase 4 — List flow
+- [x] `application/services/list-access-token.service.ts` (+ `.spec.ts`)
+- [x] Controller — `GET /api/access-tokens` (`api_token:read`), response strips `token` field
+- [x] **Checkpoint 4:** test proves response objects have no `token` key
 
-## Phase 5 — Forgot / Reset Password
-- [x] `ForgotPasswordDto`/`ResetPasswordDto` + `ForgotPasswordService` + `ResetPasswordService`
-- [x] Controller wiring + `RateLimitGuard`
-- [x] Tests + coverage (already covered by 5.1–5.2's tests; `ForgotPasswordService`/`ResetPasswordService` both 100% branches, `auth/application/services` group at 94%, well above the 80% gate)
-- [ ] **Checkpoint 5:** manual forgot→reset round trip via console-logged token
+## Phase 5 — Delete flow
+- [x] `application/services/delete-access-token.service.ts` (+ `.spec.ts`)
+- [x] Controller — `DELETE /api/access-tokens/:id` → 204 (`api_token:manager`)
+- [x] **Checkpoint 5:** 404-on-missing / 404-on-redelete tests; manual DB check confirms hard delete (deferred — no live route until Phase 7 wiring; repo's `delete()` uses Prisma's hard `delete`, no soft-delete column exists)
 
-## Phase 6 — Permission-slug authorization rollout
-- [x] `roles`: strip level checks from create/update/delete services; add guards to `role.controller.ts`; swap in shared `AuthenticatedRequest`
-- [x] `permissions`: add guards to `permission.controller.ts`
-- [x] `users`: add guards to `user.controller.ts`; level-hierarchy check + super-admin-promotion rule in `update-user.service.ts`/`delete-user.service.ts` (inject `ROLE_REPOSITORY`) — resolved a spec ambiguity: the super_admin-slug check replaces (not stacks with) the generic level check when promoting to super_admin, since level 100 is both super_admin's level and the DTO-enforced ceiling, so "caller.level > 100" could never be satisfied otherwise (confirmed with user)
-- [x] Update all affected `*.spec.ts` (role services lose level-check cases; user services gain hierarchy/promotion cases)
-- [ ] **Checkpoint 6 (highest-risk):** full regression (`test:cov`/`build`/`lint`) + full manual end-to-end flow
+## Phase 6 — Revoke flow
+- [x] `application/dto/revoke-access-token.dto.ts`
+- [x] `application/services/revoke-access-token.service.ts` (+ `.spec.ts`)
+- [x] Controller — `POST /api/access-tokens/:id/revoke`
+- [x] **Checkpoint 6:** tests cover rotate-with-empty-body, partial-field merge, unknown-slug rejection (no rotation on rejected validation); full `test:cov` on `access-tokens` tree
 
-## Phase 7 — Docs closeout
-- [x] Update `docs/documents/{roles,permissions,users}.md`
-- [x] Add `docs/documents/auth.md`
-- [x] Update `docs/ENTRYPOINT.md`
+## Phase 7 — Module + app wiring
+- [x] `access-token.module.ts` (+ `.spec.ts`) — `ApiTokenGuard` deliberately omitted from providers/exports until Phase 8 builds it
+- [x] Register `AccessTokenModule` in `src/app.module.ts`
+- [x] **Checkpoint 7:** full build/lint/test:cov; app boots without DI errors, all 4 routes mapped (note: `GET` end-to-end manual check blocked until Phase 9 seeds permissions)
+
+## Phase 8 — `ApiTokenGuard` (standalone, unwired)
+- [x] `src/common/types/api-token-payload.ts`
+- [x] `src/common/types/authenticated-request.ts` — add `apiToken?: ApiTokenPayload`
+- [x] `src/common/guards/api-token.guard.ts` (+ `.spec.ts`: missing/malformed/unknown/expired/valid/never-expires)
+- [x] `access-token.module.ts` — registered `ApiTokenGuard` as provider/export (deferred from Phase 7 since the guard didn't exist yet)
+- [x] **Checkpoint 8:** build/lint/test:cov gate; `rg "ApiTokenGuard" src --type ts -l` shows no `@UseGuards` usage
+
+## Phase 9 — Seed + cross-cutting edits (ASK FIRST GATE, two sub-confirmations)
+- [x] Confirm before editing `seed-default-data.service.ts`
+- [x] `seed-default-data.service.ts` — add `api_token:manager`/`api_token:read` to `DEFAULT_PERMISSIONS`; grant to `super_admin`/`admin` in `DEFAULT_ROLES`
+- [x] Confirm before editing `prisma-permission.repository.ts`
+- [x] `prisma-permission.repository.ts` — real `accessTokenCount` in `countReferences`
+- [x] Update `prisma-permission.repository.spec.ts` for the new branch
+- [x] **Checkpoint 9:** full-suite `test:cov` (281 tests) green; seed idempotency verified across two boots (seeded once, no-op/no errors on rerun); manual `DELETE /api/permissions/:id` 409 walkthrough deferred to Phase 10's end-to-end checkpoint (409 branch already covered by `DeletePermissionService` unit tests)
+
+## Phase 10 — Final full-stack checkpoint
+- [x] `bun run format` — clean diff
+- [x] `bun run lint` — zero errors (pre-existing unrelated warning in `main.ts`)
+- [x] `bun run build` — succeeds
+- [x] `bun run test:cov` — full suite green (58 suites, 281 tests)
+- [x] Manual end-to-end (live curl against a fresh test user promoted to `super_admin`, cleaned up afterward): login → create → list (no `token` field) → revoke via empty body (secret rotates, same `documentId`, fields preserved) → delete (204, then 404 on re-delete) → bonus: deleting a permission referenced by a live access token now 409s with a real, non-zero `accessTokenCount`
+- [x] Grep sanity: `cms_` only in util/tests; `ApiTokenGuard` never in `@UseGuards`; `accessTokenCount: 0` gone from production code (only in test fixtures)
+- [x] **Checkpoint 10 (final):** every `SPEC.md` success-criteria item verified true
+
+## Phase 11 — Docs closeout + review (added retroactively; not in the original plan)
+- [x] Add `docs/documents/access-tokens.md`
+- [x] Update `docs/documents/permissions.md` (remove stale "`accessTokenCount` hardcoded `0`" notes)
+- [x] Update `docs/ENTRYPOINT.md` index
 - [x] Fold `SPEC.md` into docs, reset `SPEC.md` for next cycle
-- [ ] **Checkpoint 7 (final):** all `SPEC.md` success criteria verified true
+- [x] Five-axis code review (`agent-skills:code-reviewer`) — APPROVE, no Critical/Important findings; extracted duplicated `assertPermissionsExist` into a shared helper (with its own spec), documented the two accepted tradeoffs (missing GIN index, check-then-act race) in `access-tokens.md`
+- [x] **Checkpoint 11 (final):** workflow's Spec → Build → Update spec/docs → Review → Clean up cycle fully closed
