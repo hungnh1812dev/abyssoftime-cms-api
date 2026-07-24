@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { ApiTokenGuard } from "@/common/guards/api-token.guard";
 import { PermissionModule } from "@/modules/permissions/permission.module";
 
 import { CreateAccessTokenService } from "./application/services/create-access-token.service";
@@ -18,8 +19,9 @@ import { AccessTokenController } from "./presentation/access-token.controller";
     CreateAccessTokenService,
     RevokeAccessTokenService,
     DeleteAccessTokenService,
+    ApiTokenGuard,
     { provide: ACCESS_TOKEN_REPOSITORY, useClass: PrismaAccessTokenRepository },
   ],
-  exports: [ACCESS_TOKEN_REPOSITORY],
+  exports: [ACCESS_TOKEN_REPOSITORY, ApiTokenGuard],
 })
 export class AccessTokenModule {}

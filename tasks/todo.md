@@ -49,10 +49,11 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 7:** full build/lint/test:cov; app boots without DI errors, all 4 routes mapped (note: `GET` end-to-end manual check blocked until Phase 9 seeds permissions)
 
 ## Phase 8 — `ApiTokenGuard` (standalone, unwired)
-- [ ] `src/common/types/api-token-payload.ts`
-- [ ] `src/common/types/authenticated-request.ts` — add `apiToken?: ApiTokenPayload`
-- [ ] `src/common/guards/api-token.guard.ts` (+ `.spec.ts`: missing/malformed/unknown/expired/valid/never-expires)
-- [ ] **Checkpoint 8:** build/lint/test:cov gate; `rg "ApiTokenGuard" src --type ts -l` shows no `@UseGuards` usage
+- [x] `src/common/types/api-token-payload.ts`
+- [x] `src/common/types/authenticated-request.ts` — add `apiToken?: ApiTokenPayload`
+- [x] `src/common/guards/api-token.guard.ts` (+ `.spec.ts`: missing/malformed/unknown/expired/valid/never-expires)
+- [x] `access-token.module.ts` — registered `ApiTokenGuard` as provider/export (deferred from Phase 7 since the guard didn't exist yet)
+- [x] **Checkpoint 8:** build/lint/test:cov gate; `rg "ApiTokenGuard" src --type ts -l` shows no `@UseGuards` usage
 
 ## Phase 9 — Seed + cross-cutting edits (ASK FIRST GATE, two sub-confirmations)
 - [ ] Confirm before editing `seed-default-data.service.ts`

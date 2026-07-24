@@ -1,5 +1,6 @@
 import { MODULE_METADATA } from "@nestjs/common/constants";
 
+import { ApiTokenGuard } from "@/common/guards/api-token.guard";
 import { PermissionModule } from "@/modules/permissions/permission.module";
 
 import { AccessTokenModule } from "./access-token.module";
@@ -28,11 +29,12 @@ describe("AccessTokenModule", () => {
       CreateAccessTokenService,
       RevokeAccessTokenService,
       DeleteAccessTokenService,
+      ApiTokenGuard,
       { provide: ACCESS_TOKEN_REPOSITORY, useClass: PrismaAccessTokenRepository },
     ]);
   });
 
-  it("exports ACCESS_TOKEN_REPOSITORY", () => {
-    expect(Reflect.getMetadata(MODULE_METADATA.EXPORTS, AccessTokenModule)).toEqual([ACCESS_TOKEN_REPOSITORY]);
+  it("exports ACCESS_TOKEN_REPOSITORY and ApiTokenGuard", () => {
+    expect(Reflect.getMetadata(MODULE_METADATA.EXPORTS, AccessTokenModule)).toEqual([ACCESS_TOKEN_REPOSITORY, ApiTokenGuard]);
   });
 });
