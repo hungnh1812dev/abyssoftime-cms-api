@@ -28,9 +28,9 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 3:** `bun run build && bun run lint && bun run test:cov` (module) green; manual `curl` create returns `token` once (deferred — module not yet wired into app.module.ts, no route to hit until Phase 7)
 
 ## Phase 4 — List flow
-- [ ] `application/services/list-access-token.service.ts` (+ `.spec.ts`)
-- [ ] Controller — `GET /api/access-tokens` (`api_token:read`), response strips `token` field
-- [ ] **Checkpoint 4:** test proves response objects have no `token` key
+- [x] `application/services/list-access-token.service.ts` (+ `.spec.ts`)
+- [x] Controller — `GET /api/access-tokens` (`api_token:read`), response strips `token` field
+- [x] **Checkpoint 4:** test proves response objects have no `token` key
 
 ## Phase 5 — Delete flow
 - [ ] `application/services/delete-access-token.service.ts` (+ `.spec.ts`)

@@ -1,5 +1,6 @@
 import { CreateAccessTokenDto } from "../application/dto/create-access-token.dto";
 import { CreateAccessTokenService } from "../application/services/create-access-token.service";
+import { ListAccessTokensService } from "../application/services/list-access-token.service";
 import { AccessTokenEntity } from "../domain/entities/access-token.entity";
 
 import { Test } from "@nestjs/testing";
@@ -12,6 +13,7 @@ import { AccessTokenController } from "./access-token.controller";
 describe("AccessTokenController", () => {
   let controller: AccessTokenController;
   let createAccessTokenService: jest.Mocked<CreateAccessTokenService>;
+  let listAccessTokensService: jest.Mocked<ListAccessTokensService>;
 
   const entity = new AccessTokenEntity("token-1", "CI deploy token", "hash", [], null, new Date(), new Date(), "caller-1");
   const req = { user: { sub: "caller-1" } } as AuthenticatedRequest;
@@ -21,12 +23,14 @@ describe("AccessTokenController", () => {
       controllers: [AccessTokenController],
       providers: [
         { provide: CreateAccessTokenService, useValue: { execute: jest.fn() } },
+        { provide: ListAccessTokensService, useValue: { execute: jest.fn() } },
         { provide: JwtTokenService, useValue: { verifyAccessToken: jest.fn() } },
       ],
     }).compile();
 
     controller = module.get(AccessTokenController);
     createAccessTokenService = module.get(CreateAccessTokenService);
+    listAccessTokensService = module.get(ListAccessTokensService);
   });
 
   it("create() delegates to CreateAccessTokenService with the caller id and returns the plaintext token once", async () => {
@@ -45,5 +49,25 @@ describe("AccessTokenController", () => {
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
     });
+  });
+
+  it("list() delegates to ListAccessTokensService and strips the token field from every item", async () => {
+    listAccessTokensService.execute.mockResolvedValue([entity]);
+
+    const result = await controller.list();
+
+    expect(listAccessTokensService.execute).toHaveBeenCalled();
+    expect(result).toEqual([
+      {
+        documentId: entity.documentId,
+        name: entity.name,
+        permissions: entity.permissions,
+        expiresAt: entity.expiresAt,
+        createdAt: entity.createdAt,
+        updatedAt: entity.updatedAt,
+        updatedBy: entity.updatedBy,
+      },
+    ]);
+    expect("token" in result[0]).toBe(false);
   });
 });
