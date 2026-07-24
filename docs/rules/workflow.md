@@ -9,14 +9,16 @@ For any new feature/page/module:
 3. **Build (execute)** — implement in multiple steps, verifying as you go.
 4. **Update spec** — reflect the final state in `/docs/specs/*`.
 5. **Update docs** — reflect the final state in `/docs/documents/*`.
-6. **Clean up** — delete the completed spec from `/specs/*.md`.
-7. **Complete** — workflow done.
+6. **Review** — conduct a five-axis code review: correctness, readability, architecture, security, performance.
+7. **Clean up** — delete the completed spec from `/specs/*.md`.
+8. **Complete** — workflow done.
 
 ## Module rules
 
 - Build each feature as its own module (same convention as `src/modules/*`).
 - A module file must be **max 500 lines**. If it grows past that, break it into smaller files.
 - Each module must be independent of other modules (no tight coupling between module internals).
+- When adding a new feature, minimize its effect/coupling on existing modules/features — prefer new files/modules and additive changes (new ports, new adapters) over editing shared internals of unrelated modules.
 
 ## Root docs
 
