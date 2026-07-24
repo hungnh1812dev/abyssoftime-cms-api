@@ -1,6 +1,6 @@
 import { EMAIL_SENDER, type IEmailSender } from "../../domain/ports/email-sender.port";
 import { ForgotPasswordDto } from "../dto/forgot-password.dto";
-import { createHash } from "node:crypto";
+import * as crypto from "node:crypto";
 
 import { Test } from "@nestjs/testing";
 
@@ -29,6 +29,7 @@ describe("ForgotPasswordService", () => {
       delete: jest.fn(),
       count: jest.fn(),
       hasAnyVerified: jest.fn(),
+      completeVerification: jest.fn(),
     };
     emailSender = { sendOtpEmail: jest.fn(), sendPasswordResetEmail: jest.fn() };
 
@@ -65,7 +66,7 @@ describe("ForgotPasswordService", () => {
     expect(emailCall.email).toBe(dto.email);
     expect(emailCall.resetToken).toBeTruthy();
 
-    const expectedHash = createHash("sha256").update(emailCall.resetToken).digest("hex");
+    const expectedHash = crypto.createHash("sha256").update(emailCall.resetToken).digest("hex");
     expect(updateData.resetTokenHash).toBe(expectedHash);
   });
 });

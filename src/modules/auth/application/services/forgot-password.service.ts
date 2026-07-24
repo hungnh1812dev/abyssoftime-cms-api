@@ -18,12 +18,17 @@ export class ForgotPasswordService {
 
   async execute(dto: ForgotPasswordDto): Promise<void> {
     const user = await this.users.findByEmail(dto.email);
+
+    // Pay the same randomBytes+sha256 cost on both branches so the "unknown email" response isn't
+    // measurably faster than the "known email" one (timing side-channel on top of the identical
+    // response body). Does not equalize the DB write / email dispatch the known-email branch also does.
+    const resetToken = randomBytes(RESET_TOKEN_BYTES).toString("hex");
+    const resetTokenHash = createHash("sha256").update(resetToken).digest("hex");
+
     if (!user) {
       return;
     }
 
-    const resetToken = randomBytes(RESET_TOKEN_BYTES).toString("hex");
-    const resetTokenHash = createHash("sha256").update(resetToken).digest("hex");
     const resetTokenExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
 
     await this.users.update(user.documentId, { resetTokenHash, resetTokenExpiresAt });

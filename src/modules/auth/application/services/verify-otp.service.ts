@@ -39,15 +39,15 @@ export class VerifyOtpService {
       throw new BadRequestException("Invalid or expired OTP");
     }
 
-    const isFirstVerification = !(await this.users.hasAnyVerified());
-    const roleSlug = isFirstVerification ? SUPER_ADMIN_ROLE_SLUG : GUEST_ROLE_SLUG;
-    const role = await this.roles.findBySlug(roleSlug);
+    // "First verifier wins super_admin" must be decided atomically with the write — resolving both
+    // roles up front and delegating the actual decision to the repository closes the race where two
+    // concurrent verifications could otherwise both read "no verified user yet". See
+    // docs/documents/auth-issues-fix.md #1.
+    const [superAdminRole, guestRole] = await Promise.all([this.roles.findBySlug(SUPER_ADMIN_ROLE_SLUG), this.roles.findBySlug(GUEST_ROLE_SLUG)]);
 
-    await this.users.update(user.documentId, {
-      verified: true,
-      roleId: role.documentId,
-      otpCodeHash: null,
-      otpExpiresAt: null,
+    await this.users.completeVerification(user.documentId, {
+      firstVerifiedRoleId: superAdminRole.documentId,
+      otherwiseRoleId: guestRole.documentId,
     });
   }
 }

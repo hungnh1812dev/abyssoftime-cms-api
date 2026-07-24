@@ -6,18 +6,35 @@ import { UpdatePermissionService } from "../modules/permissions/application/serv
 import { PermissionEntity } from "../modules/permissions/domain/entities/permission.entity";
 import { PermissionController } from "../modules/permissions/presentation/permission.controller";
 import request from "supertest";
-import { App } from "supertest/types";
 
-import { INestApplication } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { type NestExpressApplication } from "@nestjs/platform-express";
 import { Test } from "@nestjs/testing";
 
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "@/common/guards/permissions.guard";
 
-import { configureApp } from "./configure-app";
+import { configureApp, parseTrustProxy } from "./configure-app";
+
+describe("parseTrustProxy", () => {
+  it("parses boolean-looking strings as booleans", () => {
+    expect(parseTrustProxy("true")).toBe(true);
+    expect(parseTrustProxy("false")).toBe(false);
+  });
+
+  it("parses numeric strings as numbers (hop count)", () => {
+    expect(parseTrustProxy("1")).toBe(1);
+    expect(parseTrustProxy("2")).toBe(2);
+  });
+
+  it("passes through named presets/CIDR lists as-is", () => {
+    expect(parseTrustProxy("loopback")).toBe("loopback");
+    expect(parseTrustProxy("10.0.0.0/8,172.16.0.0/12")).toBe("10.0.0.0/8,172.16.0.0/12");
+  });
+});
 
 describe("configureApp", () => {
-  let app: INestApplication<App>;
+  let app: NestExpressApplication;
   let createPermission: jest.Mocked<CreatePermissionService>;
 
   const permission = new PermissionEntity("permission-1", "document:read", "Read document", "Allows reading a document", new Date(), new Date(), "");
@@ -30,6 +47,7 @@ describe("configureApp", () => {
         { provide: CreatePermissionService, useValue: { execute: jest.fn().mockResolvedValue(permission) } },
         { provide: UpdatePermissionService, useValue: { execute: jest.fn() } },
         { provide: DeletePermissionService, useValue: { execute: jest.fn() } },
+        { provide: ConfigService, useValue: { get: jest.fn((key: string) => (key === "TRUST_PROXY" ? "1" : undefined)) } },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -38,7 +56,7 @@ describe("configureApp", () => {
       .useValue({ canActivate: () => true })
       .compile();
 
-    app = module.createNestApplication();
+    app = module.createNestApplication<NestExpressApplication>();
     configureApp(app);
     createPermission = module.get(CreatePermissionService);
     await app.init();

@@ -5,7 +5,7 @@ import { randomInt } from "node:crypto";
 
 import { ConflictException, Inject, Injectable } from "@nestjs/common";
 
-import { type IUserRepository, USER_REPOSITORY } from "@/modules/users/domain/repositories/user.repository";
+import { type IUserRepository, USER_REPOSITORY, UserAlreadyExistsError } from "@/modules/users/domain/repositories/user.repository";
 
 const OTP_MIN = 100000;
 const OTP_MAX_EXCLUSIVE = 1000000;
@@ -35,17 +35,26 @@ export class RegisterService {
     const otpCodeHash = await bcrypt.hash(otp, BCRYPT_SALT_ROUNDS);
     const otpExpiresAt = new Date(Date.now() + OTP_TTL_MS);
 
-    await this.users.create({
-      email: dto.email,
-      name: dto.name,
-      username: dto.username,
-      password: hashedPassword,
-      accountType: dto.accountType,
-      verified: false,
-      roleId: null,
-      otpCodeHash,
-      otpExpiresAt,
-    });
+    try {
+      await this.users.create({
+        email: dto.email,
+        name: dto.name,
+        username: dto.username,
+        password: hashedPassword,
+        accountType: dto.accountType,
+        verified: false,
+        roleId: null,
+        otpCodeHash,
+        otpExpiresAt,
+      });
+    } catch (error) {
+      // Safety net for the rare race where two requests pass the pre-checks above concurrently —
+      // the DB's unique constraints are the real source of truth. See docs/documents/auth-issues-fix.md #3.
+      if (error instanceof UserAlreadyExistsError) {
+        throw new ConflictException(error.message);
+      }
+      throw error;
+    }
 
     await this.emailSender.sendOtpEmail({ email: dto.email, otp });
   }

@@ -12,6 +12,11 @@ export interface LoginResult {
   refreshToken: string;
 }
 
+// Precomputed bcrypt hash of an arbitrary string (no corresponding real account) — compared against
+// on the "no such user" path so it costs the same as the real bcrypt.compare on the wrong-password
+// path, closing the timing side-channel that would otherwise reveal whether an email is registered.
+const DUMMY_PASSWORD_HASH = "$2b$10$ygH41CylwgwQrk36/iBQHektv.E2P3xI54PR1J99ksWv2abtU3ihK";
+
 @Injectable()
 export class LoginService {
   constructor(
@@ -23,6 +28,7 @@ export class LoginService {
   async execute(dto: LoginDto): Promise<LoginResult> {
     const user = await this.users.findByEmail(dto.email);
     if (!user) {
+      await bcrypt.compare(dto.password, DUMMY_PASSWORD_HASH);
       throw new UnauthorizedException("Invalid email or password");
     }
 
