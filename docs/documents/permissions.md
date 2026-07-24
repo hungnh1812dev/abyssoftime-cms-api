@@ -30,7 +30,7 @@ Maps 1:1 to the `Permission` Prisma model (`prisma/postgresql/schema.prisma`); t
 - `delete(documentId): Promise<void>`
 - `countReferences(slug): Promise<{ roleCount: number; accessTokenCount: number }>`
 
-Implementation: `infrastructure/persistence/prisma-permission.repository.ts` (`PrismaPermissionRepository`). `countReferences` queries `prisma.role.count({ where: { permissions: { array_contains: [slug] } } })` — since `Role.permissions` is a raw JSON array (no join table), and hardcodes `accessTokenCount: 0` (no access-token model exists yet).
+Implementation: `infrastructure/persistence/prisma-permission.repository.ts` (`PrismaPermissionRepository`). `countReferences` runs `prisma.role.count(...)` and `prisma.accessToken.count(...)` in parallel via `Promise.all`, both using `{ where: { permissions: { array_contains: [slug] } } }` — since both `Role.permissions` and `AccessToken.permissions` are raw JSON arrays (no join table). See [access-tokens.md](./access-tokens.md) for the access-token side.
 
 ## DTOs
 
@@ -72,12 +72,11 @@ None of the four services take a caller parameter or perform authorization thems
 
 - `PERMISSSION_REPOSITORY` constant is misspelled (three S's) — kept as-is per project convention (don't fix typos as unrequested cleanup).
 - `updatedBy` is always `""` on create/update — no caller-identity plumbing exists yet.
-- `accessTokenCount` in `countReferences` is a hardcoded `0` placeholder.
 
 ## Tests
 
 Unit tests (Jest, mocked repository, ≥80% branch coverage) live next to each source file: `create-permission.service.spec.ts`, `update-permission.service.spec.ts`, `delete-permission.service.spec.ts`, `list-permission.service.spec.ts`, `permission.controller.spec.ts` (provides a mocked `JwtTokenService` so the testing module can instantiate `JwtAuthGuard`, referenced via `@UseGuards`), `prisma-permission.repository.spec.ts`.
 
-## Verified state (2026-07-23)
+## Verified state (2026-07-24)
 
-`bun run build`, `bunx tsc --noEmit`, `bunx eslint`, and `bun run test:cov` all pass with zero errors for this module.
+`bun run build`, `bunx tsc --noEmit`, `bunx eslint`, and `bun run test:cov` all pass with zero errors for this module. `countReferences`'s `accessTokenCount` fix (real query, no longer hardcoded `0`) verified live against a real access token.

@@ -15,6 +15,9 @@ describe("PrismaPermissionRepository", () => {
     role: {
       count: jest.Mock;
     };
+    accessToken: {
+      count: jest.Mock;
+    };
   };
 
   const record = {
@@ -37,6 +40,9 @@ describe("PrismaPermissionRepository", () => {
         delete: jest.fn(),
       },
       role: {
+        count: jest.fn(),
+      },
+      accessToken: {
         count: jest.fn(),
       },
     };
@@ -152,12 +158,14 @@ describe("PrismaPermissionRepository", () => {
     expect(result.updatedBy).toBeNull();
   });
 
-  it("countReferences() returns the role reference count and a zero access token count", async () => {
+  it("countReferences() returns both the role reference count and the access token reference count", async () => {
     prisma.role.count.mockResolvedValue(2);
+    prisma.accessToken.count.mockResolvedValue(3);
 
     const result = await repository.countReferences("document:read");
 
     expect(prisma.role.count).toHaveBeenCalledWith({ where: { permissions: { array_contains: ["document:read"] } } });
-    expect(result).toEqual({ roleCount: 2, accessTokenCount: 0 });
+    expect(prisma.accessToken.count).toHaveBeenCalledWith({ where: { permissions: { array_contains: ["document:read"] } } });
+    expect(result).toEqual({ roleCount: 2, accessTokenCount: 3 });
   });
 });

@@ -36,7 +36,7 @@ describe("SeedDefaultDataService", () => {
     service = new SeedDefaultDataService(permissions, roles);
   });
 
-  it("creates all 6 permissions and 4 roles when nothing exists yet", async () => {
+  it("creates all 8 permissions and 4 roles when nothing exists yet", async () => {
     permissions.findBySlug.mockResolvedValue(null);
     roles.findBySlug.mockResolvedValue(null as unknown as RoleEntity);
     permissions.create.mockResolvedValue(permissionEntity("stub"));
@@ -44,11 +44,11 @@ describe("SeedDefaultDataService", () => {
 
     await service.onApplicationBootstrap();
 
-    expect(permissions.create).toHaveBeenCalledTimes(6);
+    expect(permissions.create).toHaveBeenCalledTimes(8);
     expect(roles.create).toHaveBeenCalledTimes(4);
 
     const createdSlugs = permissions.create.mock.calls.map(([data]) => data.slug);
-    expect(createdSlugs).toEqual(["user:manager", "user:read", "role:manager", "role:read", "permission:manager", "permission:read"]);
+    expect(createdSlugs).toEqual(["user:manager", "user:read", "role:manager", "role:read", "permission:manager", "permission:read", "api_token:manager", "api_token:read"]);
 
     const createdRoleSlugs = roles.create.mock.calls.map(([data]) => data.slug);
     expect(createdRoleSlugs).toEqual(["super_admin", "admin", "editor", "guest"]);
@@ -62,11 +62,11 @@ describe("SeedDefaultDataService", () => {
 
     await service.onApplicationBootstrap();
 
-    expect(permissions.create).toHaveBeenCalledTimes(5);
+    expect(permissions.create).toHaveBeenCalledTimes(7);
     expect(roles.create).toHaveBeenCalledTimes(3);
   });
 
-  it("creates nothing when all 6 permissions and 4 roles already exist", async () => {
+  it("creates nothing when all 8 permissions and 4 roles already exist", async () => {
     permissions.findBySlug.mockImplementation((slug) => Promise.resolve(permissionEntity(slug)));
     roles.findBySlug.mockImplementation((slug) => Promise.resolve(roleEntity(slug)));
 
@@ -76,7 +76,7 @@ describe("SeedDefaultDataService", () => {
     expect(roles.create).not.toHaveBeenCalled();
   });
 
-  it("seeds super_admin with all manager permissions and admin with all read permissions", async () => {
+  it("seeds super_admin with all manager permissions (incl. api_token:manager) and admin with all read permissions (incl. api_token:read)", async () => {
     permissions.findBySlug.mockResolvedValue(null);
     roles.findBySlug.mockResolvedValue(null as unknown as RoleEntity);
     permissions.create.mockResolvedValue(permissionEntity("stub"));
@@ -89,8 +89,8 @@ describe("SeedDefaultDataService", () => {
     const editorCall = roles.create.mock.calls.find(([data]) => data.slug === "editor")![0];
     const guestCall = roles.create.mock.calls.find(([data]) => data.slug === "guest")![0];
 
-    expect(superAdminCall.permissions).toEqual(["user:manager", "role:manager", "permission:manager"]);
-    expect(adminCall.permissions).toEqual(["user:read", "role:read", "permission:read"]);
+    expect(superAdminCall.permissions).toEqual(["user:manager", "role:manager", "permission:manager", "api_token:manager"]);
+    expect(adminCall.permissions).toEqual(["user:read", "role:read", "permission:read", "api_token:read"]);
     expect(editorCall.permissions).toEqual([]);
     expect(guestCall.permissions).toEqual([]);
   });
