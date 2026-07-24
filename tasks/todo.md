@@ -11,9 +11,9 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 0:** `bun run build` clean
 
 ## Phase 1 — Domain layer
-- [ ] `src/modules/access-tokens/domain/entities/access-token.entity.ts`
-- [ ] `src/modules/access-tokens/domain/repositories/access-token.repository.ts` (`IAccessTokenRepository`, `ACCESS_TOKEN_REPOSITORY`)
-- [ ] **Checkpoint 1:** `bunx tsc --noEmit` clean
+- [x] `src/modules/access-tokens/domain/entities/access-token.entity.ts`
+- [x] `src/modules/access-tokens/domain/repositories/access-token.repository.ts` (`IAccessTokenRepository`, `ACCESS_TOKEN_REPOSITORY`)
+- [x] **Checkpoint 1:** `bunx tsc --noEmit` clean
 
 ## Phase 2 — Prisma repository
 - [ ] `src/modules/access-tokens/infrastructure/persistence/prisma-access-token.repository.ts`
