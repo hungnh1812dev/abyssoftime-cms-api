@@ -8,9 +8,9 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 0:** `bun run test env.validation.spec.ts` green
 
 ## Phase 1 — Templates
-- [ ] `templates/otp-email.template.ts` + spec
-- [ ] `templates/reset-password-email.template.ts` + spec
-- [ ] **Checkpoint 1:** template specs green
+- [x] `templates/otp-email.template.ts` + spec
+- [x] `templates/reset-password-email.template.ts` + spec
+- [x] **Checkpoint 1:** template specs green
 
 ## Phase 2 — Adapter
 - [ ] `bun add nodemailer && bun add -d @types/nodemailer`

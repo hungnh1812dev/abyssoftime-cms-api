@@ -35,10 +35,10 @@ Slicing note: this is a single cohesive infrastructure swap, not several indepen
 - [x] **Checkpoint 0:** `bun run test env.validation.spec.ts` green
 
 ### Phase 1 — Templates
-- [ ] `templates/otp-email.template.ts` — `buildOtpEmailHtml({ otp })`, mentions the real 10-minute OTP expiry
-- [ ] `templates/reset-password-email.template.ts` — `buildResetPasswordEmailHtml({ resetUrl })`, mentions the real 1-hour reset-token expiry
-- [ ] Spec files for both, asserting interpolated values appear in output
-- [ ] **Checkpoint 1:** template specs green
+- [x] `templates/otp-email.template.ts` — `buildOtpEmailHtml({ otp })`, mentions the real 10-minute OTP expiry
+- [x] `templates/reset-password-email.template.ts` — `buildResetPasswordEmailHtml({ resetUrl })`, mentions the real 1-hour reset-token expiry
+- [x] Spec files for both, asserting interpolated values appear in output
+- [x] **Checkpoint 1:** template specs green
 
 ### Phase 2 — Adapter
 - [ ] `bun add nodemailer && bun add -d @types/nodemailer`
