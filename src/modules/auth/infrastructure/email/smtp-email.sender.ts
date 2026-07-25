@@ -23,6 +23,7 @@ export class SmtpEmailSender implements IEmailSender {
       host: configService.get("SMTP_HOST", { infer: true }),
       port: configService.get("SMTP_PORT", { infer: true }),
       secure: configService.get("SMTP_SECURE", { infer: true }),
+      requireTLS: true,
       auth: {
         user: configService.get("SMTP_USER", { infer: true }),
         pass: configService.get("SMTP_PASSWORD", { infer: true }),

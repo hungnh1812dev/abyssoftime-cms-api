@@ -47,6 +47,7 @@ describe("SmtpEmailSender", () => {
       host: "smtp.example.com",
       port: 587,
       secure: false,
+      requireTLS: true,
       auth: { user: "user@example.com", pass: "hunter2" },
     });
   });
