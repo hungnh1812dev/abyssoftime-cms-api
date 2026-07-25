@@ -13,6 +13,11 @@ For any new feature/page/module:
 7. **Clean up** — delete the completed spec from `/specs/*.md`, must be run after Review complete.
 8. **Complete** — workflow done.
 
+### `[CAREFUL]` features
+
+- If a feature's request/spec is tagged `[CAREFUL]`, use the Opus model for the **Build (plan)** and **Review** phases.
+- Use the Sonnet model for all other phases (Spec, Build (execute), Update spec, Update docs, Clean up).
+
 ## Module rules
 
 - Build each feature as its own module (same convention as `src/modules/*`).
