@@ -79,6 +79,38 @@ export class EnvironmentVariables {
   @IsString()
   @MinLength(1)
   TRUST_PROXY: string = "1";
+
+  // SMTP — SMTP_HOST unset means "use ConsoleEmailSender" (dev/test fallback), see resolve-email-sender.ts
+  @IsString()
+  SMTP_HOST: string = "";
+
+  @Transform(({ value }: { value: unknown }) => (value === undefined ? 587 : Number(value)))
+  @IsInt()
+  @Min(1)
+  SMTP_PORT: number = 587;
+
+  @IsString()
+  SMTP_USER: string = "";
+
+  @IsString()
+  SMTP_PASSWORD: string = "";
+
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === undefined) return false;
+    if (value === "true") return true;
+    if (value === "false") return false;
+    return value;
+  })
+  @IsIn([true, false])
+  SMTP_SECURE: boolean = false;
+
+  @IsString()
+  @MinLength(1)
+  EMAIL_FROM: string = "no-reply@example.com";
+
+  @IsString()
+  @MinLength(1)
+  FRONTEND_URL: string = "http://localhost:3000";
 }
 
 export function validate(config: Record<string, unknown>): EnvironmentVariables {
