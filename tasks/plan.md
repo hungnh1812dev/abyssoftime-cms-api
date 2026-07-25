@@ -54,10 +54,10 @@ Slicing note: this is a single cohesive infrastructure swap, not several indepen
 - [x] **Checkpoint 3:** `bun run build`, `bunx tsc --noEmit`, `bunx eslint`, `bun run test:cov` all clean — **commit here** (workflow checkpoint-timing rule: Phase 4's docs work and the manual-verification checkpoint don't block this commit)
 
 ### Phase 4 — Docs
-- [ ] `docs/documents/auth.md` — replace the "`ConsoleEmailSender` is still the only `IEmailSender`" Known Gap with the new env-driven-selection description
-- [ ] `docs/documents/auth-issues-fix.md` finding #10 — add an "Update: resolved" note
-- [ ] `SPEC.md` — trim back to a pointer line once the above fully capture the end state
-- [ ] **Checkpoint 4:** doc read-through, no doc still claims `ConsoleEmailSender` is the only implementation — commit
+- [x] `docs/documents/auth.md` — replace the "`ConsoleEmailSender` is still the only `IEmailSender`" Known Gap with the new env-driven-selection description
+- [x] `docs/documents/auth-issues-fix.md` finding #10 — add an "Update: resolved" note
+- [x] `SPEC.md` — trim back to a pointer line once the above fully capture the end state
+- [x] **Checkpoint 4:** doc read-through, no doc still claims `ConsoleEmailSender` is the only implementation — commit
 
 ### Phase 5 — Manual verification (non-blocking for the Phase 3 commit)
 - [ ] User sets real `SMTP_*`/`EMAIL_FROM`/`FRONTEND_URL` in their own `.env` (not touched by the agent — global rule)

@@ -26,10 +26,10 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 3:** `bun run build`, `bunx tsc --noEmit`, `bunx eslint`, `bun run test:cov` all clean — commit
 
 ## Phase 4 — Docs
-- [ ] `docs/documents/auth.md` — close the `ConsoleEmailSender`-only gap
-- [ ] `docs/documents/auth-issues-fix.md` — finding #10 "Update: resolved" note
-- [ ] `SPEC.md` — trim back to pointer line
-- [ ] **Checkpoint 4:** doc read-through — commit
+- [x] `docs/documents/auth.md` — close the `ConsoleEmailSender`-only gap
+- [x] `docs/documents/auth-issues-fix.md` — finding #10 "Update: resolved" note
+- [x] `SPEC.md` — trim back to pointer line
+- [x] **Checkpoint 4:** doc read-through — commit
 
 ## Phase 5 — Manual verification (non-blocking for the Phase 3 commit)
 - [ ] User sets real `SMTP_*`/`EMAIL_FROM`/`FRONTEND_URL` in their own `.env`
