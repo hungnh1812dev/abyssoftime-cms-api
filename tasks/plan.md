@@ -41,10 +41,10 @@ Slicing note: this is a single cohesive infrastructure swap, not several indepen
 - [x] **Checkpoint 1:** template specs green
 
 ### Phase 2 — Adapter
-- [ ] `bun add nodemailer && bun add -d @types/nodemailer`
-- [ ] `smtp-email.sender.ts` — `SmtpEmailSender implements IEmailSender`, one `Transporter` built in the constructor from `ConfigService`, `sendOtpEmail`/`sendPasswordResetEmail` call `sendMail` with the Phase 1 templates
-- [ ] `smtp-email.sender.spec.ts` — `jest.mock("nodemailer")`, assert `sendMail` args (`to`/`from`/`subject`/`html` contents); no real network calls
-- [ ] **Checkpoint 2:** adapter spec green, `bun run build` clean
+- [x] `bun add nodemailer && bun add -d @types/nodemailer`
+- [x] `smtp-email.sender.ts` — `SmtpEmailSender implements IEmailSender`, one `Transporter` built in the constructor from `ConfigService`, `sendOtpEmail`/`sendPasswordResetEmail` call `sendMail` with the Phase 1 templates
+- [x] `smtp-email.sender.spec.ts` — `jest.mock("nodemailer")`, assert `sendMail` args (`to`/`from`/`subject`/`html` contents); no real network calls
+- [x] **Checkpoint 2:** adapter spec green, `bun run build` clean
 
 ### Phase 3 — Wiring
 - [ ] `resolve-email-sender.ts` — `resolveEmailSender(config)` returns `SmtpEmailSender` when `SMTP_HOST` is set, else `ConsoleEmailSender`; standalone function for unit-testability without a Nest `TestingModule`

@@ -13,10 +13,10 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 1:** template specs green
 
 ## Phase 2 — Adapter
-- [ ] `bun add nodemailer && bun add -d @types/nodemailer`
-- [ ] `smtp-email.sender.ts` — `SmtpEmailSender implements IEmailSender`
-- [ ] `smtp-email.sender.spec.ts` — `nodemailer` mocked, no real network calls
-- [ ] **Checkpoint 2:** adapter spec green, `bun run build` clean
+- [x] `bun add nodemailer && bun add -d @types/nodemailer`
+- [x] `smtp-email.sender.ts` — `SmtpEmailSender implements IEmailSender`
+- [x] `smtp-email.sender.spec.ts` — `nodemailer` mocked, no real network calls
+- [x] **Checkpoint 2:** adapter spec green, `bun run build` clean
 
 ## Phase 3 — Wiring
 - [ ] `resolve-email-sender.ts` — `resolveEmailSender(config)` selection function
