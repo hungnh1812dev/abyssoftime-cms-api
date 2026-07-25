@@ -30,6 +30,13 @@ describe("validate", () => {
     expect(result.CONTENT_TYPES_DIR).toBe("content-types");
     expect(result.MEDIA_MAX_UPLOAD_BYTES).toBe(10 * 1024 * 1024);
     expect(result.SERVER_PORT).toBe(8080);
+    expect(result.SMTP_HOST).toBe("");
+    expect(result.SMTP_PORT).toBe(587);
+    expect(result.SMTP_USER).toBe("");
+    expect(result.SMTP_PASSWORD).toBe("");
+    expect(result.SMTP_SECURE).toBe(false);
+    expect(result.EMAIL_FROM).toBe("no-reply@example.com");
+    expect(result.FRONTEND_URL).toBe("http://localhost:3000");
   });
 
   it("transforms COOKIE_SECURE 'true' to boolean true", () => {
@@ -70,6 +77,27 @@ describe("validate", () => {
 
     expect(result.MEDIA_MAX_UPLOAD_BYTES).toBe(1024);
     expect(result.SERVER_PORT).toBe(9090);
+  });
+
+  it("overrides the SMTP/email fields when explicitly provided", () => {
+    const result = validate({
+      ...requiredConfig,
+      SMTP_HOST: "smtp.example.com",
+      SMTP_PORT: "2525",
+      SMTP_USER: "user@example.com",
+      SMTP_PASSWORD: "hunter2",
+      SMTP_SECURE: "true",
+      EMAIL_FROM: "hello@abyssoftime.com",
+      FRONTEND_URL: "https://abyssoftime.com",
+    });
+
+    expect(result.SMTP_HOST).toBe("smtp.example.com");
+    expect(result.SMTP_PORT).toBe(2525);
+    expect(result.SMTP_USER).toBe("user@example.com");
+    expect(result.SMTP_PASSWORD).toBe("hunter2");
+    expect(result.SMTP_SECURE).toBe(true);
+    expect(result.EMAIL_FROM).toBe("hello@abyssoftime.com");
+    expect(result.FRONTEND_URL).toBe("https://abyssoftime.com");
   });
 
   it("falls back to defaults when the numeric fields are present but explicitly undefined", () => {
