@@ -1,4 +1,5 @@
 import { MODULE_METADATA } from "@nestjs/common/constants";
+import { ConfigService } from "@nestjs/config";
 
 import { RoleModule } from "@/modules/roles/role.module";
 import { UserModule } from "@/modules/users/user.module";
@@ -13,7 +14,7 @@ import { ResetPasswordService } from "./application/services/reset-password.serv
 import { VerifyOtpService } from "./application/services/verify-otp.service";
 import { AuthModule } from "./auth.module";
 import { EMAIL_SENDER } from "./domain/ports/email-sender.port";
-import { ConsoleEmailSender } from "./infrastructure/email/console-email.sender";
+import { resolveEmailSender } from "./infrastructure/email/resolve-email-sender";
 import { AuthController } from "./presentation/auth.controller";
 
 describe("AuthModule", () => {
@@ -25,7 +26,7 @@ describe("AuthModule", () => {
     expect(Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, AuthModule)).toEqual([AuthController]);
   });
 
-  it("registers the auth services and binds EMAIL_SENDER to ConsoleEmailSender", () => {
+  it("registers the auth services and binds EMAIL_SENDER via resolveEmailSender", () => {
     const providers = Reflect.getMetadata(MODULE_METADATA.PROVIDERS, AuthModule) as unknown[];
 
     expect(providers).toEqual([
@@ -37,7 +38,7 @@ describe("AuthModule", () => {
       RefreshTokenService,
       ForgotPasswordService,
       ResetPasswordService,
-      { provide: EMAIL_SENDER, useClass: ConsoleEmailSender },
+      { provide: EMAIL_SENDER, useFactory: resolveEmailSender, inject: [ConfigService] },
     ]);
   });
 

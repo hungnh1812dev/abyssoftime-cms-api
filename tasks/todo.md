@@ -19,11 +19,11 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 2:** adapter spec green, `bun run build` clean
 
 ## Phase 3 — Wiring
-- [ ] `resolve-email-sender.ts` — `resolveEmailSender(config)` selection function
-- [ ] `resolve-email-sender.spec.ts` — both branches
-- [ ] `auth.module.ts` — `useFactory: resolveEmailSender, inject: [ConfigService]`
-- [ ] `auth.module.spec.ts` — update exact-equality `providers` assertion
-- [ ] **Checkpoint 3:** `bun run build`, `bunx tsc --noEmit`, `bunx eslint`, `bun run test:cov` all clean — commit
+- [x] `resolve-email-sender.ts` — `resolveEmailSender(config)` selection function
+- [x] `resolve-email-sender.spec.ts` — both branches
+- [x] `auth.module.ts` — `useFactory: resolveEmailSender, inject: [ConfigService]`
+- [x] `auth.module.spec.ts` — update exact-equality `providers` assertion
+- [x] **Checkpoint 3:** `bun run build`, `bunx tsc --noEmit`, `bunx eslint`, `bun run test:cov` all clean — commit
 
 ## Phase 4 — Docs
 - [ ] `docs/documents/auth.md` — close the `ConsoleEmailSender`-only gap

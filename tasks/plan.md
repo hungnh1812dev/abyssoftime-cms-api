@@ -47,11 +47,11 @@ Slicing note: this is a single cohesive infrastructure swap, not several indepen
 - [x] **Checkpoint 2:** adapter spec green, `bun run build` clean
 
 ### Phase 3 — Wiring
-- [ ] `resolve-email-sender.ts` — `resolveEmailSender(config)` returns `SmtpEmailSender` when `SMTP_HOST` is set, else `ConsoleEmailSender`; standalone function for unit-testability without a Nest `TestingModule`
-- [ ] `resolve-email-sender.spec.ts` — both branches
-- [ ] `auth.module.ts` — swap `useClass: ConsoleEmailSender` for `{ useFactory: resolveEmailSender, inject: [ConfigService] }`
-- [ ] `auth.module.spec.ts` — update the exact-equality `providers` assertion to match the new factory-shaped entry
-- [ ] **Checkpoint 3:** `bun run build`, `bunx tsc --noEmit`, `bunx eslint`, `bun run test:cov` all clean — **commit here** (workflow checkpoint-timing rule: Phase 4's docs work and the manual-verification checkpoint don't block this commit)
+- [x] `resolve-email-sender.ts` — `resolveEmailSender(config)` returns `SmtpEmailSender` when `SMTP_HOST` is set, else `ConsoleEmailSender`; standalone function for unit-testability without a Nest `TestingModule`
+- [x] `resolve-email-sender.spec.ts` — both branches
+- [x] `auth.module.ts` — swap `useClass: ConsoleEmailSender` for `{ useFactory: resolveEmailSender, inject: [ConfigService] }`
+- [x] `auth.module.spec.ts` — update the exact-equality `providers` assertion to match the new factory-shaped entry
+- [x] **Checkpoint 3:** `bun run build`, `bunx tsc --noEmit`, `bunx eslint`, `bun run test:cov` all clean — **commit here** (workflow checkpoint-timing rule: Phase 4's docs work and the manual-verification checkpoint don't block this commit)
 
 ### Phase 4 — Docs
 - [ ] `docs/documents/auth.md` — replace the "`ConsoleEmailSender` is still the only `IEmailSender`" Known Gap with the new env-driven-selection description
