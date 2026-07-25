@@ -1,13 +1,13 @@
 import { IEmailSender, SendOtpEmailParams, SendPasswordResetEmailParams } from "../../domain/ports/email-sender.port";
-
-import { buildOtpEmailHtml } from "./templates/otp-email.template";
-import { buildResetPasswordEmailHtml } from "./templates/reset-password-email.template";
+import * as nodemailer from "nodemailer";
 
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import * as nodemailer from "nodemailer";
 
 import { type EnvironmentVariables } from "@/config/env.validation";
+
+import { buildOtpEmailHtml } from "./templates/otp-email.template";
+import { buildResetPasswordEmailHtml } from "./templates/reset-password-email.template";
 
 @Injectable()
 export class SmtpEmailSender implements IEmailSender {

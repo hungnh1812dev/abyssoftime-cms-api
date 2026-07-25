@@ -1,12 +1,22 @@
-import { SmtpEmailSender } from "./smtp-email.sender";
+import * as nodemailer from "nodemailer";
 
 import { ConfigService } from "@nestjs/config";
-import * as nodemailer from "nodemailer";
+
+import { type EnvironmentVariables } from "@/config/env.validation";
+
+import { SmtpEmailSender } from "./smtp-email.sender";
 
 jest.mock("nodemailer");
 
+interface SentMail {
+  to: string;
+  from: string;
+  subject: string;
+  html: string;
+}
+
 describe("SmtpEmailSender", () => {
-  const sendMail = jest.fn().mockResolvedValue(undefined);
+  const sendMail = jest.fn<Promise<void>, [SentMail]>();
   const createTransport = nodemailer.createTransport as jest.Mock;
 
   const config = {
@@ -22,7 +32,7 @@ describe("SmtpEmailSender", () => {
       };
       return values[key];
     }),
-  } as unknown as ConfigService;
+  } as unknown as ConfigService<EnvironmentVariables, true>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -47,7 +57,7 @@ describe("SmtpEmailSender", () => {
     await sender.sendOtpEmail({ email: "target@example.com", otp: "654321" });
 
     expect(sendMail).toHaveBeenCalledTimes(1);
-    const call = sendMail.mock.calls[0][0] as { to: string; from: string; subject: string; html: string };
+    const call = sendMail.mock.calls[0][0];
     expect(call.to).toBe("target@example.com");
     expect(call.from).toBe("no-reply@abyssoftime.com");
     expect(call.subject).toMatch(/verif/i);
@@ -60,7 +70,7 @@ describe("SmtpEmailSender", () => {
     await sender.sendPasswordResetEmail({ email: "target@example.com", resetToken: "reset-abc" });
 
     expect(sendMail).toHaveBeenCalledTimes(1);
-    const call = sendMail.mock.calls[0][0] as { to: string; from: string; subject: string; html: string };
+    const call = sendMail.mock.calls[0][0];
     expect(call.to).toBe("target@example.com");
     expect(call.from).toBe("no-reply@abyssoftime.com");
     expect(call.subject).toMatch(/reset/i);
