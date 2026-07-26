@@ -41,10 +41,13 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 4:** build/typecheck/lint/test:cov all clean — commit
 
 ## Phase 5 — Test infra + e2e
-- [ ] `test/utils/noop-storage.adapter.ts`
-- [ ] `test/utils/app-test.util.ts`
-- [ ] `test/media.e2e-spec.ts`
-- [ ] **Checkpoint 5:** `bun run test:e2e` green — commit, or flag as pending if no DB reachable
+- [x] `test/utils/noop-storage.adapter.ts`
+- [x] `test/utils/app-test.util.ts`
+- [x] `test/media.e2e-spec.ts` (written; not yet run — no reachable Postgres in this environment)
+- [ ] **Checkpoint 5:** `bun run test:e2e` green — **flagged pending**: no Postgres reachable here
+      (SASL auth failure against default localhost:5432 creds); `test/app.e2e-spec.ts` fails the
+      same way, confirming it's environmental, not a bug in the new spec. User must run
+      `bun run test:e2e` against their own reachable/migrated Postgres to confirm green, then commit.
 
 ## Phase 6 — Docs
 - [ ] `docs/documents/media.md`
