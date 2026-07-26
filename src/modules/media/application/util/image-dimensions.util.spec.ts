@@ -37,22 +37,22 @@ function buildJpegBuffer(width: number, height: number, sofMarker = 0xc0): Buffe
 }
 
 describe("getImageDimensions", () => {
-  it("reads width/height from a PNG IHDR chunk", () => {
+  it("reads width/height/format from a PNG IHDR chunk", () => {
     const buffer = buildPngBuffer(800, 600);
 
-    expect(getImageDimensions(buffer)).toEqual({ width: 800, height: 600 });
+    expect(getImageDimensions(buffer)).toEqual({ format: "png", width: 800, height: 600 });
   });
 
-  it("reads width/height from a baseline JPEG SOF0 segment, skipping APP0", () => {
+  it("reads width/height/format from a baseline JPEG SOF0 segment, skipping APP0", () => {
     const buffer = buildJpegBuffer(1024, 768, 0xc0);
 
-    expect(getImageDimensions(buffer)).toEqual({ width: 1024, height: 768 });
+    expect(getImageDimensions(buffer)).toEqual({ format: "jpeg", width: 1024, height: 768 });
   });
 
-  it("reads width/height from a progressive JPEG SOF2 segment", () => {
+  it("reads width/height/format from a progressive JPEG SOF2 segment", () => {
     const buffer = buildJpegBuffer(400, 300, 0xc2);
 
-    expect(getImageDimensions(buffer)).toEqual({ width: 400, height: 300 });
+    expect(getImageDimensions(buffer)).toEqual({ format: "jpeg", width: 400, height: 300 });
   });
 
   it("throws UnsupportedImageFormatError for a non-image buffer", () => {
@@ -63,5 +63,11 @@ describe("getImageDimensions", () => {
 
   it("throws UnsupportedImageFormatError for an empty buffer", () => {
     expect(() => getImageDimensions(Buffer.alloc(0))).toThrow(UnsupportedImageFormatError);
+  });
+
+  it("throws UnsupportedImageFormatError (not RangeError) for a JPEG truncated right after the SOF marker's length field", () => {
+    const buffer = Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x08]);
+
+    expect(() => getImageDimensions(buffer)).toThrow(UnsupportedImageFormatError);
   });
 });
