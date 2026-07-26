@@ -76,15 +76,15 @@ media domain/persistence → media application services → media presentation/w
 - [x] **Checkpoint 0:** `bun run build` succeeds with `MediaAsset` in the generated client
 
 ### Phase 1 — Storage module
-- [ ] `domain/repositories/storage-adapter.repository.ts` — `StorageAdapter`, `UploadFile`,
+- [x] `domain/repositories/storage-adapter.repository.ts` — `StorageAdapter`, `UploadFile`,
       `UploadResult`, `STORAGE_ADAPTER` (zero framework imports)
-- [ ] `infrastructure/s3-storage.adapter.ts` + `.spec.ts` — `PutObjectCommand` upload,
+- [x] `infrastructure/s3-storage.adapter.ts` + `.spec.ts` — `PutObjectCommand` upload,
       `sanitizeFileNameStem`, virtual-hosted URL, `thumbnailUrl === url`, `DeleteObjectCommand`
-- [ ] `infrastructure/cloudinary-storage.adapter.ts` + `.spec.ts` — base64 data-URI upload with
+- [x] `infrastructure/cloudinary-storage.adapter.ts` + `.spec.ts` — base64 data-URI upload with
       eager thumbnail, `client.uploader.destroy(publicId)`
-- [ ] `infrastructure/lazy-storage.adapter.ts` + `.spec.ts` — deferred provider selection
-- [ ] `storage.module.ts` — factory provider, exports `STORAGE_ADAPTER`
-- [ ] **Checkpoint 1:** `bun run test storage` green, `bun run build` clean
+- [x] `infrastructure/lazy-storage.adapter.ts` + `.spec.ts` — deferred provider selection
+- [x] `storage.module.ts` — factory provider, exports `STORAGE_ADAPTER`
+- [x] **Checkpoint 1:** `bun run test storage` green, `bun run build` clean
 
 ### Phase 2 — Media domain + persistence
 - [ ] `domain/entities/media-asset.entity.ts`
