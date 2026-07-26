@@ -140,7 +140,7 @@ media domain/persistence → media application services → media presentation/w
       for the confirmed deviations
 - [x] `docs/ENTRYPOINT.md` — add the two new index lines
 - [x] `SPEC.md` — trim to a pointer line
-- [ ] **Checkpoint 6:** doc read-through — commit
+- [x] **Checkpoint 6:** doc read-through — commit
 
 ### Phase 7 — Manual verification (non-blocking for Phase 4/6 commits)
 - [ ] User sets real `AWS_REGION`/`AWS_S3_BUCKET`/`CLOUDINARY_*`/`STORAGE_PROVIDER` in their own

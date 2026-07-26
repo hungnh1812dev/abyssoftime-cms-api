@@ -54,7 +54,7 @@ See `tasks/plan.md` for full context and rationale.
 - [x] `docs/documents/storage.md`
 - [x] `docs/ENTRYPOINT.md` — add index lines
 - [x] `SPEC.md` — trim to pointer line
-- [ ] **Checkpoint 6:** doc read-through — commit
+- [x] **Checkpoint 6:** doc read-through — commit
 
 ## Phase 7 — Manual verification (non-blocking for Phase 4/6 commits)
 - [ ] User sets real `AWS_REGION`/`AWS_S3_BUCKET`/`CLOUDINARY_*`/`STORAGE_PROVIDER` in their own
