@@ -248,7 +248,7 @@ applies as-is:
 - [ ] `MediaAsset` model added to `prisma/postgresql/schema.prisma` (existing PK convention) with
       a generated migration; `bun run prisma:generate` succeeds.
 - [ ] `StorageModule` exports `STORAGE_ADAPTER` bound to `LazyStorageAdapter`; switching
-      `STORAGE_PROVIDER` (`s3` default vs `cloudinary`) selects the right adapter, resolved lazily
+      `STORAGE_PROVIDER` (`cloudinary` default vs `s3`) selects the right adapter, resolved lazily
       (no config read at construction).
 - [ ] `MediaModule` wired into `AppModule`; `GET /api/media`, `POST /api/media/upload`,
       `DELETE /api/media/:id` all behave per the source doc's Business Rules (size/dimension
