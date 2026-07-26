@@ -1,71 +1,145 @@
-# Plan: Real Email Sender for OTP + Password-Reset (`[CAREFUL]`)
+# Plan: Media Module + Storage Module (Go → NestJS/Prisma conversion)
 
-See `SPEC.md` for the active spec and `docs/documents/auth-email-techstack.md` for the provider decision. This plan implements a real `IEmailSender` adapter (`SmtpEmailSender`, via `nodemailer`) for the two auth emails (OTP verification, password reset), replacing `ConsoleEmailSender` as the production binding while keeping it as the zero-config dev/test fallback.
+See `SPEC.md` for the active spec. This plan ports the Go/GORM `media` and `storage` modules into
+this repo's NestJS/Prisma/module-split conventions, following the five deviations from the source
+docs confirmed with the user during the Spec phase (PK convention, guard naming, per-route guards,
+no `AuthModule` import, schema-location). This is a new capability, not a refactor: no existing
+module's behavior changes except two additive edits (`seed-default-data.service.ts`,
+`app.module.ts`).
 
 ## Context
 
-`docs/documents/auth-issues-fix.md` finding #10 flagged that `ConsoleEmailSender` — which just logs OTPs and password-reset tokens instead of emailing them — is still the only `IEmailSender` implementation, and explicitly deferred fixing it as a separate decision requiring a product/ops call on provider. `SPEC.md` now captures that decision: add `SmtpEmailSender` with inline-HTML templates for both emails, selected over `ConsoleEmailSender` via an env-driven switch (`SMTP_HOST` set → real sender, else fallback) so local dev/test needs zero setup. No change to `IEmailSender`'s interface, DTOs, or any auth service — purely a new infrastructure adapter plus wiring.
-
-Slicing note: this is a single cohesive infrastructure swap, not several independent user-facing features, so tasks are ordered by dependency (config → templates → adapter → wiring) rather than by vertical user-story slices. Each task still lands independently testable/verifiable code per its own acceptance criteria.
+`storage` has to exist before `media` can depend on it (media's `UploadMediaService`/
+`DeleteMediaService` take `StorageAdapter` as a constructor dependency). The Prisma schema/
+migration has to exist before `PrismaMediaRepository` can be implemented against a generated
+client. Test infra (`NoopStorageAdapter`, `bootTestApp`) has to exist before `media.e2e-spec.ts`
+can run. Tasks are ordered along that dependency chain: storage (self-contained vertical slice) →
+media domain/persistence → media application services → media presentation/wiring → test infra/e2e
+→ docs.
 
 ## Key files
 
-- `src/modules/auth/domain/ports/email-sender.port.ts` — `IEmailSender` (unchanged)
-- `src/modules/auth/infrastructure/email/console-email.sender.ts` — existing fallback (unchanged)
-- `src/modules/auth/auth.module.ts` — DI wiring, currently `{ provide: EMAIL_SENDER, useClass: ConsoleEmailSender }`
-- `src/modules/auth/auth.module.spec.ts` — asserts the exact `providers` array via `Reflect.getMetadata` — **must be updated** alongside the wiring change or it fails
-- `src/config/env.validation.ts` / `env.validation.spec.ts` — env var schema + its test (pattern: `@Transform` for bools/numbers, every field has a default so `validateSync` always succeeds)
-- `src/common/guards/rate-limit.guard.ts` — reference pattern for `ConfigService<EnvironmentVariables, true>` typed injection with `.get(KEY, { infer: true })`
-- `src/modules/auth/application/services/forgot-password.service.ts` — source of the plaintext `resetToken` passed to `sendPasswordResetEmail`
+- `src/modules/roles/domain/repositories/role.repository.ts`,
+  `src/modules/roles/infrastructure/persistence/prisma-role.repository.ts`,
+  `src/modules/roles/application/services/delete-role.service.ts` — the repository+domain-error
+  shape to copy exactly for `MediaAssetNotFoundError` (P2025 → domain error → `NotFoundException`).
+- `src/modules/access-tokens/presentation/access-token.controller.ts`,
+  `src/modules/access-tokens/access-token.module.ts` — controller/module/DI wiring pattern
+  (per-route `@UseGuards(JwtAuthGuard, PermissionsGuard)` + `@RequirePermissions(...)`, no
+  `AuthModule`/`PrismaModule` import needed since `TokenModule`/`PrismaModule` are both `@Global`).
+- `src/modules/access-tokens/application/services/access-token-secret.util.ts` — the existing
+  `import { createHash } from "node:crypto"` + `createHash("sha256").update(...).digest("hex")`
+  pattern to copy for the upload hash.
+- `src/common/guards/rate-limit.guard.ts` vs `src/config/env.validation.ts` — contrast: this is
+  the typed `ConfigService<EnvironmentVariables, true>` + `{ infer: true }` pattern, which does
+  **not** apply to `LazyStorageAdapter`'s `STORAGE_PROVIDER`/`AWS_*`/`CLOUDINARY_*` reads (those
+  vars are deliberately absent from `EnvironmentVariables` — plain untyped `ConfigService.get`/
+  `getOrThrow` instead, first use of `getOrThrow` in the repo).
+- `test/app.e2e-spec.ts`, `src/bootstrap/configure-app.ts` — the existing e2e boot is bare
+  (`Test.createTestingModule({imports:[AppModule]}).compile()`, no `configureApp` call, so no
+  `ValidationPipe`/`cookie-parser`). The new `test/utils/app-test.util.ts` must call
+  `configureApp(app)` so cookie-based `JwtAuthGuard` and multipart validation actually work —
+  copying `app.e2e-spec.ts`'s pattern verbatim would silently break auth in the new e2e suite.
 
-## Confirmed decisions (asked the user directly, during the Spec phase)
+## Confirmed decisions (resolved with the user during the Spec phase)
 
-1. Provider/transport: SMTP via `nodemailer` — no vendor account exists yet, so defer that choice to config (`SMTP_HOST`/etc.) rather than hard-coding a vendor SDK. Full comparison in `docs/documents/auth-email-techstack.md`.
-2. Env-driven switch between `ConsoleEmailSender` (dev/test) and the real sender — not "always real."
-3. Templates: inline TS template-literal functions, no templating-engine dependency.
-4. Password-reset link source: new `FRONTEND_URL` env var, placeholder value — user fills in the real domain later.
-5. Sender identity: new `EMAIL_FROM` env var, placeholder value — user fills in the real verified address later.
-6. `[CAREFUL]` tag: this Build (plan) step and the later five-axis Review step run on Opus; Spec, Build (execute), Update spec/docs, Clean up stay on Sonnet.
+1. `MediaAsset.documentId String @id @default(uuid())` is the real key; `id Int
+   @default(autoincrement())` is a plain unmapped legacy column — matches every other model in
+   `prisma/postgresql/schema.prisma`, not the source doc's `gormId`-as-`@id` shape.
+2. Both `S3StorageAdapter` and `CloudinaryStorageAdapter` built now, behind `LazyStorageAdapter`
+   (new deps: `@aws-sdk/client-s3`, `cloudinary`).
+3. Guards: `PermissionsGuard` + `@RequirePermissions(...)` (existing plural names), per-route, not
+   class-level; `MediaModule` imports only `StorageModule`.
+4. Multer needs `FileInterceptor("file", { storage: memoryStorage() })` explicitly — default
+   multer writes to disk, but `UploadMediaService` needs `file.buffer` for hashing/dimension
+   sniffing. No `@types/multer` — hand-rolled local `UploadedMulterFile` interface instead.
+5. No e2e-capable Postgres is confirmed reachable in this environment yet — `media.e2e-spec.ts`
+   will be the first DB-backed e2e test in this repo, and `bun run prisma:migrate` (Phase 0) also
+   needs a reachable Postgres. If unreachable, both stop and become a flagged, non-blocking user
+   action rather than being faked or silently skipped — unit-level work (Phase 0's schema edit
+   through Phase 4) proceeds regardless.
 
 ## Tasks
 
-### Phase 0 — Env config
-- [x] `env.validation.ts` — add `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD`/`SMTP_SECURE`/`EMAIL_FROM`/`FRONTEND_URL`, all optional-with-defaults
-- [x] `env.validation.spec.ts` — add default-value assertions for all seven new vars
-- [x] **Checkpoint 0:** `bun run test env.validation.spec.ts` green
+### Phase 0 — Dependencies + Schema
+- [x] `bun add @aws-sdk/client-s3 cloudinary`
+- [x] `prisma/postgresql/schema.prisma` — add `MediaAsset` model per decision #1. Field set
+      (`fileName`, `mimeType`, `size`, `width`, `height`, `url`, `thumbnailUrl`, `publicId`,
+      `hash`, `uploadedBy`) is a **best-guess inference** from `SPEC.md`'s scattered clues
+      (`asset.publicId`, SHA-256 hashing, PNG/JPEG dimension checks) — the original source docs'
+      exact column list wasn't preserved in the repo. Confirmed with the user to proceed this way;
+      flag for review once the doc-writing phase (Phase 6) compares against the real source docs
+      if the user has them on hand again.
+- [x] `bun run prisma:migrate` — generated and applied
+      `prisma/postgresql/migrations/20260726074800_add_media_assets/`
+- [x] `bun run prisma:generate` — `MediaAsset` present in generated client
+- [x] **Checkpoint 0:** `bun run build` succeeds with `MediaAsset` in the generated client
 
-### Phase 1 — Templates
-- [x] `templates/otp-email.template.ts` — `buildOtpEmailHtml({ otp })`, mentions the real 10-minute OTP expiry
-- [x] `templates/reset-password-email.template.ts` — `buildResetPasswordEmailHtml({ resetUrl })`, mentions the real 1-hour reset-token expiry
-- [x] Spec files for both, asserting interpolated values appear in output
-- [x] **Checkpoint 1:** template specs green
+### Phase 1 — Storage module
+- [ ] `domain/repositories/storage-adapter.repository.ts` — `StorageAdapter`, `UploadFile`,
+      `UploadResult`, `STORAGE_ADAPTER` (zero framework imports)
+- [ ] `infrastructure/s3-storage.adapter.ts` + `.spec.ts` — `PutObjectCommand` upload,
+      `sanitizeFileNameStem`, virtual-hosted URL, `thumbnailUrl === url`, `DeleteObjectCommand`
+- [ ] `infrastructure/cloudinary-storage.adapter.ts` + `.spec.ts` — base64 data-URI upload with
+      eager thumbnail, `client.uploader.destroy(publicId)`
+- [ ] `infrastructure/lazy-storage.adapter.ts` + `.spec.ts` — deferred provider selection
+- [ ] `storage.module.ts` — factory provider, exports `STORAGE_ADAPTER`
+- [ ] **Checkpoint 1:** `bun run test storage` green, `bun run build` clean
 
-### Phase 2 — Adapter
-- [x] `bun add nodemailer && bun add -d @types/nodemailer`
-- [x] `smtp-email.sender.ts` — `SmtpEmailSender implements IEmailSender`, one `Transporter` built in the constructor from `ConfigService`, `sendOtpEmail`/`sendPasswordResetEmail` call `sendMail` with the Phase 1 templates
-- [x] `smtp-email.sender.spec.ts` — `jest.mock("nodemailer")`, assert `sendMail` args (`to`/`from`/`subject`/`html` contents); no real network calls
-- [x] **Checkpoint 2:** adapter spec green, `bun run build` clean
+### Phase 2 — Media domain + persistence
+- [ ] `domain/entities/media-asset.entity.ts`
+- [ ] `domain/repositories/media-asset.repository.ts` — `IMediaAssetRepository`,
+      `MEDIA_ASSET_REPOSITORY`, `MediaAssetNotFoundError`
+- [ ] `infrastructure/persistence/prisma-media.repository.ts` + `.spec.ts` — P2025-catch on
+      delete, `findAll` ordered `createdAt desc`
+- [ ] **Checkpoint 2:** `bun run test prisma-media` green
 
-### Phase 3 — Wiring
-- [x] `resolve-email-sender.ts` — `resolveEmailSender(config)` returns `SmtpEmailSender` when `SMTP_HOST` is set, else `ConsoleEmailSender`; standalone function for unit-testability without a Nest `TestingModule`
-- [x] `resolve-email-sender.spec.ts` — both branches
-- [x] `auth.module.ts` — swap `useClass: ConsoleEmailSender` for `{ useFactory: resolveEmailSender, inject: [ConfigService] }`
-- [x] `auth.module.spec.ts` — update the exact-equality `providers` assertion to match the new factory-shaped entry
-- [x] **Checkpoint 3:** `bun run build`, `bunx tsc --noEmit`, `bunx eslint`, `bun run test:cov` all clean — **commit here** (workflow checkpoint-timing rule: Phase 4's docs work and the manual-verification checkpoint don't block this commit)
+### Phase 3 — Media application services
+- [ ] `application/util/image-dimensions.util.ts` + `.spec.ts` — PNG/JPEG sniffing (independent
+      pure function)
+- [ ] `application/services/upload-media.service.ts` + `.spec.ts` — size → dimension → storage
+      upload → hash → create, in order
+- [ ] `application/services/list-media.service.ts` + `.spec.ts`
+- [ ] `application/services/delete-media.service.ts` + `.spec.ts` — storage-then-DB, uncaught on
+      storage failure
+- [ ] **Checkpoint 3:** `bun run test media/application` green
 
-### Phase 4 — Docs
-- [x] `docs/documents/auth.md` — replace the "`ConsoleEmailSender` is still the only `IEmailSender`" Known Gap with the new env-driven-selection description
-- [x] `docs/documents/auth-issues-fix.md` finding #10 — add an "Update: resolved" note
-- [x] `SPEC.md` — trim back to a pointer line once the above fully capture the end state
-- [x] **Checkpoint 4:** doc read-through, no doc still claims `ConsoleEmailSender` is the only implementation — commit
+### Phase 4 — Media presentation + wiring
+- [ ] `presentation/media.controller.ts` — `@Controller("api/media")`, per-route guards
+- [ ] `media.module.ts` — imports `[StorageModule]` only
+- [ ] `src/app.module.ts` — add `StorageModule`, `MediaModule`
+- [ ] `seed-default-data.service.ts` — add `media:manager`/`media:read`; grant to
+      `super_admin`/`admin` respectively
+- [ ] `seed-default-data.service.spec.ts` — update counts/slug-array assertions
+- [ ] **Checkpoint 4:** `bun run build`, `bunx tsc --noEmit`, `bunx eslint .`, `bun run test:cov`
+      all clean — **commit here** (automated checkpoint; Phase 5's DB-dependent work doesn't
+      block it)
 
-### Phase 5 — Manual verification (non-blocking for the Phase 3 commit)
-- [ ] User sets real `SMTP_*`/`EMAIL_FROM`/`FRONTEND_URL` in their own `.env` (not touched by the agent — global rule)
-- [ ] User runs `bun run start:dev`, triggers `POST /api/auth/register` and `POST /api/auth/forgot-password` against a real inbox, confirms both HTML emails render and links/codes work
-- [ ] Tracked as outstanding until the user confirms — same pattern as the still-open manual e2e walkthrough already noted in `auth.md`
+### Phase 5 — Test infra + e2e
+- [ ] `test/utils/noop-storage.adapter.ts` — records uploads/deletes, `failNextDelete()`
+- [ ] `test/utils/app-test.util.ts` — `bootTestApp(configureModule?)`, calls `configureApp`
+- [ ] `test/media.e2e-spec.ts` — full scenario list (see `SPEC.md` Testing Strategy)
+- [ ] **Checkpoint 5:** `bun run test:e2e` green against reachable Postgres — commit, or flag as
+      pending user action if no DB is reachable here
+
+### Phase 6 — Docs
+- [ ] `docs/documents/media.md`, `docs/documents/storage.md` — mirror the source docs, corrected
+      for the confirmed deviations
+- [ ] `docs/ENTRYPOINT.md` — add the two new index lines
+- [ ] `SPEC.md` — trim to a pointer line
+- [ ] **Checkpoint 6:** doc read-through — commit
+
+### Phase 7 — Manual verification (non-blocking for Phase 4/6 commits)
+- [ ] User sets real `AWS_REGION`/`AWS_S3_BUCKET`/`CLOUDINARY_*`/`STORAGE_PROVIDER` in their own
+      `.env`
+- [ ] User runs `bun run start:dev`, exercises upload → list → delete against a real provider
+- [ ] User confirms Phase 5's e2e suite against their own reachable Postgres, if it couldn't run
+      here
 
 ## Verification (end-to-end)
 
-1. `bun run build && bunx tsc --noEmit && bunx eslint . && bun run test:cov` — all green, zero new lint/type errors.
-2. No test performs a real network call (`nodemailer` is `jest.mock`'d everywhere it's used in a spec).
-3. Manual (Phase 5, user-performed): real SMTP send confirmed for both email types.
+1. `bun run build && bunx tsc --noEmit && bunx eslint . && bun run test:cov` — all green.
+2. `bun run test:e2e` — `media.e2e-spec.ts` green against real Postgres, storage stubbed by
+   `NoopStorageAdapter`.
+3. No test performs a real AWS/Cloudinary network call.
+4. Manual (Phase 7, user-performed): real upload/list/delete confirmed against one real provider.

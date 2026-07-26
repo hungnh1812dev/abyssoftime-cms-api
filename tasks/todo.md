@@ -1,36 +1,60 @@
-# Todo — Real Email Sender for OTP + Password-Reset (`[CAREFUL]`)
+# Todo — Media Module + Storage Module (Go → NestJS/Prisma conversion)
 
 See `tasks/plan.md` for full context and rationale.
 
-## Phase 0 — Env config
-- [x] `env.validation.ts` — `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD`/`SMTP_SECURE`/`EMAIL_FROM`/`FRONTEND_URL`, all optional-with-defaults
-- [x] `env.validation.spec.ts` — default-value assertions for all seven
-- [x] **Checkpoint 0:** `bun run test env.validation.spec.ts` green
+## Phase 0 — Dependencies + Schema
+- [x] `bun add @aws-sdk/client-s3 cloudinary`
+- [x] `prisma/postgresql/schema.prisma` — `MediaAsset` model (`documentId` as `@id`, per confirmed
+      decision, not the source doc's `gormId`); field set is a best-guess inference, see
+      `tasks/plan.md`
+- [x] `bun run prisma:migrate` — applied `20260726074800_add_media_assets`
+- [x] `bun run prisma:generate` — `MediaAsset` present in generated client
+- [x] **Checkpoint 0:** `bun run build` succeeds
 
-## Phase 1 — Templates
-- [x] `templates/otp-email.template.ts` + spec
-- [x] `templates/reset-password-email.template.ts` + spec
-- [x] **Checkpoint 1:** template specs green
+## Phase 1 — Storage module
+- [ ] `storage-adapter.repository.ts` — port
+- [ ] `s3-storage.adapter.ts` + spec
+- [ ] `cloudinary-storage.adapter.ts` + spec
+- [ ] `lazy-storage.adapter.ts` + spec
+- [ ] `storage.module.ts`
+- [ ] **Checkpoint 1:** `bun run test storage` green, build clean
 
-## Phase 2 — Adapter
-- [x] `bun add nodemailer && bun add -d @types/nodemailer`
-- [x] `smtp-email.sender.ts` — `SmtpEmailSender implements IEmailSender`
-- [x] `smtp-email.sender.spec.ts` — `nodemailer` mocked, no real network calls
-- [x] **Checkpoint 2:** adapter spec green, `bun run build` clean
+## Phase 2 — Media domain + persistence
+- [ ] `media-asset.entity.ts`
+- [ ] `media-asset.repository.ts` — interface + `MediaAssetNotFoundError`
+- [ ] `prisma-media.repository.ts` + spec
+- [ ] **Checkpoint 2:** repository spec green
 
-## Phase 3 — Wiring
-- [x] `resolve-email-sender.ts` — `resolveEmailSender(config)` selection function
-- [x] `resolve-email-sender.spec.ts` — both branches
-- [x] `auth.module.ts` — `useFactory: resolveEmailSender, inject: [ConfigService]`
-- [x] `auth.module.spec.ts` — update exact-equality `providers` assertion
-- [x] **Checkpoint 3:** `bun run build`, `bunx tsc --noEmit`, `bunx eslint`, `bun run test:cov` all clean — commit
+## Phase 3 — Media application services
+- [ ] `image-dimensions.util.ts` + spec
+- [ ] `upload-media.service.ts` + spec
+- [ ] `list-media.service.ts` + spec
+- [ ] `delete-media.service.ts` + spec
+- [ ] **Checkpoint 3:** service specs green
 
-## Phase 4 — Docs
-- [x] `docs/documents/auth.md` — close the `ConsoleEmailSender`-only gap
-- [x] `docs/documents/auth-issues-fix.md` — finding #10 "Update: resolved" note
-- [x] `SPEC.md` — trim back to pointer line
-- [x] **Checkpoint 4:** doc read-through — commit
+## Phase 4 — Media presentation + wiring
+- [ ] `media.controller.ts`
+- [ ] `media.module.ts`
+- [ ] `app.module.ts` — register `StorageModule`, `MediaModule`
+- [ ] `seed-default-data.service.ts` — add `media:manager`/`media:read`
+- [ ] `seed-default-data.service.spec.ts` — update counts/slugs
+- [ ] **Checkpoint 4:** build/typecheck/lint/test:cov all clean — commit
 
-## Phase 5 — Manual verification (non-blocking for the Phase 3 commit)
-- [ ] User sets real `SMTP_*`/`EMAIL_FROM`/`FRONTEND_URL` in their own `.env`
-- [ ] User confirms real OTP + reset-password emails send and render correctly
+## Phase 5 — Test infra + e2e
+- [ ] `test/utils/noop-storage.adapter.ts`
+- [ ] `test/utils/app-test.util.ts`
+- [ ] `test/media.e2e-spec.ts`
+- [ ] **Checkpoint 5:** `bun run test:e2e` green — commit, or flag as pending if no DB reachable
+
+## Phase 6 — Docs
+- [ ] `docs/documents/media.md`
+- [ ] `docs/documents/storage.md`
+- [ ] `docs/ENTRYPOINT.md` — add index lines
+- [ ] `SPEC.md` — trim to pointer line
+- [ ] **Checkpoint 6:** doc read-through — commit
+
+## Phase 7 — Manual verification (non-blocking for Phase 4/6 commits)
+- [ ] User sets real `AWS_REGION`/`AWS_S3_BUCKET`/`CLOUDINARY_*`/`STORAGE_PROVIDER` in their own
+      `.env`
+- [ ] User confirms upload → list → delete against a real provider
+- [ ] User confirms e2e suite against their own reachable Postgres, if it couldn't run here
