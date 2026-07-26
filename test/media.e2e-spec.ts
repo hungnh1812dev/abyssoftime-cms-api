@@ -3,8 +3,10 @@ import request from "supertest";
 import { type App } from "supertest/types";
 
 import { type INestApplication } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 import { JwtTokenService } from "@/common/token/jwt-token.service";
+import { type EnvironmentVariables } from "@/config/env.validation";
 import { STORAGE_ADAPTER } from "@/modules/storage/domain/repositories/storage-adapter.repository";
 import { PrismaService } from "@/prisma/application/prisma.service";
 
@@ -127,6 +129,21 @@ describe("Media (e2e)", () => {
     });
     expect(storage.uploads).toHaveLength(1);
     createdMediaIds.push((response.body as MediaUploadResponseBody).documentId);
+  });
+
+  it("rejects an upload over MEDIA_MAX_UPLOAD_BYTES with 413 and never touches storage", async () => {
+    const uploadsBefore = storage.uploads.length;
+    const maxUploadBytes = app.get<ConfigService<EnvironmentVariables, true>>(ConfigService).get("MEDIA_MAX_UPLOAD_BYTES", { infer: true });
+    const buffer = buildPngBuffer(1, 1);
+    const oversized = Buffer.concat([buffer, Buffer.alloc(maxUploadBytes - buffer.length + 1)]);
+
+    await request(app.getHttpServer())
+      .post("/api/media/upload")
+      .set("Cookie", [`access_token=${managerToken}`])
+      .attach("file", oversized, "too-big.png")
+      .expect(413);
+
+    expect(storage.uploads).toHaveLength(uploadsBefore);
   });
 
   it("rejects a non-image upload with 422 and never touches storage", async () => {

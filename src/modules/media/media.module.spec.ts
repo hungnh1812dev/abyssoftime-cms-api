@@ -1,5 +1,9 @@
+import { type DynamicModule } from "@nestjs/common";
 import { MODULE_METADATA } from "@nestjs/common/constants";
+import { ConfigService } from "@nestjs/config";
+import { MulterModule } from "@nestjs/platform-express";
 
+import { type EnvironmentVariables } from "@/config/env.validation";
 import { StorageModule } from "@/modules/storage/storage.module";
 
 import { DeleteMediaService } from "./application/services/delete-media.service";
@@ -10,9 +14,29 @@ import { PrismaMediaRepository } from "./infrastructure/persistence/prisma-media
 import { MediaModule } from "./media.module";
 import { MediaController } from "./presentation/media.controller";
 
+interface AsyncOptionsProvider {
+  provide: string;
+  useFactory: (configService: ConfigService<EnvironmentVariables, true>) => { limits: { fileSize: number } };
+  inject: unknown[];
+}
+
 describe("MediaModule", () => {
-  it("imports only StorageModule", () => {
-    expect(Reflect.getMetadata(MODULE_METADATA.IMPORTS, MediaModule)).toEqual([StorageModule]);
+  it("imports StorageModule and a MulterModule registered with MEDIA_MAX_UPLOAD_BYTES as the fileSize limit", () => {
+    const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, MediaModule) as [typeof StorageModule, DynamicModule];
+
+    expect(imports).toHaveLength(2);
+    expect(imports[0]).toBe(StorageModule);
+
+    const multerDynamicModule = imports[1];
+    expect(multerDynamicModule.module).toBe(MulterModule);
+
+    const optionsProvider = (multerDynamicModule.providers as AsyncOptionsProvider[]).find((provider) => provider.provide === "MULTER_MODULE_OPTIONS");
+    expect(optionsProvider).toBeDefined();
+    expect(optionsProvider?.inject).toEqual([ConfigService]);
+
+    const configService = { get: jest.fn().mockReturnValue(5_000_000) } as unknown as ConfigService<EnvironmentVariables, true>;
+    expect(optionsProvider?.useFactory(configService)).toEqual({ limits: { fileSize: 5_000_000 } });
+    expect(configService.get).toHaveBeenCalledWith("MEDIA_MAX_UPLOAD_BYTES", { infer: true });
   });
 
   it("registers the MediaController", () => {
