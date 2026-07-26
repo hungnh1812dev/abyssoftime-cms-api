@@ -29,16 +29,16 @@ export class LazyStorageAdapter implements StorageAdapter {
   }
 
   private createAdapter(): StorageAdapter {
-    const provider = this.configService.get<string>("STORAGE_PROVIDER") ?? "s3";
+    const provider = this.configService.get<string>("STORAGE_PROVIDER") ?? "cloudinary";
 
-    if (provider === "cloudinary") {
-      return new CloudinaryStorageAdapter(
-        this.configService.getOrThrow<string>("CLOUDINARY_CLOUD_NAME"),
-        this.configService.getOrThrow<string>("CLOUDINARY_API_KEY"),
-        this.configService.getOrThrow<string>("CLOUDINARY_API_SECRET"),
-      );
+    if (provider === "s3") {
+      return new S3StorageAdapter(this.configService.getOrThrow<string>("AWS_REGION"), this.configService.getOrThrow<string>("AWS_S3_BUCKET"));
     }
 
-    return new S3StorageAdapter(this.configService.getOrThrow<string>("AWS_REGION"), this.configService.getOrThrow<string>("AWS_S3_BUCKET"));
+    return new CloudinaryStorageAdapter(
+      this.configService.getOrThrow<string>("CLOUDINARY_CLOUD_NAME"),
+      this.configService.getOrThrow<string>("CLOUDINARY_API_KEY"),
+      this.configService.getOrThrow<string>("CLOUDINARY_API_SECRET"),
+    );
   }
 }

@@ -27,28 +27,8 @@ describe("LazyStorageAdapter", () => {
     expect(() => new LazyStorageAdapter(configService)).not.toThrow();
   });
 
-  it("resolves S3StorageAdapter by default when STORAGE_PROVIDER is unset", async () => {
+  it("resolves CloudinaryStorageAdapter by default when STORAGE_PROVIDER is unset", async () => {
     get.mockReturnValue(undefined);
-    getOrThrow.mockImplementation((key: string) => {
-      const values: Record<string, string> = { AWS_REGION: "us-east-1", AWS_S3_BUCKET: "my-bucket" };
-      return values[key];
-    });
-    const uploadResult = { url: "u", thumbnailUrl: "u", publicId: "p" };
-    (S3StorageAdapter.prototype.upload as jest.Mock).mockResolvedValue(uploadResult);
-
-    const adapter = new LazyStorageAdapter(configService);
-    const file = { buffer: Buffer.from("x"), fileName: "a.png", mimeType: "image/png" };
-    const result = await adapter.upload(file);
-
-    expect(get).toHaveBeenCalledWith("STORAGE_PROVIDER");
-    expect(S3StorageAdapter).toHaveBeenCalledWith("us-east-1", "my-bucket");
-    expect(CloudinaryStorageAdapter).not.toHaveBeenCalled();
-    expect(S3StorageAdapter.prototype.upload).toHaveBeenCalledWith(file);
-    expect(result).toBe(uploadResult);
-  });
-
-  it("resolves CloudinaryStorageAdapter when STORAGE_PROVIDER=cloudinary", async () => {
-    get.mockReturnValue("cloudinary");
     getOrThrow.mockImplementation((key: string) => {
       const values: Record<string, string> = {
         CLOUDINARY_CLOUD_NAME: "my-cloud",
@@ -62,13 +42,33 @@ describe("LazyStorageAdapter", () => {
     const adapter = new LazyStorageAdapter(configService);
     await adapter.delete("abc");
 
+    expect(get).toHaveBeenCalledWith("STORAGE_PROVIDER");
     expect(CloudinaryStorageAdapter).toHaveBeenCalledWith("my-cloud", "key", "secret");
     expect(S3StorageAdapter).not.toHaveBeenCalled();
     expect(CloudinaryStorageAdapter.prototype.delete).toHaveBeenCalledWith("abc");
   });
 
+  it("resolves S3StorageAdapter when STORAGE_PROVIDER=s3", async () => {
+    get.mockReturnValue("s3");
+    getOrThrow.mockImplementation((key: string) => {
+      const values: Record<string, string> = { AWS_REGION: "us-east-1", AWS_S3_BUCKET: "my-bucket" };
+      return values[key];
+    });
+    const uploadResult = { url: "u", thumbnailUrl: "u", publicId: "p" };
+    (S3StorageAdapter.prototype.upload as jest.Mock).mockResolvedValue(uploadResult);
+
+    const adapter = new LazyStorageAdapter(configService);
+    const file = { buffer: Buffer.from("x"), fileName: "a.png", mimeType: "image/png" };
+    const result = await adapter.upload(file);
+
+    expect(S3StorageAdapter).toHaveBeenCalledWith("us-east-1", "my-bucket");
+    expect(CloudinaryStorageAdapter).not.toHaveBeenCalled();
+    expect(S3StorageAdapter.prototype.upload).toHaveBeenCalledWith(file);
+    expect(result).toBe(uploadResult);
+  });
+
   it("resolves the concrete adapter only once and reuses it across calls", async () => {
-    get.mockReturnValue(undefined);
+    get.mockReturnValue("s3");
     getOrThrow.mockImplementation((key: string) => {
       const values: Record<string, string> = { AWS_REGION: "us-east-1", AWS_S3_BUCKET: "my-bucket" };
       return values[key];
