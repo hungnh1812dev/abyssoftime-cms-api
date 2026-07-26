@@ -50,10 +50,10 @@ See `tasks/plan.md` for full context and rationale.
       `bun run test:e2e` against their own reachable/migrated Postgres to confirm green, then commit.
 
 ## Phase 6 — Docs
-- [ ] `docs/documents/media.md`
-- [ ] `docs/documents/storage.md`
-- [ ] `docs/ENTRYPOINT.md` — add index lines
-- [ ] `SPEC.md` — trim to pointer line
+- [x] `docs/documents/media.md`
+- [x] `docs/documents/storage.md`
+- [x] `docs/ENTRYPOINT.md` — add index lines
+- [x] `SPEC.md` — trim to pointer line
 - [ ] **Checkpoint 6:** doc read-through — commit
 
 ## Phase 7 — Manual verification (non-blocking for Phase 4/6 commits)
