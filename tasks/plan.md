@@ -116,11 +116,24 @@ media domain/persistence → media application services → media presentation/w
       block it)
 
 ### Phase 5 — Test infra + e2e
-- [ ] `test/utils/noop-storage.adapter.ts` — records uploads/deletes, `failNextDelete()`
-- [ ] `test/utils/app-test.util.ts` — `bootTestApp(configureModule?)`, calls `configureApp`
-- [ ] `test/media.e2e-spec.ts` — full scenario list (see `SPEC.md` Testing Strategy)
-- [ ] **Checkpoint 5:** `bun run test:e2e` green against reachable Postgres — commit, or flag as
-      pending user action if no DB is reachable here
+- [x] `test/utils/noop-storage.adapter.ts` — records uploads/deletes, `failNextDelete()`
+- [x] `test/utils/app-test.util.ts` — `bootTestApp(configureModule?)`, calls `configureApp`
+- [x] `test/media.e2e-spec.ts` — full scenario list (see `SPEC.md` Testing Strategy): 401
+      unauthenticated, upload success (media:manager), 422 non-image with storage untouched, 403
+      upload without media:manager, list reachable by media:read-only, delete removes storage +
+      DB row, 403 delete without media:manager, 404 delete unknown id, forced storage-delete
+      failure (`NoopStorageAdapter.failNextDelete()`) leaves the DB row intact. Users/tokens are
+      created directly via `PrismaService` + `JwtTokenService.signAccessToken(...)` against the
+      seeded `super_admin`/`admin` roles (`JwtAuthGuard` never touches the DB — it just verifies
+      the JWT — so no HTTP register/verify-otp/login round-trip is needed); `runId` suffix on
+      email/username avoids collisions with leftover rows from a prior incomplete run.
+- [ ] **Checkpoint 5:** `bun run test:e2e` green against reachable Postgres — **flagged pending,
+      not run here**: no Postgres is reachable in this environment (confirmed by exporting the 4
+      required env vars — `test/app.e2e-spec.ts`, the pre-existing bare e2e spec, fails identically
+      with a SASL auth error against default `localhost:5432` creds, so this is environmental, not
+      a defect in the new spec). Typecheck (`bunx tsc --noEmit`) and lint are clean for
+      `test/media.e2e-spec.ts`. User must run `bun run test:e2e` against their own
+      reachable/migrated Postgres to confirm green, then commit.
 
 ### Phase 6 — Docs
 - [ ] `docs/documents/media.md`, `docs/documents/storage.md` — mirror the source docs, corrected
