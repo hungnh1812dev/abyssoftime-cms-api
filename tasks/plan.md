@@ -44,7 +44,7 @@ media domain/persistence → media application services → media presentation/w
 ## Confirmed decisions (resolved with the user during the Spec phase)
 
 1. `MediaAsset.documentId String @id @default(uuid())` is the real key; `id Int
-   @default(autoincrement())` is a plain unmapped legacy column — matches every other model in
+@default(autoincrement())` is a plain unmapped legacy column — matches every other model in
    `prisma/postgresql/schema.prisma`, not the source doc's `gormId`-as-`@id` shape.
 2. Both `S3StorageAdapter` and `CloudinaryStorageAdapter` built now, behind `LazyStorageAdapter`
    (new deps: `@aws-sdk/client-s3`, `cloudinary`).
@@ -62,6 +62,7 @@ media domain/persistence → media application services → media presentation/w
 ## Tasks
 
 ### Phase 0 — Dependencies + Schema
+
 - [x] `bun add @aws-sdk/client-s3 cloudinary`
 - [x] `prisma/postgresql/schema.prisma` — add `MediaAsset` model per decision #1. Field set
       (`fileName`, `mimeType`, `size`, `width`, `height`, `url`, `thumbnailUrl`, `publicId`,
@@ -76,6 +77,7 @@ media domain/persistence → media application services → media presentation/w
 - [x] **Checkpoint 0:** `bun run build` succeeds with `MediaAsset` in the generated client
 
 ### Phase 1 — Storage module
+
 - [x] `domain/repositories/storage-adapter.repository.ts` — `StorageAdapter`, `UploadFile`,
       `UploadResult`, `STORAGE_ADAPTER` (zero framework imports)
 - [x] `infrastructure/s3-storage.adapter.ts` + `.spec.ts` — `PutObjectCommand` upload,
@@ -87,6 +89,7 @@ media domain/persistence → media application services → media presentation/w
 - [x] **Checkpoint 1:** `bun run test storage` green, `bun run build` clean
 
 ### Phase 2 — Media domain + persistence
+
 - [x] `domain/entities/media-asset.entity.ts`
 - [x] `domain/repositories/media-asset.repository.ts` — `IMediaAssetRepository`,
       `MEDIA_ASSET_REPOSITORY`, `MediaAssetNotFoundError`
@@ -95,6 +98,7 @@ media domain/persistence → media application services → media presentation/w
 - [x] **Checkpoint 2:** `bun run test prisma-media` green
 
 ### Phase 3 — Media application services
+
 - [x] `application/util/image-dimensions.util.ts` + `.spec.ts` — PNG/JPEG sniffing (independent
       pure function)
 - [x] `application/services/upload-media.service.ts` + `.spec.ts` — size → dimension → storage
@@ -105,6 +109,7 @@ media domain/persistence → media application services → media presentation/w
 - [x] **Checkpoint 3:** `bun run test media/application` green
 
 ### Phase 4 — Media presentation + wiring
+
 - [x] `presentation/media.controller.ts` — `@Controller("api/media")`, per-route guards
 - [x] `media.module.ts` — imports `[StorageModule]` only
 - [x] `src/app.module.ts` — add `StorageModule`, `MediaModule`
@@ -116,6 +121,7 @@ media domain/persistence → media application services → media presentation/w
       block it)
 
 ### Phase 5 — Test infra + e2e
+
 - [x] `test/utils/noop-storage.adapter.ts` — records uploads/deletes, `failNextDelete()`
 - [x] `test/utils/app-test.util.ts` — `bootTestApp(configureModule?)`, calls `configureApp`
 - [x] `test/media.e2e-spec.ts` — full scenario list (see `SPEC.md` Testing Strategy): 401
@@ -127,15 +133,18 @@ media domain/persistence → media application services → media presentation/w
       seeded `super_admin`/`admin` roles (`JwtAuthGuard` never touches the DB — it just verifies
       the JWT — so no HTTP register/verify-otp/login round-trip is needed); `runId` suffix on
       email/username avoids collisions with leftover rows from a prior incomplete run.
-- [ ] **Checkpoint 5:** `bun run test:e2e` green against reachable Postgres — **flagged pending,
-      not run here**: no Postgres is reachable in this environment (confirmed by exporting the 4
-      required env vars — `test/app.e2e-spec.ts`, the pre-existing bare e2e spec, fails identically
-      with a SASL auth error against default `localhost:5432` creds, so this is environmental, not
-      a defect in the new spec). Typecheck (`bunx tsc --noEmit`) and lint are clean for
-      `test/media.e2e-spec.ts`. User must run `bun run test:e2e` against their own
-      reachable/migrated Postgres to confirm green, then commit.
+- [x] **Checkpoint 5:** `bun run test:e2e` green against reachable Postgres — confirmed green
+      (11/11) once the user pointed `.env.local`/`.env.test.local` at a reachable Postgres. Getting
+      there required one out-of-band fix: the user's dev DB had `super_admin`/`admin` roles
+      pre-dating the `media:manager`/`media:read` permission additions, and `SeedDefaultDataService`
+      only seeds a role if it doesn't already exist (no retroactive permission sync onto existing
+      roles — see `docs/documents/media.md`'s "Permissions catalog additions" note). Granted via two
+      real `PUT /api/roles/:id` calls (through the actual guarded HTTP endpoint, not a direct DB
+      write) — not a code defect, this is the documented, expected behavior for any DB seeded before
+      this cycle.
 
 ### Phase 6 — Docs
+
 - [x] `docs/documents/media.md`, `docs/documents/storage.md` — mirror the source docs, corrected
       for the confirmed deviations
 - [x] `docs/ENTRYPOINT.md` — add the two new index lines
@@ -143,6 +152,7 @@ media domain/persistence → media application services → media presentation/w
 - [x] **Checkpoint 6:** doc read-through — commit
 
 ### Phase 7 — Manual verification (non-blocking for Phase 4/6 commits)
+
 - [ ] User sets real `AWS_REGION`/`AWS_S3_BUCKET`/`CLOUDINARY_*`/`STORAGE_PROVIDER` in their own
       `.env`
 - [ ] User runs `bun run start:dev`, exercises upload → list → delete against a real provider

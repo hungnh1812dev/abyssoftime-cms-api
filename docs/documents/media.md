@@ -150,7 +150,7 @@ Two new `test/utils/*` files, not media-specific — the first reusable e2e help
 
 `media.e2e-spec.ts` creates its own users directly via `PrismaService` + `JwtTokenService.signAccessToken(...)` against the seeded `super_admin`/`admin` roles (no HTTP register/verify-otp/login round-trip needed, since `JwtAuthGuard` only verifies the JWT — it never re-queries the DB for the user). A `randomUUID().slice(0, 8)` `runId` suffix on email/username avoids collisions with leftover rows from a prior incomplete run; `afterAll` cleans up every user/media row it created.
 
-**Not run in this environment** — no Postgres was reachable when this suite was written (confirmed environmental, not a defect: the pre-existing `test/app.e2e-spec.ts` fails identically against default `localhost:5432` credentials). Typecheck and lint are clean for `test/media.e2e-spec.ts`. Run `bun run test:e2e` against a reachable, migrated Postgres to confirm green.
+**Confirmed green (11/11)** against the user's own reachable Postgres. Note: the app only loads env from `.env.test.local`/`.env.local` (`src/config/config.module.ts`), never plain `.env` — `bun --env-file=.env.local run test:e2e` (or populating `.env.local` directly) is required for `bun run test:e2e` to see real config. Getting to green also required one one-off fix unrelated to this module's code: the target dev DB's `super_admin`/`admin` roles pre-dated this cycle's `media:manager`/`media:read` permissions, and `SeedDefaultDataService` doesn't retroactively add new permission slugs to a role that already exists (see [Permissions catalog additions](#permissions-catalog-additions) above) — granted via two real `PUT /api/roles/:id` calls.
 
 ## Known quirks / deviations (preserved intentionally)
 
@@ -171,4 +171,4 @@ Two Suggestion-level findings from the same review were **not** applied (left as
 
 ## Verified state
 
-`bun run build`, `bunx tsc --noEmit`, `bunx eslint .`, and `bun run test:cov` all pass, including the post-review hardening fixes above (74 suites, 358 tests). `bun run test:e2e` for `media.e2e-spec.ts` has **not** been run against a real Postgres in this environment (see [Tests](#tests) above) — pending user confirmation against their own reachable/migrated database, and pending a manual live walkthrough (upload → list → delete) against a real S3 or Cloudinary account with `STORAGE_PROVIDER`/`AWS_*`/`CLOUDINARY_*` set in the user's own `.env`.
+`bun run build`, `bunx tsc --noEmit`, `bunx eslint .`, and `bun run test:cov` all pass, including the post-review hardening fixes above (74 suites, 358 tests). `bun run test:e2e` for `media.e2e-spec.ts` is confirmed green (11/11) against the user's own reachable Postgres (see [Tests](#tests) above). Still pending: a manual live walkthrough (upload → list → delete) against a real S3 or Cloudinary account with `STORAGE_PROVIDER`/`AWS_*`/`CLOUDINARY_*` set in the user's own `.env`.
