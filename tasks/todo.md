@@ -12,12 +12,12 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 0:** `bun run build` succeeds
 
 ## Phase 1 — Storage module
-- [ ] `storage-adapter.repository.ts` — port
-- [ ] `s3-storage.adapter.ts` + spec
-- [ ] `cloudinary-storage.adapter.ts` + spec
-- [ ] `lazy-storage.adapter.ts` + spec
-- [ ] `storage.module.ts`
-- [ ] **Checkpoint 1:** `bun run test storage` green, build clean
+- [x] `storage-adapter.repository.ts` — port
+- [x] `s3-storage.adapter.ts` + spec
+- [x] `cloudinary-storage.adapter.ts` + spec
+- [x] `lazy-storage.adapter.ts` + spec
+- [x] `storage.module.ts`
+- [x] **Checkpoint 1:** `bun run test storage` green, build clean
 
 ## Phase 2 — Media domain + persistence
 - [ ] `media-asset.entity.ts`
