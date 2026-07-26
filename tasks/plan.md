@@ -95,14 +95,14 @@ media domain/persistence → media application services → media presentation/w
 - [x] **Checkpoint 2:** `bun run test prisma-media` green
 
 ### Phase 3 — Media application services
-- [ ] `application/util/image-dimensions.util.ts` + `.spec.ts` — PNG/JPEG sniffing (independent
+- [x] `application/util/image-dimensions.util.ts` + `.spec.ts` — PNG/JPEG sniffing (independent
       pure function)
-- [ ] `application/services/upload-media.service.ts` + `.spec.ts` — size → dimension → storage
+- [x] `application/services/upload-media.service.ts` + `.spec.ts` — size → dimension → storage
       upload → hash → create, in order
-- [ ] `application/services/list-media.service.ts` + `.spec.ts`
-- [ ] `application/services/delete-media.service.ts` + `.spec.ts` — storage-then-DB, uncaught on
+- [x] `application/services/list-media.service.ts` + `.spec.ts`
+- [x] `application/services/delete-media.service.ts` + `.spec.ts` — storage-then-DB, uncaught on
       storage failure
-- [ ] **Checkpoint 3:** `bun run test media/application` green
+- [x] **Checkpoint 3:** `bun run test media/application` green
 
 ### Phase 4 — Media presentation + wiring
 - [ ] `presentation/media.controller.ts` — `@Controller("api/media")`, per-route guards

@@ -26,11 +26,11 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 2:** repository spec green
 
 ## Phase 3 — Media application services
-- [ ] `image-dimensions.util.ts` + spec
-- [ ] `upload-media.service.ts` + spec
-- [ ] `list-media.service.ts` + spec
-- [ ] `delete-media.service.ts` + spec
-- [ ] **Checkpoint 3:** service specs green
+- [x] `image-dimensions.util.ts` + spec
+- [x] `upload-media.service.ts` + spec
+- [x] `list-media.service.ts` + spec
+- [x] `delete-media.service.ts` + spec
+- [x] **Checkpoint 3:** service specs green
 
 ## Phase 4 — Media presentation + wiring
 - [ ] `media.controller.ts`
