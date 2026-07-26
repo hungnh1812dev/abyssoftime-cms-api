@@ -87,12 +87,12 @@ media domain/persistence → media application services → media presentation/w
 - [x] **Checkpoint 1:** `bun run test storage` green, `bun run build` clean
 
 ### Phase 2 — Media domain + persistence
-- [ ] `domain/entities/media-asset.entity.ts`
-- [ ] `domain/repositories/media-asset.repository.ts` — `IMediaAssetRepository`,
+- [x] `domain/entities/media-asset.entity.ts`
+- [x] `domain/repositories/media-asset.repository.ts` — `IMediaAssetRepository`,
       `MEDIA_ASSET_REPOSITORY`, `MediaAssetNotFoundError`
-- [ ] `infrastructure/persistence/prisma-media.repository.ts` + `.spec.ts` — P2025-catch on
+- [x] `infrastructure/persistence/prisma-media.repository.ts` + `.spec.ts` — P2025-catch on
       delete, `findAll` ordered `createdAt desc`
-- [ ] **Checkpoint 2:** `bun run test prisma-media` green
+- [x] **Checkpoint 2:** `bun run test prisma-media` green
 
 ### Phase 3 — Media application services
 - [ ] `application/util/image-dimensions.util.ts` + `.spec.ts` — PNG/JPEG sniffing (independent

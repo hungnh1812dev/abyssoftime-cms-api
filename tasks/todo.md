@@ -20,10 +20,10 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 1:** `bun run test storage` green, build clean
 
 ## Phase 2 — Media domain + persistence
-- [ ] `media-asset.entity.ts`
-- [ ] `media-asset.repository.ts` — interface + `MediaAssetNotFoundError`
-- [ ] `prisma-media.repository.ts` + spec
-- [ ] **Checkpoint 2:** repository spec green
+- [x] `media-asset.entity.ts`
+- [x] `media-asset.repository.ts` — interface + `MediaAssetNotFoundError`
+- [x] `prisma-media.repository.ts` + spec
+- [x] **Checkpoint 2:** repository spec green
 
 ## Phase 3 — Media application services
 - [ ] `image-dimensions.util.ts` + spec
