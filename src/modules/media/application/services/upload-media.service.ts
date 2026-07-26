@@ -1,7 +1,6 @@
 import { MediaAssetEntity } from "../../domain/entities/media-asset.entity";
 import { type IMediaAssetRepository, MEDIA_ASSET_REPOSITORY } from "../../domain/repositories/media-asset.repository";
 import { getImageDimensions, UnsupportedImageFormatError } from "../util/image-dimensions.util";
-
 import { createHash } from "node:crypto";
 
 import { Inject, Injectable, PayloadTooLargeException, UnprocessableEntityException } from "@nestjs/common";

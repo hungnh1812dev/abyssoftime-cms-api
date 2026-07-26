@@ -105,13 +105,13 @@ media domain/persistence → media application services → media presentation/w
 - [x] **Checkpoint 3:** `bun run test media/application` green
 
 ### Phase 4 — Media presentation + wiring
-- [ ] `presentation/media.controller.ts` — `@Controller("api/media")`, per-route guards
-- [ ] `media.module.ts` — imports `[StorageModule]` only
-- [ ] `src/app.module.ts` — add `StorageModule`, `MediaModule`
-- [ ] `seed-default-data.service.ts` — add `media:manager`/`media:read`; grant to
+- [x] `presentation/media.controller.ts` — `@Controller("api/media")`, per-route guards
+- [x] `media.module.ts` — imports `[StorageModule]` only
+- [x] `src/app.module.ts` — add `StorageModule`, `MediaModule`
+- [x] `seed-default-data.service.ts` — add `media:manager`/`media:read`; grant to
       `super_admin`/`admin` respectively
-- [ ] `seed-default-data.service.spec.ts` — update counts/slug-array assertions
-- [ ] **Checkpoint 4:** `bun run build`, `bunx tsc --noEmit`, `bunx eslint .`, `bun run test:cov`
+- [x] `seed-default-data.service.spec.ts` — update counts/slug-array assertions
+- [x] **Checkpoint 4:** `bun run build`, `bunx tsc --noEmit`, `bunx eslint .`, `bun run test:cov`
       all clean — **commit here** (automated checkpoint; Phase 5's DB-dependent work doesn't
       block it)
 

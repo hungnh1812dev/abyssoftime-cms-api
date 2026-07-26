@@ -1,6 +1,5 @@
 import { MediaAssetEntity } from "../../domain/entities/media-asset.entity";
 import { IMediaAssetRepository } from "../../domain/repositories/media-asset.repository";
-
 import { createHash } from "node:crypto";
 
 import { PayloadTooLargeException, UnprocessableEntityException } from "@nestjs/common";
@@ -114,13 +113,13 @@ describe("UploadMediaService", () => {
   it("uploads to storage before persisting metadata", async () => {
     const buffer = buildPngBuffer(800, 600);
     const callOrder: string[] = [];
-    storage.upload.mockImplementation(async () => {
+    storage.upload.mockImplementation(() => {
       callOrder.push("upload");
-      return { url: "u", thumbnailUrl: "t", publicId: "p" };
+      return Promise.resolve({ url: "u", thumbnailUrl: "t", publicId: "p" });
     });
-    mediaAssets.create.mockImplementation(async () => {
+    mediaAssets.create.mockImplementation(() => {
       callOrder.push("create");
-      return created;
+      return Promise.resolve(created);
     });
 
     await service.execute({ buffer, fileName: "photo.png", mimeType: "image/png", uploadedBy: "user-1" });

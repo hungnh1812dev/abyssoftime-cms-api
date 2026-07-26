@@ -33,12 +33,12 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 3:** service specs green
 
 ## Phase 4 — Media presentation + wiring
-- [ ] `media.controller.ts`
-- [ ] `media.module.ts`
-- [ ] `app.module.ts` — register `StorageModule`, `MediaModule`
-- [ ] `seed-default-data.service.ts` — add `media:manager`/`media:read`
-- [ ] `seed-default-data.service.spec.ts` — update counts/slugs
-- [ ] **Checkpoint 4:** build/typecheck/lint/test:cov all clean — commit
+- [x] `media.controller.ts`
+- [x] `media.module.ts`
+- [x] `app.module.ts` — register `StorageModule`, `MediaModule`
+- [x] `seed-default-data.service.ts` — add `media:manager`/`media:read`
+- [x] `seed-default-data.service.spec.ts` — update counts/slugs
+- [x] **Checkpoint 4:** build/typecheck/lint/test:cov all clean — commit
 
 ## Phase 5 — Test infra + e2e
 - [ ] `test/utils/noop-storage.adapter.ts`

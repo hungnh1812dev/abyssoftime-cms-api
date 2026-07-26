@@ -21,7 +21,21 @@ describe("ListMediaService", () => {
 
   it("returns all media assets from the repository", async () => {
     const assetList = [
-      new MediaAssetEntity("media-1", "photo.png", "image/png", 100, 800, 600, "https://cdn.example.com/photo.png", "https://cdn.example.com/photo.png", "photo", "hash", "user-1", new Date(), new Date()),
+      new MediaAssetEntity(
+        "media-1",
+        "photo.png",
+        "image/png",
+        100,
+        800,
+        600,
+        "https://cdn.example.com/photo.png",
+        "https://cdn.example.com/photo.png",
+        "photo",
+        "hash",
+        "user-1",
+        new Date(),
+        new Date(),
+      ),
     ];
     mediaAssets.findAll.mockResolvedValue(assetList);
 

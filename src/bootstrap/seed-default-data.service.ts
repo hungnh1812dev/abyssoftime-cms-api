@@ -12,11 +12,19 @@ const DEFAULT_PERMISSIONS: Omit<CreatePermissionData, "updatedBy">[] = [
   { slug: "permission:read", name: "Read permissions", description: "View permissions" },
   { slug: "api_token:manager", name: "Manage access tokens", description: "Create, revoke, and delete access tokens" },
   { slug: "api_token:read", name: "Read access tokens", description: "View access tokens" },
+  { slug: "media:manager", name: "Manage media", description: "Upload and delete media assets" },
+  { slug: "media:read", name: "Read media", description: "View media assets" },
 ];
 
 const DEFAULT_ROLES: Omit<CreateRoleData, "updatedBy">[] = [
-  { name: "Super Admin", slug: "super_admin", permissions: ["user:manager", "role:manager", "permission:manager", "api_token:manager"], level: 100, isDefault: true },
-  { name: "Admin", slug: "admin", permissions: ["user:read", "role:read", "permission:read", "api_token:read"], level: 50, isDefault: true },
+  {
+    name: "Super Admin",
+    slug: "super_admin",
+    permissions: ["user:manager", "role:manager", "permission:manager", "api_token:manager", "media:manager"],
+    level: 100,
+    isDefault: true,
+  },
+  { name: "Admin", slug: "admin", permissions: ["user:read", "role:read", "permission:read", "api_token:read", "media:read"], level: 50, isDefault: true },
   { name: "Editor", slug: "editor", permissions: [], level: 20, isDefault: true },
   { name: "Guest", slug: "guest", permissions: [], level: 0, isDefault: true },
 ];
