@@ -65,7 +65,11 @@ See `tasks/plan.md` for full context and rationale.
 
 ## Phase 7 — Manual verification (non-blocking for Phase 4/6 commits)
 
-- [ ] User sets real `AWS_REGION`/`AWS_S3_BUCKET`/`CLOUDINARY_*`/`STORAGE_PROVIDER` in their own
-      `.env`
-- [ ] User confirms upload → list → delete against a real provider
-- [ ] User confirms e2e suite against their own reachable Postgres, if it couldn't run here
+- [x] User sets real `CLOUDINARY_CLOUD_NAME`/`CLOUDINARY_API_KEY`/`CLOUDINARY_API_SECRET` in their
+      own `.env.local` (`STORAGE_PROVIDER` left unset, defaults to `cloudinary`; `AWS_*`/S3 not
+      exercised)
+- [x] Confirmed upload → list → delete against real Cloudinary: `POST /api/media/upload` → `201`
+      with a genuine `res.cloudinary.com` URL (fetched directly, `200`); `GET /api/media` → `200`
+      listing it; `DELETE /api/media/:id` → `204`, DB row gone from a follow-up list, and the
+      Cloudinary URL now `404`s (object actually deleted, not just the DB row)
+- [x] User confirms e2e suite against their own reachable Postgres — done, see Phase 5 Checkpoint 5

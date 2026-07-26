@@ -153,11 +153,22 @@ media domain/persistence → media application services → media presentation/w
 
 ### Phase 7 — Manual verification (non-blocking for Phase 4/6 commits)
 
-- [ ] User sets real `AWS_REGION`/`AWS_S3_BUCKET`/`CLOUDINARY_*`/`STORAGE_PROVIDER` in their own
-      `.env`
-- [ ] User runs `bun run start:dev`, exercises upload → list → delete against a real provider
-- [ ] User confirms Phase 5's e2e suite against their own reachable Postgres, if it couldn't run
-      here
+- [x] User set real `CLOUDINARY_CLOUD_NAME`/`CLOUDINARY_API_KEY`/`CLOUDINARY_API_SECRET` in their
+      own `.env.local` (default `STORAGE_PROVIDER=cloudinary`; S3 path not exercised — `LazyStorageAdapter`'s
+      provider branching is already unit-tested, so this was about proving the Cloudinary path and
+      the app's env-loading end-to-end, not re-testing the branch itself)
+- [x] Live walkthrough against `bun run start:dev` + real Cloudinary: `POST /api/media/upload` →
+      `201` with a real `res.cloudinary.com` URL (independently fetched, `200`); `GET /api/media` →
+      `200`; `DELETE /api/media/:id` → `204`, DB row gone, Cloudinary URL now `404` (the object was
+      actually deleted, not just the DB row — closes the loop on `DeleteMediaService`'s
+      storage-then-DB ordering against a real provider, not just `NoopStorageAdapter`). One dead end
+      on the way: the first upload attempt against a hand-crafted PNG (header-only, no real pixel
+      data) got a real `400 Invalid image file` from Cloudinary — proved credentials/wiring were
+      already correct, fixed by using a genuinely valid 1×1 PNG. A synthetic JWT `sub` not backed by
+      a real `User` row also 500'd on `media_assets_uploaded_by_fkey` (FK violation) until a real
+      user was created for the token. Verification user/JWT were temporary and cleaned up afterward.
+- [x] User confirms Phase 5's e2e suite against their own reachable Postgres — done, see Phase 5
+      Checkpoint 5
 
 ## Verification (end-to-end)
 
