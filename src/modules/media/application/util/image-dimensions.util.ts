@@ -1,6 +1,29 @@
+export type ImageFormat = "png" | "jpeg";
+
 export interface ImageDimensions {
+  format: ImageFormat;
   width: number;
   height: number;
+}
+
+const CANONICAL_MIME_TYPES: Record<ImageFormat, string> = {
+  png: "image/png",
+  jpeg: "image/jpeg",
+};
+
+const CANONICAL_EXTENSIONS: Record<ImageFormat, string> = {
+  png: ".png",
+  jpeg: ".jpg",
+};
+
+export function getCanonicalMimeType(format: ImageFormat): string {
+  return CANONICAL_MIME_TYPES[format];
+}
+
+export function withCanonicalExtension(fileName: string, format: ImageFormat): string {
+  const dot = fileName.lastIndexOf(".");
+  const stem = dot === -1 ? fileName : fileName.slice(0, dot);
+  return `${stem}${CANONICAL_EXTENSIONS[format]}`;
 }
 
 export class UnsupportedImageFormatError extends Error {
@@ -31,7 +54,7 @@ function isPng(buffer: Buffer): boolean {
 function readPngDimensions(buffer: Buffer): ImageDimensions {
   const width = buffer.readUInt32BE(16);
   const height = buffer.readUInt32BE(20);
-  return { width, height };
+  return { format: "png", width, height };
 }
 
 function isJpeg(buffer: Buffer): boolean {
@@ -58,9 +81,12 @@ function readJpegDimensions(buffer: Buffer): ImageDimensions {
     const segmentLength = buffer.readUInt16BE(offset + 2);
 
     if (JPEG_SOF_MARKERS.has(marker)) {
+      if (offset + 8 >= buffer.length) {
+        throw new UnsupportedImageFormatError();
+      }
       const height = buffer.readUInt16BE(offset + 5);
       const width = buffer.readUInt16BE(offset + 7);
-      return { width, height };
+      return { format: "jpeg", width, height };
     }
 
     offset += 2 + segmentLength;

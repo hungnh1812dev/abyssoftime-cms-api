@@ -1,6 +1,6 @@
 import { MediaAssetEntity } from "../../domain/entities/media-asset.entity";
 import { type IMediaAssetRepository, MEDIA_ASSET_REPOSITORY } from "../../domain/repositories/media-asset.repository";
-import { getImageDimensions, UnsupportedImageFormatError } from "../util/image-dimensions.util";
+import { getCanonicalMimeType, getImageDimensions, UnsupportedImageFormatError, withCanonicalExtension } from "../util/image-dimensions.util";
 import { createHash } from "node:crypto";
 
 import { Inject, Injectable, PayloadTooLargeException, UnprocessableEntityException } from "@nestjs/common";
@@ -30,7 +30,7 @@ export class UploadMediaService {
       throw new PayloadTooLargeException(`File exceeds maximum upload size of ${maxUploadBytes} bytes`);
     }
 
-    let dimensions: { width: number; height: number };
+    let dimensions: ReturnType<typeof getImageDimensions>;
     try {
       dimensions = getImageDimensions(input.buffer);
     } catch (error) {
@@ -40,13 +40,18 @@ export class UploadMediaService {
       throw error;
     }
 
-    const uploadResult = await this.storage.upload({ buffer: input.buffer, fileName: input.fileName, mimeType: input.mimeType });
+    // Derived from the sniffed magic bytes, not the caller-supplied mimeType/fileName — a
+    // spoofed mimeType (e.g. an image/html polyglot) must never reach storage's Content-Type.
+    const canonicalMimeType = getCanonicalMimeType(dimensions.format);
+    const storageFileName = withCanonicalExtension(input.fileName, dimensions.format);
+
+    const uploadResult = await this.storage.upload({ buffer: input.buffer, fileName: storageFileName, mimeType: canonicalMimeType });
 
     const hash = createHash("sha256").update(input.buffer).digest("hex");
 
     return this.mediaAssets.create({
       fileName: input.fileName,
-      mimeType: input.mimeType,
+      mimeType: canonicalMimeType,
       size: input.buffer.length,
       width: dimensions.width,
       height: dimensions.height,

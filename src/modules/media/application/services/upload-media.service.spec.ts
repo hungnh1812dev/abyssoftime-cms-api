@@ -127,6 +127,17 @@ describe("UploadMediaService", () => {
     expect(callOrder).toEqual(["upload", "create"]);
   });
 
+  it("ignores a spoofed mimeType/extension and uses the detected image format for storage and persistence", async () => {
+    const buffer = buildPngBuffer(800, 600);
+    storage.upload.mockResolvedValue({ url: "u", thumbnailUrl: "t", publicId: "p" });
+    mediaAssets.create.mockResolvedValue(created);
+
+    await service.execute({ buffer, fileName: "photo.html", mimeType: "text/html", uploadedBy: "user-1" });
+
+    expect(storage.upload).toHaveBeenCalledWith({ buffer, fileName: "photo.png", mimeType: "image/png" });
+    expect(mediaAssets.create).toHaveBeenCalledWith(expect.objectContaining({ fileName: "photo.html", mimeType: "image/png" }));
+  });
+
   it("passes uploadedBy: null through when no uploader is known", async () => {
     const buffer = buildPngBuffer(800, 600);
     storage.upload.mockResolvedValue({ url: "u", thumbnailUrl: "t", publicId: "p" });
