@@ -136,10 +136,10 @@ media domain/persistence → media application services → media presentation/w
       reachable/migrated Postgres to confirm green, then commit.
 
 ### Phase 6 — Docs
-- [ ] `docs/documents/media.md`, `docs/documents/storage.md` — mirror the source docs, corrected
+- [x] `docs/documents/media.md`, `docs/documents/storage.md` — mirror the source docs, corrected
       for the confirmed deviations
-- [ ] `docs/ENTRYPOINT.md` — add the two new index lines
-- [ ] `SPEC.md` — trim to a pointer line
+- [x] `docs/ENTRYPOINT.md` — add the two new index lines
+- [x] `SPEC.md` — trim to a pointer line
 - [ ] **Checkpoint 6:** doc read-through — commit
 
 ### Phase 7 — Manual verification (non-blocking for Phase 4/6 commits)
