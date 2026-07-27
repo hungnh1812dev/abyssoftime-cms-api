@@ -80,14 +80,14 @@ describe("configureApp", () => {
     expect(createPermission.execute).toHaveBeenCalledWith(dto);
   });
 
-  it("strips unknown properties from the body before it reaches the controller", async () => {
+  it("rejects unknown properties in the body with 400 before it reaches the controller", async () => {
     const dto: CreatePermissionDto = { slug: "document:read", name: "Read document", description: "Allows reading a document" };
 
     await request(app.getHttpServer())
       .post("/api/permissions")
       .send({ ...dto, notAllowed: "value" })
-      .expect(201);
+      .expect(400);
 
-    expect(createPermission.execute).toHaveBeenCalledWith(dto);
+    expect(createPermission.execute).not.toHaveBeenCalled();
   });
 });

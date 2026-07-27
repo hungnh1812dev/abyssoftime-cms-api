@@ -14,10 +14,12 @@ export function parseTrustProxy(raw: string): boolean | number | string {
 }
 
 export function configureApp(app: NestExpressApplication): void {
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   app.use(cookieParser());
 
   const configService: ConfigService<EnvironmentVariables, true> = app.get(ConfigService);
   const trustProxy = configService.get("TRUST_PROXY", { infer: true });
   app.set("trust proxy", parseTrustProxy(trustProxy));
+
+  // app.setGlobalPrefix("api/v1", {exclude: [' ']});
 }
