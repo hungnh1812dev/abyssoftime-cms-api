@@ -15,7 +15,7 @@ For any new feature/page/module:
 
 ### `[CAREFUL]` features
 
-- If a feature's request/spec is tagged `[CAREFUL]`, use the Opus model for the **Build (plan)** and **Review** phases.
+- If a feature's request/spec is tagged `[CAREFUL]`, use the Opus model for the **Spec**, **Build (plan)** and **Review** phases.
 - Use the Sonnet model for all other phases (Spec, Build (execute), Update spec, Update docs, Clean up).
 
 ## Module rules
