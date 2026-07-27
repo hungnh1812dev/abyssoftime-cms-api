@@ -66,15 +66,15 @@ See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
 
 ## Phase 7 — Document collection services
 
-- [ ] `save-document.service.ts` + spec — transactional
-- [ ] `publish-document.service.ts` + spec — mode B → 400
-- [ ] `unpublish-document.service.ts` + spec — mode B → 400
-- [ ] `get-document-for-edit.service.ts` + spec
-- [ ] `get-public-document.service.ts` + spec
-- [ ] `delete-document.service.ts` + spec — transactional
-- [ ] `list-documents.service.ts` + spec
-- [ ] `duplicate-document.service.ts` + spec
-- [ ] **Checkpoint 7:** collection service specs green
+- [x] `save-document.service.ts` + spec — transactional
+- [x] `publish-document.service.ts` + spec — mode B → 400
+- [x] `unpublish-document.service.ts` + spec — mode B → 400
+- [x] `get-document-for-edit.service.ts` + spec
+- [x] `get-public-document.service.ts` + spec
+- [x] `delete-document.service.ts` + spec — transactional
+- [x] `list-documents.service.ts` + spec
+- [x] `duplicate-document.service.ts` + spec
+- [x] **Checkpoint 7:** collection service specs green
 
 ## Phase 8 — Bulk + single-type services
 
