@@ -8,7 +8,7 @@ For any new feature/page/module:
 2. **Build (plan)** — override old `tasks/todo.md` and `tasks/plan.md` with the new task breakdown.
 3. **Build (execute)** — implement in multiple steps, verifying as you go.
 4. **Update spec** — reflect the final state in `/docs/specs/*`.
-5. **Update docs** — reflect the final state in `/docs/documents/*`.
+5. **Update docs** — reflect the final state in `/docs/documents/*`. If the feature adds a new endpoint, also update the Swagger doc.
 6. **Review** — conduct a five-axis code review: correctness, readability, architecture, security, performance.
 7. **Clean up** — delete the completed spec from `/specs/*.md`, must be run after Review complete.
 8. **Complete** — workflow done.
