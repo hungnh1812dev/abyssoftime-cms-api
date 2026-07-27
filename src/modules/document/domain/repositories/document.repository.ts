@@ -1,6 +1,7 @@
 import { DocumentEntity, DocumentVersion } from "../entities/document.entity";
 
 import { FieldDefinition } from "@/modules/content-type/domain/entities/field-definition";
+import { ParsedFilter } from "@/modules/document/infrastructure/persistence/sql/where-builder";
 import { Prisma } from "@/prisma/application/client";
 
 export interface ListOptions {
@@ -11,6 +12,7 @@ export interface ListOptions {
   search?: string;
   listFields: string[];
   searchableFields: string[];
+  filters: ParsedFilter[];
 }
 
 export interface IDocumentRepository {

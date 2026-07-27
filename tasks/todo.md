@@ -31,29 +31,40 @@ See `tasks/plan.md` for full context, approach, and confirmed decisions.
 
 ## Phase 2 — Wire into the list request path (one full vertical slice)
 
-- [ ] `document.repository.ts` — `ListOptions` gains `filters: ParsedFilter[]`
-- [ ] `list-query.parser.ts` — `ListQueryParams` gains `filters?: Record<string, Record<string,
-      string>>`; `parseListQuery` calls `parseFilters(contentType, query.filters)` and includes the
-      result in the returned `ListOptions`
-- [ ] `list-query.parser.spec.ts` — add cases: no `filters` in query → `filters: []`; valid `filters`
-      → parsed array present in the returned options; an invalid filter throws `400` from within
-      `parseListQuery` itself
-- [ ] `prisma-document.repository.ts` — `listPaginated`: after the existing `search` clause, call
-      `buildFilterWhere(opts.filters, whereParams.length + 1)` and AND its `sql` into `whereSql`,
-      push its `params`; applies to both the count query and the data query (shared `whereSql`/
+- [x] `document.repository.ts` — `ListOptions` gains `filters: ParsedFilter[]`
+- [x] `list-query.parser.ts` — `ListQueryParams` gains `filters?: FilterQueryParams`; `parseListQuery`
+      calls `parseFilters(contentType, query.filters)` and includes the result in the returned
+      `ListOptions`
+- [x] `list-query.parser.spec.ts` — added cases: no `filters` in query → `filters: []`; valid
+      `filters` → parsed array present in the returned options; an invalid filter throws `400` from
+      within `parseListQuery` itself. Also fixed `prisma-document.repository.spec.ts`'s hand-built
+      `ListOptions` literal (missing `filters: []` — a `bun run build` type error `bun run test`
+      alone didn't catch, since ts-jest here doesn't do full-project type-checking; caught it by
+      running the build)
+- [x] `prisma-document.repository.ts` — `listPaginated`: after the existing `search` clause, calls
+      `buildFilterWhere(opts.filters, whereParams.length + 1)` and ANDs its `sql` into `whereSql`,
+      pushes its `params`; applies to both the count query and the data query (shared `whereSql`/
       `whereParams`, one change point)
-- [ ] `prisma-document.repository.spec.ts` — add cases: filters set → only matching rows/correct
-      `total`; empty `filters` → identical behavior to today (no regression); `filters` + `search`
-      together → AND, not either/or
-- [ ] `list-query.dto.ts` — add `filters?: Record<string, Record<string, string>>`,
-      `@IsOptional() @IsObject()` only (shape gate, matches `save-document.dto.ts` precedent);
-      `@ApiPropertyOptional` documenting the bracket syntax + supported `$op` set per field class
-- [ ] **Checkpoint 2:** `bun run build && bun run test:cov && bun run lint` green (no new
-      `coverageThreshold` entries for the Prisma repository or controller, per
-      `docs/rules/workflow.md`); manual smoke test via `bun run start:dev` + `curl` against a real
-      dev DB: `GET .../cv-page?filters[position][$contains]=...` and
-      `GET .../cv-page?filters[isMain][$eq]=true`, confirm 200 + correctly filtered rows, and check
-      `/api-docs` shows the new param; confirm before committing
+- [x] `prisma-document.repository.spec.ts` — added cases: filters set → only matching rows/correct
+      `total` (asserted via the generated SQL/params, mocked DB); `filters` + `search` together →
+      AND with independent placeholders, not either/or
+- [x] `list-query.dto.ts` — added `filters?: FilterQueryParams`, `@IsOptional() @IsObject()` only
+      (shape gate, matches `save-document.dto.ts` precedent); `@ApiPropertyOptional` documenting the
+      bracket syntax + supported `$op` set per field class. Build caught a real Swagger-decorator
+      type error along the way: `type: "object"` requires an explicit `additionalProperties` in this
+      `@nestjs/swagger` version's typings — added `additionalProperties: true`
+- [x] **Checkpoint 2:** `bun run build && bun run test:cov && bun run lint` green (no new
+      `coverageThreshold` entries for the Prisma repository or controller). Manual smoke test via
+      `bun run start:dev` against the real dev Postgres: app boots cleanly with the new route param
+      registered, `GET /health` → 200, and `GET /api-docs-json` confirms the `filters` query param
+      is present on the collection-type list route with the documented bracket syntax/operator set.
+      Stopped short of an authenticated `curl` round-trip proving actual row filtering — this dev
+      DB's `/auth/register` DTO wants fields unrelated to this feature to construct a fresh account,
+      and existing dev credentials aren't known/available here. Deferred that exact proof (real
+      HTTP route + real Postgres + auth) to Task 6's e2e suite, which uses
+      `JwtTokenService.signAccessToken` directly (the existing e2e pattern) instead of a live
+      register/login round-trip — a stronger, repeatable check than one-off `curl` would have been
+      anyway; confirmed before committing
 
 ## Phase 3 — e2e proof, docs, spec cleanup, review
 

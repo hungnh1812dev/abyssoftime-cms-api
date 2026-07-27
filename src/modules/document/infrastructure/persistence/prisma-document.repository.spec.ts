@@ -185,6 +185,7 @@ describe("PrismaDocumentRepository", () => {
       sortDir: "desc",
       listFields: ["wordGroup"],
       searchableFields: ["wordGroup"],
+      filters: [],
     };
 
     it("runs a count query and a paginated data query scoped to the given version", async () => {
@@ -219,6 +220,32 @@ describe("PrismaDocumentRepository", () => {
       expect(String(dataSql)).toContain('"wordGroup" ILIKE $2');
       expect(String(dataSql)).toContain("LIMIT $3 OFFSET $4");
       expect(dataParams).toEqual(["draft", "%hello%", 20, 0]);
+    });
+
+    it("adds filters to both the count and data queries, AND'd with the version scope", async () => {
+      prisma.$queryRawUnsafe.mockResolvedValueOnce([{ count: 0 }]).mockResolvedValueOnce([]);
+
+      await repository.listPaginated("en-it-vocab", "draft", { ...opts, filters: [{ column: "wordGroup", operator: "$eq", value: "hello" }] }, FIELDS);
+
+      const [countSql, ...countParams] = prisma.$queryRawUnsafe.mock.calls[0];
+      expect(String(countSql)).toContain('("wordGroup" = $2)');
+      expect(countParams).toEqual(["draft", "hello"]);
+
+      const [dataSql, ...dataParams] = prisma.$queryRawUnsafe.mock.calls[1];
+      expect(String(dataSql)).toContain('("wordGroup" = $2)');
+      expect(String(dataSql)).toContain("LIMIT $3 OFFSET $4");
+      expect(dataParams).toEqual(["draft", "hello", 20, 0]);
+    });
+
+    it("combines filters and search as an AND, each with its own placeholder", async () => {
+      prisma.$queryRawUnsafe.mockResolvedValueOnce([{ count: 0 }]).mockResolvedValueOnce([]);
+
+      await repository.listPaginated("en-it-vocab", "draft", { ...opts, search: "hi", filters: [{ column: "isMain", operator: "$eq", value: true }] }, FIELDS);
+
+      const [countSql, ...countParams] = prisma.$queryRawUnsafe.mock.calls[0];
+      expect(String(countSql)).toContain('"wordGroup" ILIKE $2');
+      expect(String(countSql)).toContain('("isMain" = $3)');
+      expect(countParams).toEqual(["draft", "%hi%", true]);
     });
 
     it("rejects an orderBy column outside the schema allowlist", async () => {

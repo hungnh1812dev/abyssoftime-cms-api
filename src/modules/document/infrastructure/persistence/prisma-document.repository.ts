@@ -10,7 +10,7 @@ import { Prisma } from "@/prisma/application/client";
 import { PrismaService } from "@/prisma/application/prisma.service";
 
 import { fieldsToRowValues, mapRowToDocument } from "./sql/row-mapper";
-import { buildOrderByClause, buildSearchWhere, sortableColumnsFor } from "./sql/where-builder";
+import { buildFilterWhere, buildOrderByClause, buildSearchWhere, sortableColumnsFor } from "./sql/where-builder";
 
 @Injectable()
 export class PrismaDocumentRepository implements IDocumentRepository {
@@ -92,6 +92,12 @@ export class PrismaDocumentRepository implements IDocumentRepository {
     if (search) {
       whereSql += ` AND ${search.sql}`;
       whereParams.push(...search.params);
+    }
+
+    const filters = buildFilterWhere(opts.filters, whereParams.length + 1);
+    if (filters) {
+      whereSql += ` AND ${filters.sql}`;
+      whereParams.push(...filters.params);
     }
 
     const orderByClause = buildOrderByClause(opts.orderBy, opts.sortDir, sortableColumnsFor(fields));
