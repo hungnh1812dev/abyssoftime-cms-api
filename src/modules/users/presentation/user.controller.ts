@@ -1,13 +1,11 @@
-import { CreateUserDto } from "../application/dto/create-user.dto";
 import { UpdateUserRoleDto } from "../application/dto/update-user-role.dto";
 import { UpdateUserDto } from "../application/dto/update-user.dto";
-import { CreateUserService } from "../application/services/create-user.service";
 import { DeleteUserService } from "../application/services/delete-user.service";
 import { ListUserService } from "../application/services/list-user.service";
 import { UpdateUserRoleService } from "../application/services/update-user-role.service";
 import { UpdateUserService } from "../application/services/update-user.service";
 
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Put, Req, UseGuards } from "@nestjs/common";
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
@@ -23,7 +21,6 @@ import { UserResponseDto } from "./user-response.dto";
 export class UserController {
   constructor(
     private readonly listUsers: ListUserService,
-    private readonly createUser: CreateUserService,
     private readonly updateUser: UpdateUserService,
     private readonly updateUserRole: UpdateUserRoleService,
     private readonly deleteUser: DeleteUserService,
@@ -37,17 +34,6 @@ export class UserController {
   async list(): Promise<UserResponseDto[]> {
     const users = await this.listUsers.execute();
     return users.map((user) => UserResponseDto.fromEntity(user));
-  }
-
-  @Post()
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions("user:manager")
-  @ApiOperation({ summary: "Create a user" })
-  @ApiResponse({ status: 201, type: UserResponseDto })
-  @ApiResponse({ status: 409, description: "Email or username already in use" })
-  async create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
-    const user = await this.createUser.execute(dto);
-    return UserResponseDto.fromEntity(user);
   }
 
   @Put(":id")

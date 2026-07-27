@@ -2,7 +2,6 @@ import { MODULE_METADATA } from "@nestjs/common/constants";
 
 import { RoleModule } from "@/modules/roles/role.module";
 
-import { CreateUserService } from "./application/services/create-user.service";
 import { DeleteUserService } from "./application/services/delete-user.service";
 import { ListUserService } from "./application/services/list-user.service";
 import { UpdateUserRoleService } from "./application/services/update-user-role.service";
@@ -24,14 +23,7 @@ describe("UserModule", () => {
   it("registers the CRUD services and binds USER_REPOSITORY to PrismaUserRepository", () => {
     const providers = Reflect.getMetadata(MODULE_METADATA.PROVIDERS, UserModule) as unknown[];
 
-    expect(providers).toEqual([
-      ListUserService,
-      CreateUserService,
-      UpdateUserService,
-      UpdateUserRoleService,
-      DeleteUserService,
-      { provide: USER_REPOSITORY, useClass: PrismaUserRepository },
-    ]);
+    expect(providers).toEqual([ListUserService, UpdateUserService, UpdateUserRoleService, DeleteUserService, { provide: USER_REPOSITORY, useClass: PrismaUserRepository }]);
   });
 
   it("exports USER_REPOSITORY", () => {

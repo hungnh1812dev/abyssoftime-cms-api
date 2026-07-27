@@ -1,7 +1,5 @@
-import { CreateUserDto } from "../application/dto/create-user.dto";
 import { UpdateUserRoleDto } from "../application/dto/update-user-role.dto";
 import { UpdateUserDto } from "../application/dto/update-user.dto";
-import { CreateUserService } from "../application/services/create-user.service";
 import { DeleteUserService } from "../application/services/delete-user.service";
 import { ListUserService } from "../application/services/list-user.service";
 import { UpdateUserRoleService } from "../application/services/update-user-role.service";
@@ -19,7 +17,6 @@ import { UserController } from "./user.controller";
 describe("UserController", () => {
   let controller: UserController;
   let listUsers: jest.Mocked<ListUserService>;
-  let createUser: jest.Mocked<CreateUserService>;
   let updateUser: jest.Mocked<UpdateUserService>;
   let updateUserRole: jest.Mocked<UpdateUserRoleService>;
   let deleteUser: jest.Mocked<DeleteUserService>;
@@ -32,7 +29,6 @@ describe("UserController", () => {
       controllers: [UserController],
       providers: [
         { provide: ListUserService, useValue: { execute: jest.fn() } },
-        { provide: CreateUserService, useValue: { execute: jest.fn() } },
         { provide: UpdateUserService, useValue: { execute: jest.fn() } },
         { provide: UpdateUserRoleService, useValue: { execute: jest.fn() } },
         { provide: DeleteUserService, useValue: { execute: jest.fn() } },
@@ -42,7 +38,6 @@ describe("UserController", () => {
 
     controller = module.get(UserController);
     listUsers = module.get(ListUserService);
-    createUser = module.get(CreateUserService);
     updateUser = module.get(UpdateUserService);
     updateUserRole = module.get(UpdateUserRoleService);
     deleteUser = module.get(DeleteUserService);
@@ -56,17 +51,6 @@ describe("UserController", () => {
     expect(listUsers.execute).toHaveBeenCalled();
     expect(result).toEqual([UserResponseDto.fromEntity(user)]);
     expect(result[0]).not.toHaveProperty("password");
-  });
-
-  it("create() delegates to CreateUserService and strips sensitive fields from the response", async () => {
-    const dto: CreateUserDto = { email: "jane@example.com", name: "Jane Doe", username: "janedoe", password: "secret" };
-    createUser.execute.mockResolvedValue(user);
-
-    const result = await controller.create(dto);
-
-    expect(createUser.execute).toHaveBeenCalledWith(dto);
-    expect(result).toEqual(UserResponseDto.fromEntity(user));
-    expect(result).not.toHaveProperty("password");
   });
 
   it("update() delegates to UpdateUserService with the caller from req.user and strips sensitive fields from the response", async () => {

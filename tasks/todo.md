@@ -2,6 +2,12 @@
 
 See `tasks/plan.md` for full context, approach, and confirmed decisions.
 
+> **Superseded (2026-07-27):** Phase 1's `POST /api/users` endpoint (and its
+> `CreateUserService`/`CreateUserDto`) was later removed entirely — it was redundant with
+> public self-registration via `POST /api/auth/register` + `verify-otp`. See
+> `docs/documents/users.md#removed-post-apiusers`. This phase's checklist is kept below as a
+> historical record only.
+
 ## Phase 1 — Create endpoint lockdown
 
 - [x] `create-user.dto.ts` — remove `accountType`/`verified`/`roleId` fields + decorators/imports;
