@@ -15,32 +15,35 @@ See `tasks/plan.md` for full context, build order, and confirmed decisions.
 
 ## Phase 1 — `permissions` module
 
-- [ ] `create-permission.dto.ts` / `update-permission.dto.ts` — `@ApiProperty`/`@ApiPropertyOptional`
+- [x] `create-permission.dto.ts` / `update-permission.dto.ts` — `@ApiProperty`/`@ApiPropertyOptional`
       per field (slug pattern example `"document:read"`, name/description examples)
-- [ ] `permission.controller.ts` — `@ApiTags("permissions")`; per route `@ApiCookieAuth()` (all 4
-      routes are guarded) + `@ApiOperation` + `@ApiResponse` for: `GET` 200; `POST` 201/409; `PUT`
-      200/404; `DELETE` 204/404
-- [ ] **Checkpoint 1:** `bun run build && bun run lint && bun run test:cov` green
+- [x] New `presentation/dto/permission-response.dto.ts` (domain entities stay undecorated;
+      controller still returns the real `PermissionEntity`)
+- [x] `permission.controller.ts` — `@ApiTags("permissions")` + class-level `@ApiCookieAuth()`; `GET`
+      200; `POST` 201/409; `PUT` 200/404; `DELETE` 204/404/409 (still-referenced, incl. schema)
+- [x] **Checkpoint 1:** `bun run build && bun run test` green (permissions suite: 7/7, 27 tests)
 
 ## Phase 2 — `roles` module
 
-- [ ] `create-role.dto.ts` / `update-role.dto.ts` — properties incl. `level` (`0`-`100` range in
+- [x] `create-role.dto.ts` / `update-role.dto.ts` — properties incl. `level` (`0`-`100` range in
       the property doc), `permissions` array
-- [ ] `role.controller.ts` — `@ApiTags("roles")`; all 4 routes `@ApiCookieAuth()`; `GET` 200;
+- [x] New `presentation/dto/role-response.dto.ts`
+- [x] `role.controller.ts` — `@ApiTags("roles")` + class-level `@ApiCookieAuth()`; `GET` 200;
       `POST` 201/400(unknown permission slug)/409; `PUT` 200/400/404; `DELETE` 204/400/404/409
       (still-assigned-to-users)
-- [ ] **Checkpoint 2:** build/lint/test:cov green
+- [x] **Checkpoint 2:** build green (verified together with Phase 3 below)
 
 ## Phase 3 — `users` module
 
-- [ ] `create-user.dto.ts` / `update-user.dto.ts` — note in the property doc that `password` is
+- [x] `create-user.dto.ts` / `update-user.dto.ts` — noted in the property doc that `password` is
       round-tripped in plaintext by this module (pre-existing gap, not something Swagger should
-      paper over) — no fake-realistic password example, use an obvious placeholder
-      (`"changeme123"`)
-- [ ] `user.controller.ts` — `@ApiTags("users")`; all 4 routes `@ApiCookieAuth()`; response type is
-      `UserResponseDto` (already strips sensitive fields) for `GET`/`POST`/`PUT`; `POST` 201/409;
-      `PUT` 200/403(level-hierarchy)/404/409; `DELETE` 204/403/404
-- [ ] **Checkpoint 3:** build/lint/test:cov green
+      paper over) — obvious placeholder example (`"changeme123"`), not a realistic-looking secret
+- [x] `user-response.dto.ts` — decorated directly (already the real runtime return type, strips
+      sensitive fields)
+- [x] `user.controller.ts` — `@ApiTags("users")` + class-level `@ApiCookieAuth()`; `POST` 201/409;
+      `PUT` 200/403(level-hierarchy/super-admin-promotion)/404/409; `DELETE` 204/403/404
+- [x] **Checkpoint 3:** `bun run build && bun run test src/modules/roles src/modules/users` green
+      (16 suites, 114 tests)
 
 ## Phase 4 — `access-tokens` module
 

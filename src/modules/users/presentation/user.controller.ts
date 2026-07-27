@@ -6,6 +6,7 @@ import { ListUserService } from "../application/services/list-user.service";
 import { UpdateUserService } from "../application/services/update-user.service";
 
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, Req, UseGuards } from "@nestjs/common";
+import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
@@ -14,6 +15,8 @@ import { type AuthenticatedRequest } from "@/common/types/authenticated-request"
 
 import { UserResponseDto } from "./user-response.dto";
 
+@ApiTags("users")
+@ApiCookieAuth()
 @Controller("/api/users")
 export class UserController {
   constructor(
@@ -26,6 +29,8 @@ export class UserController {
   @Get()
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("user:read")
+  @ApiOperation({ summary: "List all users" })
+  @ApiResponse({ status: 200, type: [UserResponseDto] })
   async list(): Promise<UserResponseDto[]> {
     const users = await this.listUsers.execute();
     return users.map((user) => UserResponseDto.fromEntity(user));
@@ -34,6 +39,9 @@ export class UserController {
   @Post()
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("user:manager")
+  @ApiOperation({ summary: "Create a user" })
+  @ApiResponse({ status: 201, type: UserResponseDto })
+  @ApiResponse({ status: 409, description: "Email or username already in use" })
   async create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
     const user = await this.createUser.execute(dto);
     return UserResponseDto.fromEntity(user);
@@ -42,6 +50,11 @@ export class UserController {
   @Put(":id")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("user:manager")
+  @ApiOperation({ summary: "Update a user" })
+  @ApiResponse({ status: 200, type: UserResponseDto })
+  @ApiResponse({ status: 403, description: "Caller's role level doesn't outrank the target's role, or the target is being promoted to super_admin by a non-super_admin caller" })
+  @ApiResponse({ status: 404, description: "User not found" })
+  @ApiResponse({ status: 409, description: "Email or username already in use by another user" })
   async update(@Param("id") documentId: string, @Body() dto: UpdateUserDto, @Req() req: AuthenticatedRequest): Promise<UserResponseDto> {
     const user = await this.updateUser.execute(documentId, dto, req.user);
     return UserResponseDto.fromEntity(user);
@@ -51,6 +64,10 @@ export class UserController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("user:manager")
+  @ApiOperation({ summary: "Delete a user" })
+  @ApiResponse({ status: 204, description: "Deleted" })
+  @ApiResponse({ status: 403, description: "Caller's role level doesn't outrank the target's role" })
+  @ApiResponse({ status: 404, description: "User not found" })
   async delete(@Param("id") documentId: string, @Req() req: AuthenticatedRequest): Promise<void> {
     return this.deleteUser.execute(documentId, req.user);
   }
