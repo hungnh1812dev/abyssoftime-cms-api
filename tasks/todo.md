@@ -82,37 +82,49 @@ See `tasks/plan.md` for full context, build order, and confirmed decisions.
 
 ## Phase 7 — `content-type` module
 
-- [ ] `content-type.controller.ts` — `@ApiTags("content-types")`; both routes `@ApiCookieAuth()`
-      (guarded, read-only); `GET /` 200 (`ContentTypeSummary[]`); `GET /:slug` 200/400(unsafe
-      slug)/404 — note in the class-level description that this module has no write route by
-      design (per `content-type.md`), so Swagger correctly shows only 2 GETs
-- [ ] **Checkpoint 7:** build/lint/test:cov green
+- [x] New `presentation/dto/content-type-response.dto.ts` (`FieldDefinitionResponseDto` self-
+      referential for nested component fields, `ContentTypeSummaryResponseDto`,
+      `ContentTypeResponseDto` extends it) — caught a real TS1272 build error requiring `import
+      type` for the `FieldType` union used in a decorated property
+- [x] `content-type.controller.ts` — `@ApiTags("content-types")` + class-level `@ApiCookieAuth()`
+      (guarded, read-only); `GET /` 200; `GET /:slug` 200/400(unsafe slug)/404; class-level comment
+      notes the deliberate no-write-route design
+- [x] **Checkpoint 7:** `bun run build && bun run test src/modules/content-type` green (14 suites,
+      101 tests)
 
 ## Phase 8 — `document` module (3 controllers)
 
-- [ ] `save-document.dto.ts` / `bulk-create.dto.ts` / `bulk-delete.dto.ts` / `list-query.dto.ts` —
-      properties; note `save-document.dto.ts`'s `data` is intentionally a loose `object` (schema
-      fields are dynamic per content type, see `document.md`) — document that in the property
-      description rather than trying to type it more tightly
-- [ ] `single-type-document.controller.ts` — `@ApiTags("documents-single-type")`; all 4 routes
+- [x] `save-document.dto.ts` / `bulk-create.dto.ts` / `bulk-delete.dto.ts` / `list-query.dto.ts` —
+      `save-document.dto.ts`'s `data` documented as `type: "object", additionalProperties: true`
+      with a description pointing at `GET /api/content-types/:slug` for the real per-type schema
+- [x] New `presentation/dto/document-response.dto.ts` — `DocumentDataResponseDto`,
+      `DocumentResponseDto`, `PublishStatusResponseDto`, `ListedDocumentItemResponseDto`,
+      `ListDocumentsResponseDto`, `BulkCreateResponseDto`, `BulkDeleteFailureDto`,
+      `BulkDeleteResponseDto` — all documentation-only, mirroring the existing plain-object return
+      shapes (an index-signature field can't carry `@ApiProperty` in TS, so
+      `DocumentDataResponseDto` documents that via a class-level comment instead)
+- [x] `single-type-document.controller.ts` — `@ApiTags("documents-single-type")` + class-level
       `@ApiCookieAuth()`; `GET` 200/404; `PUT` 200; `POST /publish` 200/400(Mode B); `POST
       /unpublish` 200/400(Mode B)
-- [ ] `collection-type-document.controller.ts` — `@ApiTags("documents-collection-type")`; all 9
-      routes `@ApiCookieAuth()`; note the `/bulk` route-ordering footgun in the class description
-      (informational only, doesn't change behavior); `GET` 200; `POST /bulk` 201; `DELETE /bulk`
-      200; `POST` 201; `GET /:documentId` 200/404; `PUT /:documentId` 200; `DELETE /:documentId`
-      204; `POST /:documentId/publish` 200/400; `POST /:documentId/unpublish` 200/400; `POST
-      /:documentId/duplicate` 201/404
-- [ ] `public-document.controller.ts` — `@ApiTags("documents-public")`; **no** `@ApiCookieAuth()`
-      (no guards per `document.md`); both routes 200/404
-- [ ] **Checkpoint 8:** build/lint/test:cov green
+- [x] `collection-type-document.controller.ts` — `@ApiTags("documents-collection-type")` +
+      class-level `@ApiCookieAuth()`; the `/bulk` route-ordering footgun noted in a class comment;
+      all 9 routes annotated with real status codes
+- [x] `public-document.controller.ts` — `@ApiTags("documents-public")`; **no** `@ApiCookieAuth()`
+      (no guards); both routes 200/404
+- [x] **Checkpoint 8:** `bun run build` green; full suite `bun run test` green (116 suites, 646
+      tests — matches the pre-change baseline exactly, confirming zero behavior change); one
+      unrelated pre-existing 1ms timestamp flake in
+      `bulk-create-publish.service.spec.ts` reproduced and confirmed untouched by this diff (passes
+      on retry)
 
 ## Phase 9 — Manual verification
 
-- [ ] `bun run start:dev`, browse `/api-docs`, confirm all 10 tags appear with every route listed,
-      cookie-lock icon shown only on the guarded routes/tags, `auth`/`public-document` show no lock
-- [ ] Confirm `bun run test:cov` shows no changed assertions vs. pre-change baseline (decorator-only
-      diff, zero runtime behavior change)
+- [x] `bun run start:dev`, `curl /api-docs` (200) and `/api-docs-json` — confirmed all 10 module
+      tags present (`access-tokens`, `auth`, `content-types`, `documents-collection-type`,
+      `documents-public`, `documents-single-type`, `media`, `permissions`, `roles`, `users`), 35
+      paths / 47 operations, both `cookie`/`bearer` security schemes registered, and every
+      `auth`/`documents-public` route correctly shows no security requirement
+- [x] `bun run lint` clean (only the pre-existing unrelated `main.ts` warning)
 
 ## Phase 10 — Update spec/docs
 
