@@ -33,6 +33,48 @@ export function buildSearchWhere(search: string | undefined, searchableColumns: 
   return { sql: `(${clause})`, params: [`%${escapeSearchValue(search)}%`] };
 }
 
+export type FilterOperator = "$eq" | "$ne" | "$contains" | "$gt" | "$gte" | "$lt" | "$lte";
+
+export interface ParsedFilter {
+  column: string;
+  operator: FilterOperator;
+  value: string | number | boolean;
+}
+
+const SQL_COMPARATOR_BY_OPERATOR: Record<Exclude<FilterOperator, "$contains">, string> = {
+  $eq: "=",
+  $ne: "<>",
+  $gt: ">",
+  $gte: ">=",
+  $lt: "<",
+  $lte: "<=",
+};
+
+export function buildFilterWhere(filters: ParsedFilter[], paramIndex: number): { sql: string; params: unknown[] } | null {
+  if (filters.length === 0) {
+    return null;
+  }
+
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  let index = paramIndex;
+
+  for (const filter of filters) {
+    const column = quoteIdent(filter.column);
+    const placeholder = `$${index}`;
+    if (filter.operator === "$contains") {
+      clauses.push(`${column} ILIKE ${placeholder} ESCAPE '\\'`);
+      params.push(`%${escapeSearchValue(String(filter.value))}%`);
+    } else {
+      clauses.push(`${column} ${SQL_COMPARATOR_BY_OPERATOR[filter.operator]} ${placeholder}`);
+      params.push(filter.value);
+    }
+    index += 1;
+  }
+
+  return { sql: `(${clauses.join(" AND ")})`, params };
+}
+
 const SYSTEM_SORTABLE_COLUMNS = ["id", "document_id", "created_at", "updated_at", "published_at"];
 const SORTABLE_FIELD_TYPES: ReadonlySet<FieldType> = new Set(["text", "number", "boolean"]);
 

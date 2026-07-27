@@ -1,7 +1,7 @@
 import { UnsafeSqlIdentifierError } from "@/modules/content-type/application/schema/sql-identifier";
 import { FieldDefinition } from "@/modules/content-type/domain/entities/field-definition";
 
-import { buildOrderByClause, buildSearchWhere, escapeSearchValue, InvalidOrderByFieldError, sortableColumnsFor } from "./where-builder";
+import { buildFilterWhere, buildOrderByClause, buildSearchWhere, escapeSearchValue, InvalidOrderByFieldError, ParsedFilter, sortableColumnsFor } from "./where-builder";
 
 describe("buildOrderByClause", () => {
   const ALLOWED = ["id", "created_at", "wordGroup", "isMain"];
@@ -72,6 +72,56 @@ describe("buildSearchWhere", () => {
 
   it("re-validates searchable column names as a defence-in-depth check", () => {
     expect(() => buildSearchWhere("hello", ['wordGroup"; DROP TABLE users; --'], 1)).toThrow(UnsafeSqlIdentifierError);
+  });
+});
+
+describe("buildFilterWhere", () => {
+  it("returns null for an empty filters array", () => {
+    expect(buildFilterWhere([], 1)).toBeNull();
+  });
+
+  it("builds a single $eq clause with a raw value param", () => {
+    const filters: ParsedFilter[] = [{ column: "status", operator: "$eq", value: "active" }];
+
+    expect(buildFilterWhere(filters, 2)).toEqual({
+      sql: '("status" = $2)',
+      params: ["active"],
+    });
+  });
+
+  it("maps every comparison operator to its SQL operator", () => {
+    expect(buildFilterWhere([{ column: "age", operator: "$ne", value: 18 }], 1)).toEqual({ sql: '("age" <> $1)', params: [18] });
+    expect(buildFilterWhere([{ column: "age", operator: "$gt", value: 18 }], 1)).toEqual({ sql: '("age" > $1)', params: [18] });
+    expect(buildFilterWhere([{ column: "age", operator: "$gte", value: 18 }], 1)).toEqual({ sql: '("age" >= $1)', params: [18] });
+    expect(buildFilterWhere([{ column: "age", operator: "$lt", value: 18 }], 1)).toEqual({ sql: '("age" < $1)', params: [18] });
+    expect(buildFilterWhere([{ column: "age", operator: "$lte", value: 18 }], 1)).toEqual({ sql: '("age" <= $1)', params: [18] });
+  });
+
+  it("builds an escaped, wildcarded ILIKE clause for $contains", () => {
+    const filters: ParsedFilter[] = [{ column: "title", operator: "$contains", value: "50%_off" }];
+
+    expect(buildFilterWhere(filters, 3)).toEqual({
+      sql: `("title" ILIKE $3 ESCAPE '\\')`,
+      params: ["%50\\%\\_off%"],
+    });
+  });
+
+  it("AND-joins multiple filters with sequential placeholder indices", () => {
+    const filters: ParsedFilter[] = [
+      { column: "status", operator: "$eq", value: "active" },
+      { column: "age", operator: "$gte", value: 18 },
+    ];
+
+    expect(buildFilterWhere(filters, 5)).toEqual({
+      sql: '("status" = $5 AND "age" >= $6)',
+      params: ["active", 18],
+    });
+  });
+
+  it("re-validates the column name as a defence-in-depth check", () => {
+    const filters: ParsedFilter[] = [{ column: 'status"; DROP TABLE users; --', operator: "$eq", value: "active" }];
+
+    expect(() => buildFilterWhere(filters, 1)).toThrow(UnsafeSqlIdentifierError);
   });
 });
 
