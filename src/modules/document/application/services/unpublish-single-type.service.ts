@@ -1,6 +1,6 @@
 import { DOCUMENT_REPOSITORY, type IDocumentRepository } from "../../domain/repositories/document.repository";
 import { ComponentIoService } from "../support/component-io.service";
-import { assertDraftPublishEnabled } from "../support/draft-publish.policy";
+import { assertDraftPublishEnabled, assertKind } from "../support/draft-publish.policy";
 import { SchemaResolverService } from "../support/schema-resolver.service";
 
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
@@ -18,6 +18,7 @@ export class UnpublishSingleTypeService {
 
   async execute(slug: string): Promise<void> {
     const contentType = await this.schemaResolver.resolve(slug);
+    assertKind(contentType, "single");
     assertDraftPublishEnabled(contentType);
 
     const published = await this.documents.findSingle(slug, "published", contentType.fields);

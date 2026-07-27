@@ -63,7 +63,7 @@ describe("ContentTypeSyncService", () => {
 
     await service.sync([definition]);
 
-    expect(schemaTables.ensureDocumentTable).toHaveBeenCalledWith("cv-page", definition.fields);
+    expect(schemaTables.ensureDocumentTable).toHaveBeenCalledWith("cv-page", definition.fields, "collection");
     expect(schemaTables.ensureComponentTable).toHaveBeenCalledWith("cv-page", ["experience"], [{ name: "company", type: "text" }]);
     expect(schemaTables.alterDocumentTable).not.toHaveBeenCalled();
     expect(contentTypes.create).toHaveBeenCalledWith({
@@ -75,6 +75,25 @@ describe("ContentTypeSyncService", () => {
       listFields: ["position"],
     });
     expect(contentTypes.update).not.toHaveBeenCalled();
+  });
+
+  it("new file: passes the definition's kind through to ensureDocumentTable (single vs. collection)", async () => {
+    const contentTypes = buildContentTypeRepository();
+    const schemaTables = buildSchemaTableRepository();
+    const service = new ContentTypeSyncService(buildSchemaLoader(), contentTypes, schemaTables);
+
+    const definition: ContentTypeDefinition = {
+      slug: "site-settings",
+      name: "Site Settings",
+      kind: "single",
+      draftToPublish: true,
+      fields: [{ name: "title", type: "text" }],
+      listFields: ["title"],
+    };
+
+    await service.sync([definition]);
+
+    expect(schemaTables.ensureDocumentTable).toHaveBeenCalledWith("site-settings", definition.fields, "single");
   });
 
   it("changed file: alters the document table against live columns and updates the ContentType row", async () => {
@@ -173,6 +192,6 @@ describe("ContentTypeSyncService", () => {
     await service.onApplicationBootstrap();
 
     expect(schemaLoader.load).toHaveBeenCalled();
-    expect(schemaTables.ensureDocumentTable).toHaveBeenCalledWith("cv-page", definition.fields);
+    expect(schemaTables.ensureDocumentTable).toHaveBeenCalledWith("cv-page", definition.fields, "collection");
   });
 });

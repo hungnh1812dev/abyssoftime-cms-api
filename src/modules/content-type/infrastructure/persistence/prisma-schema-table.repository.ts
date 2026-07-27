@@ -1,7 +1,7 @@
 import { columnTypeFor } from "../../application/schema/field-type-mapping";
 import { quoteIdent } from "../../application/schema/sql-identifier";
 import { componentTableName, documentTableName, indexName } from "../../application/schema/table-naming";
-import { FieldDefinition, isComponentField } from "../../domain/entities/field-definition";
+import { ContentKind, FieldDefinition, isComponentField } from "../../domain/entities/field-definition";
 import { ColumnDiffPlan, ISchemaTableRepository, LiveColumn } from "../../domain/repositories/schema-table.repository";
 
 import { Injectable } from "@nestjs/common";
@@ -46,11 +46,16 @@ function buildAlterTableSql(quotedTableName: string, plan: ColumnDiffPlan): stri
 export class PrismaSchemaTableRepository implements ISchemaTableRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async ensureDocumentTable(slug: string, fields: FieldDefinition[]): Promise<void> {
+  async ensureDocumentTable(slug: string, fields: FieldDefinition[], kind: ContentKind): Promise<void> {
     const tableName = documentTableName(slug);
     const quotedTableName = quoteIdent(tableName);
     const contentColumnsSql = nonComponentColumnsSql(fields);
     const contentColumnsBlock = contentColumnsSql ? `${contentColumnsSql},\n      ` : "";
+    // A single-kind content type has at most one entry: enforcing "at most one row per version"
+    // at the DB level (not just app-level convention) closes a race where two concurrent first
+    // saves could otherwise both succeed and leave two permanent, undetectable rows behind (there
+    // is no single-type delete route).
+    const singleRowConstraint = kind === "single" ? ",\n        UNIQUE (version)" : "";
 
     await this.prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS ${quotedTableName} (
@@ -63,7 +68,7 @@ export class PrismaSchemaTableRepository implements ISchemaTableRepository {
         created_by UUID,
         updated_by UUID,
         published_by UUID,
-        UNIQUE (document_id, version)
+        UNIQUE (document_id, version)${singleRowConstraint}
       );
     `);
 

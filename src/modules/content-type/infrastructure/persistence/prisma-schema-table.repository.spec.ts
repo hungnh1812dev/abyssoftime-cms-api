@@ -29,7 +29,7 @@ describe("PrismaSchemaTableRepository", () => {
         { name: "experiences", type: "component", component: "experience", repeatable: true, fields: [] },
       ];
 
-      await repository.ensureDocumentTable("en-it-vocab", fields);
+      await repository.ensureDocumentTable("en-it-vocab", fields, "collection");
 
       const createTableCall = prisma.$executeRawUnsafe.mock.calls.find((call) => String(call[0]).includes("CREATE TABLE"));
       expect(createTableCall).toBeDefined();
@@ -46,7 +46,7 @@ describe("PrismaSchemaTableRepository", () => {
     });
 
     it("creates a lookup index on document_id", async () => {
-      await repository.ensureDocumentTable("cv-page", []);
+      await repository.ensureDocumentTable("cv-page", [], "collection");
 
       const indexCall = prisma.$executeRawUnsafe.mock.calls.find((call) => String(call[0]).includes("CREATE INDEX"));
       expect(indexCall).toBeDefined();
@@ -54,8 +54,22 @@ describe("PrismaSchemaTableRepository", () => {
       expect(String(indexCall![0])).toContain("(document_id)");
     });
 
+    it("does not add a single-row constraint for a collection-kind content type", async () => {
+      await repository.ensureDocumentTable("cv-page", [], "collection");
+
+      const createTableCall = prisma.$executeRawUnsafe.mock.calls.find((call) => String(call[0]).includes("CREATE TABLE"));
+      expect(String(createTableCall![0])).not.toContain("UNIQUE (version)");
+    });
+
+    it("adds a UNIQUE (version) constraint for a single-kind content type, enforcing at most one row per version at the DB level", async () => {
+      await repository.ensureDocumentTable("site-settings", [], "single");
+
+      const createTableCall = prisma.$executeRawUnsafe.mock.calls.find((call) => String(call[0]).includes("CREATE TABLE"));
+      expect(String(createTableCall![0])).toContain("UNIQUE (version)");
+    });
+
     it("rejects an unsafe slug before touching the database", async () => {
-      await expect(repository.ensureDocumentTable("bad slug", [])).rejects.toThrow();
+      await expect(repository.ensureDocumentTable("bad slug", [], "collection")).rejects.toThrow();
       expect(prisma.$executeRawUnsafe).not.toHaveBeenCalled();
     });
   });

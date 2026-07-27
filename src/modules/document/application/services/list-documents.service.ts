@@ -1,6 +1,6 @@
 import { DocumentStatus } from "../../domain/entities/document.entity";
 import { DOCUMENT_REPOSITORY, type IDocumentRepository } from "../../domain/repositories/document.repository";
-import { resolveSaveVersion } from "../support/draft-publish.policy";
+import { assertKind, resolveSaveVersion } from "../support/draft-publish.policy";
 import { ListQueryParams, parseListQuery } from "../support/list-query.parser";
 import { SchemaResolverService } from "../support/schema-resolver.service";
 import { resolveBatchStatuses } from "../support/status-resolver";
@@ -31,6 +31,7 @@ export class ListDocumentsService {
 
   async execute(slug: string, query: ListQueryParams): Promise<ListDocumentsResult> {
     const contentType = await this.schemaResolver.resolve(slug);
+    assertKind(contentType, "collection");
     const options = parseListQuery(contentType, query);
     const version = resolveSaveVersion(contentType);
 

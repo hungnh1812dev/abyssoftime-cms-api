@@ -54,7 +54,7 @@ export class ContentTypeSyncService implements OnApplicationBootstrap {
     const previousFields = previous?.fields ?? [];
 
     if (!previous) {
-      await this.schemaTables.ensureDocumentTable(definition.slug, definition.fields);
+      await this.schemaTables.ensureDocumentTable(definition.slug, definition.fields, definition.kind);
     } else {
       const liveColumns = await this.schemaTables.listDocumentColumns(definition.slug);
       await this.schemaTables.alterDocumentTable(definition.slug, diffColumns(liveColumns, definition.fields));

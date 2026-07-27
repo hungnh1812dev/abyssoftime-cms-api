@@ -1,7 +1,7 @@
 import { DocumentEntity } from "../../domain/entities/document.entity";
 import { DOCUMENT_REPOSITORY, type IDocumentRepository } from "../../domain/repositories/document.repository";
 import { ComponentIoService } from "../support/component-io.service";
-import { assertDraftPublishEnabled } from "../support/draft-publish.policy";
+import { assertDraftPublishEnabled, assertKind } from "../support/draft-publish.policy";
 import { SchemaResolverService } from "../support/schema-resolver.service";
 
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
@@ -19,6 +19,7 @@ export class PublishDocumentService {
 
   async execute(slug: string, documentId: string, userId: string | null): Promise<DocumentEntity> {
     const contentType = await this.schemaResolver.resolve(slug);
+    assertKind(contentType, "collection");
     assertDraftPublishEnabled(contentType);
 
     const draft = await this.documents.findByVersion(slug, documentId, "draft", contentType.fields);

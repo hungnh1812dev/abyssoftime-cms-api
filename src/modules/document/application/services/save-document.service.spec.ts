@@ -4,7 +4,7 @@ import { IDocumentRepository } from "../../domain/repositories/document.reposito
 import { ComponentIoService } from "../support/component-io.service";
 import { SchemaResolverService } from "../support/schema-resolver.service";
 
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 
 import { FieldDefinition } from "@/modules/content-type/domain/entities/field-definition";
 import { PrismaService } from "@/prisma/application/prisma.service";
@@ -15,8 +15,8 @@ describe("SaveDocumentService", () => {
   const FIELDS: FieldDefinition[] = [{ name: "position", type: "text" }];
   const TX = { fake: "tx" };
 
-  function buildContentType(draftToPublish: boolean): ContentTypeEntity {
-    return new ContentTypeEntity("ct-1", "cv-page", "CV Page", "collection", draftToPublish, FIELDS, ["position"], new Date(), new Date());
+  function buildContentType(draftToPublish: boolean, kind: "single" | "collection" = "collection"): ContentTypeEntity {
+    return new ContentTypeEntity("ct-1", "cv-page", "CV Page", kind, draftToPublish, FIELDS, ["position"], new Date(), new Date());
   }
 
   function buildDeps(contentType: ContentTypeEntity) {
@@ -112,6 +112,16 @@ describe("SaveDocumentService", () => {
     const service = new SaveDocumentService(schemaResolver, documents, componentIo, prisma);
 
     await expect(service.execute("missing", {}, undefined, "user-1")).rejects.toThrow(NotFoundException);
+    expect(documents.findByVersion).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("throws BadRequestException when the content type is single-kind, without touching any repository", async () => {
+    const contentType = buildContentType(true, "single");
+    const { schemaResolver, documents, componentIo, prisma } = buildDeps(contentType);
+    const service = new SaveDocumentService(schemaResolver, documents, componentIo, prisma);
+
+    await expect(service.execute("cv-page", { position: "Engineer" }, undefined, "user-1")).rejects.toThrow(BadRequestException);
     expect(documents.findByVersion).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });

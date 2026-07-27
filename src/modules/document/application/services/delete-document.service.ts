@@ -1,5 +1,6 @@
 import { DOCUMENT_REPOSITORY, type IDocumentRepository } from "../../domain/repositories/document.repository";
 import { ComponentIoService } from "../support/component-io.service";
+import { assertKind } from "../support/draft-publish.policy";
 import { SchemaResolverService } from "../support/schema-resolver.service";
 
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
@@ -17,6 +18,7 @@ export class DeleteDocumentService {
 
   async execute(slug: string, documentId: string): Promise<void> {
     const contentType = await this.schemaResolver.resolve(slug);
+    assertKind(contentType, "collection");
 
     const [draft, published] = await Promise.all([
       this.documents.findByVersion(slug, documentId, "draft", contentType.fields),
