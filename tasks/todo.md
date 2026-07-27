@@ -117,8 +117,8 @@ See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
 
 ## Phase 12 — Docs
 
-- [ ] `docs/documents/content-type.md`
-- [ ] `docs/documents/document.md`
-- [ ] `docs/ENTRYPOINT.md` — add index lines
-- [ ] `SPEC.md` — trim to pointer line
+- [x] `docs/documents/content-type.md`
+- [x] `docs/documents/document.md`
+- [x] `docs/ENTRYPOINT.md` — add index lines
+- [x] `SPEC.md` — trim to pointer line
 - [ ] **Checkpoint 12:** doc read-through — commit
