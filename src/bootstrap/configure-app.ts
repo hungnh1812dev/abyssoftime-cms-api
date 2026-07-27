@@ -37,7 +37,7 @@ export function configureApp(app: NestExpressApplication): void {
   const trustProxy = configService.get("TRUST_PROXY", { infer: true });
   app.set("trust proxy", parseTrustProxy(trustProxy));
 
-  configureSwagger(app);
+  app.setGlobalPrefix("api/v1", { exclude: ["health"] });
 
-  // app.setGlobalPrefix("api/v1", {exclude: [' ']});
+  configureSwagger(app);
 }

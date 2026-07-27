@@ -1,7 +1,6 @@
 import { Module } from "@nestjs/common";
 
 import { AppController } from "./app.controller";
-import { AppService } from "./app.service";
 import { SeedModule } from "./bootstrap/seed.module";
 import { TokenModule } from "./common/token/token.module";
 import { ConfigModule } from "./config/config.module";
@@ -33,6 +32,5 @@ import { PrismaModule } from "./prisma/prisma.module";
     SeedModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

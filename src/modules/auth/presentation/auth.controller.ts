@@ -31,7 +31,7 @@ const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 // Every route here is public by design (this module establishes identity) — no @ApiCookieAuth
 // anywhere. login/refresh set the access_token/refresh_token httpOnly cookies; logout clears them.
 @ApiTags("auth")
-@Controller("/api/auth")
+@Controller("auth")
 export class AuthController {
   constructor(
     private readonly registerService: RegisterService,

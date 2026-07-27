@@ -11,6 +11,7 @@ import { ConfigService } from "@nestjs/config";
 import { type NestExpressApplication } from "@nestjs/platform-express";
 import { Test } from "@nestjs/testing";
 
+import { AppController } from "@/app.controller";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "@/common/guards/permissions.guard";
 
@@ -41,7 +42,7 @@ describe("configureApp", () => {
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({
-      controllers: [PermissionController],
+      controllers: [PermissionController, AppController],
       providers: [
         { provide: ListPermissionService, useValue: { execute: jest.fn() } },
         { provide: CreatePermissionService, useValue: { execute: jest.fn().mockResolvedValue(permission) } },
@@ -67,7 +68,7 @@ describe("configureApp", () => {
   });
 
   it("rejects a malformed body with 400 before it reaches the controller", async () => {
-    await request(app.getHttpServer()).post("/api/permissions").send({ name: "" }).expect(400);
+    await request(app.getHttpServer()).post("/api/v1/permissions").send({ name: "" }).expect(400);
 
     expect(createPermission.execute).not.toHaveBeenCalled();
   });
@@ -75,7 +76,7 @@ describe("configureApp", () => {
   it("still accepts a valid body", async () => {
     const dto: CreatePermissionDto = { slug: "document:read", name: "Read document", description: "Allows reading a document" };
 
-    await request(app.getHttpServer()).post("/api/permissions").send(dto).expect(201);
+    await request(app.getHttpServer()).post("/api/v1/permissions").send(dto).expect(201);
 
     expect(createPermission.execute).toHaveBeenCalledWith(dto);
   });
@@ -84,10 +85,22 @@ describe("configureApp", () => {
     const dto: CreatePermissionDto = { slug: "document:read", name: "Read document", description: "Allows reading a document" };
 
     await request(app.getHttpServer())
-      .post("/api/permissions")
+      .post("/api/v1/permissions")
       .send({ ...dto, notAllowed: "value" })
       .expect(400);
 
     expect(createPermission.execute).not.toHaveBeenCalled();
+  });
+
+  it("404s on the unversioned path — the global prefix is enforced", async () => {
+    await request(app.getHttpServer()).get("/permissions").expect(404);
+  });
+
+  it("serves /health outside the /api/v1 prefix", async () => {
+    await request(app.getHttpServer()).get("/health").expect(200, { status: "ok" });
+  });
+
+  it("404s on /api/v1/health — the exclude only applies to the unprefixed path", async () => {
+    await request(app.getHttpServer()).get("/api/v1/health").expect(404);
   });
 });

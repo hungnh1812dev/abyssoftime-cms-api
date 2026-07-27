@@ -1,8 +1,8 @@
 # Users Module
 
-`src/modules/users/**` — clean-architecture module for managing user accounts. Fully wired: registered in `AppModule`, update/role-assignment/delete/list routes are live, Prisma-backed, and guarded by real JWT + permission-slug authorization (see [Endpoints](#endpoints) and [Services & business rules](#services--business-rules)). This module is the **admin-facing surface** for existing user records; account creation is public-only, via the separate `auth` module's register/verify-otp flow (see [auth.md](./auth.md)), which shares the same `User` entity/repository. There is no admin-facing create-user route — `POST /api/users` was removed (see [Removed: POST /api/users](#removed-post-apiusers) below).
+`src/modules/users/**` — clean-architecture module for managing user accounts. Fully wired: registered in `AppModule`, update/role-assignment/delete/list routes are live, Prisma-backed, and guarded by real JWT + permission-slug authorization (see [Endpoints](#endpoints) and [Services & business rules](#services--business-rules)). This module is the **admin-facing surface** for existing user records; account creation is public-only, via the separate `auth` module's register/verify-otp flow (see [auth.md](./auth.md)), which shares the same `User` entity/repository. There is no admin-facing create-user route — `POST /api/v1/users` was removed (see [Removed: POST /api/v1/users](#removed-post-apiv1users) below).
 
-`email`/`username` are permanent, immutable identifiers once a user is created — no route on this module (or `auth`) ever changes them. `accountType`/`verified`/`roleId` are internal/fixed on this module's update routes: `verified` only ever flips via `auth`'s self-serve `resend-otp`/`verify-otp` flow; `accountType` is a placeholder reserved for a future OAuth (Google/Facebook) account-type flag, not implemented yet, and stays a fixed `false`; `roleId` is set only via the dedicated `PATCH /api/users/:id/role` endpoint (see below).
+`email`/`username` are permanent, immutable identifiers once a user is created — no route on this module (or `auth`) ever changes them. `accountType`/`verified`/`roleId` are internal/fixed on this module's update routes: `verified` only ever flips via `auth`'s self-serve `resend-otp`/`verify-otp` flow; `accountType` is a placeholder reserved for a future OAuth (Google/Facebook) account-type flag, not implemented yet, and stays a fixed `false`; `roleId` is set only via the dedicated `PATCH /api/v1/users/:id/role` endpoint (see below).
 
 ## Entity
 
@@ -82,14 +82,14 @@ Implementation: `infrastructure/persistence/prisma-user.repository.ts` (`PrismaU
 
 ## Endpoints
 
-`presentation/user.controller.ts`, `@Controller("/api/users")`.
+`presentation/user.controller.ts`, `@Controller("/api/v1/users")`.
 
 | Method   | Path                        | Service                | Auth                                              |
 | -------- | --------------------------- | ----------------------- | -------------------------------------------------- |
-| `GET`    | `/api/users`                | `ListUserService`      | `JwtAuthGuard` + `PermissionsGuard("user:read")`   |
-| `PUT`    | `/api/users/:id`            | `UpdateUserService`    | `JwtAuthGuard` only — self-or-`user:manager` is checked inside the service, not the guard |
-| `PATCH`  | `/api/users/:id/role`       | `UpdateUserRoleService`| `JwtAuthGuard` + `PermissionsGuard("user:role_manager")` |
-| `DELETE` | `/api/users/:id` (204)      | `DeleteUserService`    | `JwtAuthGuard` + `PermissionsGuard("user:manager")`|
+| `GET`    | `/api/v1/users`                | `ListUserService`      | `JwtAuthGuard` + `PermissionsGuard("user:read")`   |
+| `PUT`    | `/api/v1/users/:id`            | `UpdateUserService`    | `JwtAuthGuard` only — self-or-`user:manager` is checked inside the service, not the guard |
+| `PATCH`  | `/api/v1/users/:id/role`       | `UpdateUserRoleService`| `JwtAuthGuard` + `PermissionsGuard("user:role_manager")` |
+| `DELETE` | `/api/v1/users/:id` (204)      | `DeleteUserService`    | `JwtAuthGuard` + `PermissionsGuard("user:manager")`|
 
 `update`/`updateRole`/`delete` all take `@Req() req: AuthenticatedRequest` and pass `req.user` straight through as the `caller` argument (no extra DB lookup — the JWT payload already carries the caller's own `sub`/`level`/`roleSlug`/`permissions`).
 
@@ -101,16 +101,16 @@ Implementation: `infrastructure/persistence/prisma-user.repository.ts` (`PrismaU
 
 `user.module.ts` imports `RoleModule` (for `UpdateUserRoleService`/`DeleteUserService`'s `ROLE_REPOSITORY` dependency), registers the controller and all four services (`ListUserService`, `UpdateUserService`, `UpdateUserRoleService`, `DeleteUserService`), and binds `USER_REPOSITORY → PrismaUserRepository`. Exports `USER_REPOSITORY`, consumed by `AuthModule`. Imported into `src/app.module.ts`.
 
-## Removed: `POST /api/users`
+## Removed: `POST /api/v1/users`
 
-This module previously had an admin-only `POST /api/users` route (`CreateUserService`/`CreateUserDto`, guarded by `JwtAuthGuard` + `PermissionsGuard("user:manager")`) for creating a user record on someone else's behalf. It was removed as redundant: the account it produced still had to self-verify via `auth`'s `resend-otp`/`verify-otp` flow before becoming usable, which is exactly what public `POST /api/auth/register` already does end-to-end (see [auth.md](./auth.md)). There is now exactly one way to create a `User` record — public self-registration through the `auth` module.
+This module previously had an admin-only `POST /api/v1/users` route (`CreateUserService`/`CreateUserDto`, guarded by `JwtAuthGuard` + `PermissionsGuard("user:manager")`) for creating a user record on someone else's behalf. It was removed as redundant: the account it produced still had to self-verify via `auth`'s `resend-otp`/`verify-otp` flow before becoming usable, which is exactly what public `POST /api/v1/auth/register` already does end-to-end (see [auth.md](./auth.md)). There is now exactly one way to create a `User` record — public self-registration through the `auth` module.
 
 ## Known gaps (deferred, out of scope for the current pass)
 
 - No password hashing on this module's own update route — `password` is round-tripped as plain text (only the `auth` module hashes passwords). Do not treat this module's route as production-ready for setting a user's password directly.
 - No `updatedBy`/audit trail on the `User` model, unlike `Role`/`Permission`.
 - Delete has no dependent-record guard.
-- The boot-time seeder (`SeedDefaultDataService`) only creates roles/permissions that don't already exist by slug — it never patches an already-seeded role's `permissions` array. A dev/prod database seeded before the `user:role_manager` permission was added needs `super_admin`'s role record updated manually (via `PUT /api/roles/:id`) to actually gain the new permission; a fresh database seeds correctly from first boot. This is a pre-existing seeder limitation, not new to this permission.
+- The boot-time seeder (`SeedDefaultDataService`) only creates roles/permissions that don't already exist by slug — it never patches an already-seeded role's `permissions` array. A dev/prod database seeded before the `user:role_manager` permission was added needs `super_admin`'s role record updated manually (via `PUT /api/v1/roles/:id`) to actually gain the new permission; a fresh database seeds correctly from first boot. This is a pre-existing seeder limitation, not new to this permission.
 
 ## Tests
 
@@ -122,4 +122,4 @@ A five-axis code review (`agent-skills:code-reviewer`) flagged one real, low-sev
 
 ## Verified state (2026-07-27)
 
-Following removal of `POST /api/users` (`CreateUserService`/`CreateUserDto`): `bun run build`, `bun run test` (642 tests, 116 suites), and `bun run lint` all pass with zero errors (one pre-existing, unrelated warning in `src/main.ts`).
+Following removal of `POST /api/v1/users` (`CreateUserService`/`CreateUserDto`): `bun run build`, `bun run test` (642 tests, 116 suites), and `bun run lint` all pass with zero errors (one pre-existing, unrelated warning in `src/main.ts`).

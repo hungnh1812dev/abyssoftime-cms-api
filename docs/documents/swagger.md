@@ -39,7 +39,15 @@ All 10 controllers, all 19 request DTOs, full response-shape coverage:
 | `content-type` | `content-types` | `content-type.controller.ts` |
 | `document` | `documents-single-type` / `documents-collection-type` / `documents-public` | 3 controllers |
 
-Live-verified: 36 paths, 47 operations (`POST /api/users` was later removed — see [users.md](./users.md#removed-post-apiusers)), both `cookie`/`bearer` security schemes registered in `components.securitySchemes`.
+Live-verified: 36 paths, 47 operations (`POST /api/v1/users` was later removed — see [users.md](./users.md#removed-post-apiv1users); the old boilerplate `GET /` route/`AppService` was later replaced by `GET /health`, net zero — see [Global prefix & health check](#global-prefix--health-check) below), both `cookie`/`bearer` security schemes registered in `components.securitySchemes`.
+
+## Global prefix & health check
+
+`src/bootstrap/configure-app.ts` calls `app.setGlobalPrefix("api/v1", { exclude: ["health"] })`, called before `configureSwagger(app)` so the generated OpenAPI document's paths reflect the prefix. Every module controller's `@Controller(...)` decorator was changed from a hardcoded `/api/xxx` path to a bare relative path (e.g. `@Controller("users")`) so the prefix isn't doubled up — the prefix is now the single source of truth for the `/api/v1` segment.
+
+`AppController`'s boilerplate root `GET /` route (and the now-unused `AppService`/`getHello()`) was replaced with a `GET /health` route (`{ status: "ok" }`) that stays unprefixed via the `exclude` option — matched against the route's own declared path (`"health"`), not the prefixed one, so `GET /api/v1/health` correctly 404s and only `GET /health` serves it. `AppModule`'s `providers` array is now empty (`AppController` has no dependencies left).
+
+Live-verified: `GET /health` → 200 `{ status: "ok" }`; `GET /api/v1/health` → 404; `GET /` → 404 (route removed entirely, not just moved); `GET /api/users` (old unversioned path) → 404; `GET /api/v1/users` → 401 (reaches the real guard).
 
 ## Response-shape DTOs (documentation-only, zero behavior change)
 

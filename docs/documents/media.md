@@ -82,13 +82,13 @@ All services inject `@Inject(MEDIA_ASSET_REPOSITORY)`; `Upload`/`Delete` additio
 
 ## Endpoints
 
-`presentation/media.controller.ts`, `@Controller("/api/media")`, per-route `@UseGuards(JwtAuthGuard, PermissionsGuard)` + `@RequirePermissions(...)`:
+`presentation/media.controller.ts`, `@Controller("/api/v1/media")`, per-route `@UseGuards(JwtAuthGuard, PermissionsGuard)` + `@RequirePermissions(...)`:
 
 | Method   | Path                   | Service              | Required permission | Notes                                                                                                                                                                     |
 | -------- | ---------------------- | -------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/api/media`           | `ListMediaService`   | `media:read`        | Returns the full `MediaAssetEntity[]`, newest first.                                                                                                                      |
-| `POST`   | `/api/media/upload`    | `UploadMediaService` | `media:manager`     | `multipart/form-data`, field name `file`; `400 BadRequestException` if no file part is present; `uploadedBy: req.user.sub` (always non-null — `JwtAuthGuard` runs first). |
-| `DELETE` | `/api/media/:id` (204) | `DeleteMediaService` | `media:manager`     | Hard delete; storage object removed before the DB row (see [Delete](#services--business-rules) above); `404` if not found.                                                |
+| `GET`    | `/api/v1/media`           | `ListMediaService`   | `media:read`        | Returns the full `MediaAssetEntity[]`, newest first.                                                                                                                      |
+| `POST`   | `/api/v1/media/upload`    | `UploadMediaService` | `media:manager`     | `multipart/form-data`, field name `file`; `400 BadRequestException` if no file part is present; `uploadedBy: req.user.sub` (always non-null — `JwtAuthGuard` runs first). |
+| `DELETE` | `/api/v1/media/:id` (204) | `DeleteMediaService` | `media:manager`     | Hard delete; storage object removed before the DB row (see [Delete](#services--business-rules) above); `404` if not found.                                                |
 
 ### Multipart handling
 
@@ -112,7 +112,7 @@ All services inject `@Inject(MEDIA_ASSET_REPOSITORY)`; `Upload`/`Delete` additio
 
 ## Permissions catalog additions
 
-`src/bootstrap/seed-default-data.service.ts` — two new slugs added to `DEFAULT_PERMISSIONS` (`media:manager`, `media:read`), granted to `super_admin` and `admin` respectively in `DEFAULT_ROLES` — same additive, `findBySlug`-guarded seeding pattern as every other resource pair (see `access-tokens.md`'s equivalent note: **existing dev/prod databases seeded before this change will not retroactively gain these permissions on an already-existing `super_admin`/`admin` role** without a manual `PUT /api/roles/:id` or a fresh DB).
+`src/bootstrap/seed-default-data.service.ts` — two new slugs added to `DEFAULT_PERMISSIONS` (`media:manager`, `media:read`), granted to `super_admin` and `admin` respectively in `DEFAULT_ROLES` — same additive, `findBySlug`-guarded seeding pattern as every other resource pair (see `access-tokens.md`'s equivalent note: **existing dev/prod databases seeded before this change will not retroactively gain these permissions on an already-existing `super_admin`/`admin` role** without a manual `PUT /api/v1/roles/:id` or a fresh DB).
 
 ## Tests
 
@@ -128,7 +128,7 @@ Unit tests (Jest, mocked repositories/adapters via `Test.createTestingModule` + 
 
 `test/media.e2e-spec.ts` (new shared e2e infra, see below) — real Postgres, `STORAGE_ADAPTER` overridden with `NoopStorageAdapter`:
 
-- `401` unauthenticated `GET /api/media`.
+- `401` unauthenticated `GET /api/v1/media`.
 - Upload success with a `media:manager` token — response shape, `storage.uploads` recorded.
 - `413` for an upload over `MEDIA_MAX_UPLOAD_BYTES`, with `storage.uploads` unchanged (never touched).
 - `422` for a non-image upload, with `storage.uploads` unchanged (never touched).
@@ -150,7 +150,7 @@ Two new `test/utils/*` files, not media-specific — the first reusable e2e help
 
 `media.e2e-spec.ts` creates its own users directly via `PrismaService` + `JwtTokenService.signAccessToken(...)` against the seeded `super_admin`/`admin` roles (no HTTP register/verify-otp/login round-trip needed, since `JwtAuthGuard` only verifies the JWT — it never re-queries the DB for the user). A `randomUUID().slice(0, 8)` `runId` suffix on email/username avoids collisions with leftover rows from a prior incomplete run; `afterAll` cleans up every user/media row it created.
 
-**Confirmed green (11/11)** against the user's own reachable Postgres. Note: the app only loads env from `.env.test.local`/`.env.local` (`src/config/config.module.ts`), never plain `.env` — `bun --env-file=.env.local run test:e2e` (or populating `.env.local` directly) is required for `bun run test:e2e` to see real config. Getting to green also required one one-off fix unrelated to this module's code: the target dev DB's `super_admin`/`admin` roles pre-dated this cycle's `media:manager`/`media:read` permissions, and `SeedDefaultDataService` doesn't retroactively add new permission slugs to a role that already exists (see [Permissions catalog additions](#permissions-catalog-additions) above) — granted via two real `PUT /api/roles/:id` calls.
+**Confirmed green (11/11)** against the user's own reachable Postgres. Note: the app only loads env from `.env.test.local`/`.env.local` (`src/config/config.module.ts`), never plain `.env` — `bun --env-file=.env.local run test:e2e` (or populating `.env.local` directly) is required for `bun run test:e2e` to see real config. Getting to green also required one one-off fix unrelated to this module's code: the target dev DB's `super_admin`/`admin` roles pre-dated this cycle's `media:manager`/`media:read` permissions, and `SeedDefaultDataService` doesn't retroactively add new permission slugs to a role that already exists (see [Permissions catalog additions](#permissions-catalog-additions) above) — granted via two real `PUT /api/v1/roles/:id` calls.
 
 ## Known quirks / deviations (preserved intentionally)
 

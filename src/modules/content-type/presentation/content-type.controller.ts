@@ -16,7 +16,7 @@ import { ContentTypeResponseDto, ContentTypeSummaryResponseDto } from "./dto/con
 // file and rebooting (the sync engine reconciles it), never via a write route.
 @ApiTags("content-types")
 @ApiCookieAuth()
-@Controller("/api/content-types")
+@Controller("content-types")
 export class ContentTypeController {
   constructor(
     private readonly listContentTypeService: ListContentTypeService,

@@ -53,14 +53,14 @@ All four services inject `@Inject(PERMISSSION_REPOSITORY)`.
 
 ## Endpoints
 
-`presentation/permission.controller.ts`, `@Controller("/api/permissions")`. Every route is guarded by `JwtAuthGuard` + `PermissionsGuard` (`src/common/guards/`), which validate the `access_token` httpOnly cookie and check `req.user.permissions` against each route's `@RequirePermissions` metadata (read-implies-manager):
+`presentation/permission.controller.ts`, `@Controller("/api/v1/permissions")`. Every route is guarded by `JwtAuthGuard` + `PermissionsGuard` (`src/common/guards/`), which validate the `access_token` httpOnly cookie and check `req.user.permissions` against each route's `@RequirePermissions` metadata (read-implies-manager):
 
 | Method   | Path                         | Service                   | Required permission        |
 | -------- | ---------------------------- | ------------------------- | --------------------------- |
-| `GET`    | `/api/permissions`           | `ListPermissionService`   | `permission:read`           |
-| `POST`   | `/api/permissions`           | `CreatePermissionService` | `permission:manager`        |
-| `PUT`    | `/api/permissions/:id`       | `UpdatePermissionService` | `permission:manager`        |
-| `DELETE` | `/api/permissions/:id` (204) | `DeletePermissionService` | `permission:manager`        |
+| `GET`    | `/api/v1/permissions`           | `ListPermissionService`   | `permission:read`           |
+| `POST`   | `/api/v1/permissions`           | `CreatePermissionService` | `permission:manager`        |
+| `PUT`    | `/api/v1/permissions/:id`       | `UpdatePermissionService` | `permission:manager`        |
+| `DELETE` | `/api/v1/permissions/:id` (204) | `DeletePermissionService` | `permission:manager`        |
 
 None of the four services take a caller parameter or perform authorization themselves — that's entirely the guards' job at the controller layer, same pattern as `roles` and `users`.
 

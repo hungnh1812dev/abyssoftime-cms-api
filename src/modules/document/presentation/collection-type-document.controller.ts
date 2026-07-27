@@ -36,7 +36,7 @@ interface BulkDeleteResponse {
 
 @ApiTags("documents-collection-type")
 @ApiCookieAuth()
-@Controller("/api/documents/collection-type")
+@Controller("documents/collection-type")
 export class CollectionTypeDocumentController {
   constructor(
     private readonly listDocuments: ListDocumentsService,

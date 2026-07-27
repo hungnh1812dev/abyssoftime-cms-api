@@ -17,7 +17,7 @@ import { PermissionResponseDto } from "./dto/permission-response.dto";
 
 @ApiTags("permissions")
 @ApiCookieAuth()
-@Controller("/api/permissions")
+@Controller("permissions")
 export class PermissionController {
   constructor(
     private readonly listPermissions: ListPermissionService,
