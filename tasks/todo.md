@@ -1,81 +1,124 @@
-# Todo — Access Token Feature (CRUD + standalone ApiTokenGuard)
+# Todo — Content-Type-Schema-Driven CMS Document Engine
 
-See `tasks/plan.md` for full context and rationale.
+See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
 
-## Phase 0 — Schema + migration (ASK FIRST GATE)
-- [x] Confirm with user before touching schema (postgres-only deviation, already discussed)
-- [x] `prisma/postgresql/schema.prisma` — add `AccessToken` model (after `Role`, before `User`)
-- [x] `prisma/postgresql/schema.prisma` — add `User.updatedAccessTokens` back-relation
-- [x] `bun run prisma:migrate` — new migration `add_access_tokens`
+## Phase 0 — Prisma model + migration + dir scaffold
+
+- [x] `prisma/postgresql/schema.prisma` — `ContentType` model (`content_types` table)
+- [x] `bun run prisma:migrate` — `add_content_types`
 - [x] `bun run prisma:generate`
-- [x] **Checkpoint 0:** `bun run build` clean
+- [x] **Checkpoint 0:** `bun run build` succeeds
 
-## Phase 1 — Domain layer
-- [x] `src/modules/access-tokens/domain/entities/access-token.entity.ts`
-- [x] `src/modules/access-tokens/domain/repositories/access-token.repository.ts` (`IAccessTokenRepository`, `ACCESS_TOKEN_REPOSITORY`)
-- [x] **Checkpoint 1:** `bunx tsc --noEmit` clean
+## Phase 1 — SQL foundations (pure, no DB, highest-risk-first)
 
-## Phase 2 — Prisma repository
-- [x] `src/modules/access-tokens/infrastructure/persistence/prisma-access-token.repository.ts`
-- [x] `prisma-access-token.repository.spec.ts` (found/not-found `findByTokenHash`, `permissions` JSON round-trip)
-- [x] **Checkpoint 2:** file-scoped tests green, `tsc --noEmit` clean
+- [x] `field-definition.ts` — `ContentKind`/`FieldType`/`FieldDefinition`/`isComponentField`
+- [x] `sql-identifier.ts` + spec — `assertSafeSlug`/`assertSafeFieldName`/`quoteIdent` (the
+      injection choke-point)
+- [x] `table-naming.ts` + spec — `documentTableName`/`componentTableName` + hash-truncation
+- [x] `field-type-mapping.ts` + spec — `FieldType → Postgres column type`
+- [x] **Checkpoint 1:** schema-helper specs green, build clean
 
-## Phase 3 — Create flow
-- [x] `application/dto/create-access-token.dto.ts`
-- [x] `application/services/access-token-secret.util.ts` (`generateAccessTokenSecret`, `resolveExpiresAt`)
-- [x] `application/services/create-access-token.service.ts` (+ `.spec.ts`)
-- [x] `presentation/access-token.controller.ts` — `POST /api/access-tokens` (`api_token:manager`, first `req.user.sub` consumer)
-- [x] **Checkpoint 3:** `bun run build && bun run lint && bun run test:cov` (module) green; manual `curl` create returns `token` once (deferred — module not yet wired into app.module.ts, no route to hit until Phase 7)
+## Phase 2 — Content-type domain + loader/validator/differ (pure/fs, no DB)
 
-## Phase 4 — List flow
-- [x] `application/services/list-access-token.service.ts` (+ `.spec.ts`)
-- [x] Controller — `GET /api/access-tokens` (`api_token:read`), response strips `token` field
-- [x] **Checkpoint 4:** test proves response objects have no `token` key
+- [x] `content-type.entity.ts`
+- [x] `content-type.repository.ts` — `IContentTypeRepository` + `ContentTypeNotFoundError`
+- [x] `schema-table.repository.ts` — `ISchemaTableRepository`
+- [x] `schema-validator.ts` + spec
+- [x] `schema-loader.service.ts` + spec
+- [x] `schema-differ.ts` + spec — pure diff plan (add/drop/retype), no `DROP TABLE`
+- [x] **Checkpoint 2:** content-type specs green (excl. persistence), typecheck clean
 
-## Phase 5 — Delete flow
-- [x] `application/services/delete-access-token.service.ts` (+ `.spec.ts`)
-- [x] Controller — `DELETE /api/access-tokens/:id` → 204 (`api_token:manager`)
-- [x] **Checkpoint 5:** 404-on-missing / 404-on-redelete tests; manual DB check confirms hard delete (deferred — no live route until Phase 7 wiring; repo's `delete()` uses Prisma's hard `delete`, no soft-delete column exists)
+## Phase 3 — Content-type persistence (first DB-touching code)
 
-## Phase 6 — Revoke flow
-- [x] `application/dto/revoke-access-token.dto.ts`
-- [x] `application/services/revoke-access-token.service.ts` (+ `.spec.ts`)
-- [x] Controller — `POST /api/access-tokens/:id/revoke`
-- [x] **Checkpoint 6:** tests cover rotate-with-empty-body, partial-field merge, unknown-slug rejection (no rotation on rejected validation); full `test:cov` on `access-tokens` tree
+- [x] `prisma-content-type.repository.ts` + spec
+- [x] `prisma-schema-table.repository.ts` + spec — raw DDL, identifiers quoted, values
+      parameterized, `information_schema` introspection
+- [x] **Checkpoint 3:** persistence specs green, build clean
 
-## Phase 7 — Module + app wiring
-- [x] `access-token.module.ts` (+ `.spec.ts`) — `ApiTokenGuard` deliberately omitted from providers/exports until Phase 8 builds it
-- [x] Register `AccessTokenModule` in `src/app.module.ts`
-- [x] **Checkpoint 7:** full build/lint/test:cov; app boots without DI errors, all 4 routes mapped (note: `GET` end-to-end manual check blocked until Phase 9 seeds permissions)
+## Phase 4 — Content-type sync + services + controller + module
 
-## Phase 8 — `ApiTokenGuard` (standalone, unwired)
-- [x] `src/common/types/api-token-payload.ts`
-- [x] `src/common/types/authenticated-request.ts` — add `apiToken?: ApiTokenPayload`
-- [x] `src/common/guards/api-token.guard.ts` (+ `.spec.ts`: missing/malformed/unknown/expired/valid/never-expires)
-- [x] `access-token.module.ts` — registered `ApiTokenGuard` as provider/export (deferred from Phase 7 since the guard didn't exist yet)
-- [x] **Checkpoint 8:** build/lint/test:cov gate; `rg "ApiTokenGuard" src --type ts -l` shows no `@UseGuards` usage
+- [x] `content-type-sync.service.ts` + spec — `OnApplicationBootstrap`
+- [x] `list-content-type.service.ts` + spec
+- [x] `get-content-type.service.ts` + spec — exported for `document` module
+- [x] `content-type.controller.ts` + spec — `/api/content-types`, read-only
+- [x] `content-type.module.ts` — exports `GetContentTypeService` + `CONTENT_TYPE_REPOSITORY`
+- [x] `app.module.ts` — register `ContentTypeModule`
+- [x] **Checkpoint 4:** build/typecheck/lint/`test content-type` all clean — **commit here**
 
-## Phase 9 — Seed + cross-cutting edits (ASK FIRST GATE, two sub-confirmations)
-- [x] Confirm before editing `seed-default-data.service.ts`
-- [x] `seed-default-data.service.ts` — add `api_token:manager`/`api_token:read` to `DEFAULT_PERMISSIONS`; grant to `super_admin`/`admin` in `DEFAULT_ROLES`
-- [x] Confirm before editing `prisma-permission.repository.ts`
-- [x] `prisma-permission.repository.ts` — real `accessTokenCount` in `countReferences`
-- [x] Update `prisma-permission.repository.spec.ts` for the new branch
-- [x] **Checkpoint 9:** full-suite `test:cov` (281 tests) green; seed idempotency verified across two boots (seeded once, no-op/no errors on rerun); manual `DELETE /api/permissions/:id` 409 walkthrough deferred to Phase 10's end-to-end checkpoint (409 branch already covered by `DeletePermissionService` unit tests)
+## Phase 5 — Document domain + SQL helpers + raw DML repos
 
-## Phase 10 — Final full-stack checkpoint
-- [x] `bun run format` — clean diff
-- [x] `bun run lint` — zero errors (pre-existing unrelated warning in `main.ts`)
-- [x] `bun run build` — succeeds
-- [x] `bun run test:cov` — full suite green (58 suites, 281 tests)
-- [x] Manual end-to-end (live curl against a fresh test user promoted to `super_admin`, cleaned up afterward): login → create → list (no `token` field) → revoke via empty body (secret rotates, same `documentId`, fields preserved) → delete (204, then 404 on re-delete) → bonus: deleting a permission referenced by a live access token now 409s with a real, non-zero `accessTokenCount`
-- [x] Grep sanity: `cms_` only in util/tests; `ApiTokenGuard` never in `@UseGuards`; `accessTokenCount: 0` gone from production code (only in test fixtures)
-- [x] **Checkpoint 10 (final):** every `SPEC.md` success-criteria item verified true
+- [x] `document.entity.ts`, `component.entity.ts`
+- [x] `document.repository.ts`, `component.repository.ts` — ports w/ optional `tx` param
+- [x] `row-mapper.ts` + spec
+- [x] `where-builder.ts` + spec — `ILIKE` search + `ORDER BY` allowlist
+- [x] `prisma-document.repository.ts` + spec — `tx ?? this.prisma`
+- [x] `prisma-component.repository.ts` + spec — `tx ?? this.prisma`
+- [x] **Checkpoint 5:** `document/infrastructure` specs green, build clean
 
-## Phase 11 — Docs closeout + review (added retroactively; not in the original plan)
-- [x] Add `docs/documents/access-tokens.md`
-- [x] Update `docs/documents/permissions.md` (remove stale "`accessTokenCount` hardcoded `0`" notes)
-- [x] Update `docs/ENTRYPOINT.md` index
-- [x] Fold `SPEC.md` into docs, reset `SPEC.md` for next cycle
-- [x] Five-axis code review (`agent-skills:code-reviewer`) — APPROVE, no Critical/Important findings; extracted duplicated `assertPermissionsExist` into a shared helper (with its own spec), documented the two accepted tradeoffs (missing GIN index, check-then-act race) in `access-tokens.md`
-- [x] **Checkpoint 11 (final):** workflow's Spec → Build → Update spec/docs → Review → Clean up cycle fully closed
+## Phase 6 — Document support layer
+
+- [x] `schema-resolver.service.ts` + spec
+- [x] `draft-publish.policy.ts` + spec — mode A/B branching
+- [x] `status-resolver.ts` + spec — incl. batch variant (no N+1)
+- [x] `component-io.service.ts` + spec — recursive extract/hydrate/cascade, 3-level seeds
+- [x] `list-query.parser.ts` + spec
+- [x] **Checkpoint 6:** `document/application/support` specs green, typecheck clean
+
+## Phase 7 — Document collection services
+
+- [x] `save-document.service.ts` + spec — transactional
+- [x] `publish-document.service.ts` + spec — mode B → 400
+- [x] `unpublish-document.service.ts` + spec — mode B → 400
+- [x] `get-document-for-edit.service.ts` + spec
+- [x] `get-public-document.service.ts` + spec
+- [x] `delete-document.service.ts` + spec — transactional
+- [x] `list-documents.service.ts` + spec
+- [x] `duplicate-document.service.ts` + spec
+- [x] **Checkpoint 7:** collection service specs green
+
+## Phase 8 — Bulk + single-type services
+
+- [x] `bulk-create-publish.service.ts` + spec — compensating rollback
+- [x] `bulk-delete.service.ts` + spec — partial success, no rollback
+- [x] `get-single-type.service.ts` + spec
+- [x] `save-single-type.service.ts` + spec — transactional
+- [x] `publish-single-type.service.ts` + spec — mode B → 400
+- [x] `unpublish-single-type.service.ts` + spec — mode B → 400
+- [x] **Checkpoint 8:** all `document/application/services` specs green, build clean
+
+## Phase 9 — Document presentation + DTOs + module wiring
+
+- [x] `save-document.dto.ts`, `bulk-create.dto.ts`, `bulk-delete.dto.ts`, `list-query.dto.ts`
+- [x] `single-type-document.controller.ts` + spec
+- [x] `collection-type-document.controller.ts` + spec — `/bulk` routes before `/:documentId`
+- [x] `public-document.controller.ts` + spec — no guards
+- [x] `document.module.ts` — imports `ContentTypeModule`
+- [x] `app.module.ts` — register `DocumentModule`
+- [x] **Checkpoint 9:** build/typecheck/lint/`test document` all clean
+
+## Phase 10 — Seed permissions + seed JSON
+
+- [x] `seed-default-data.service.ts` — add 7 slugs (`content_type:read`, `document:read/create/
+      update/delete/publish/unpublish`); all 7 → `super_admin`; `content_type:read`+`document:read`
+      → `admin`
+- [x] `seed-default-data.service.spec.ts` — update counts/ordered-slug/permissions-array assertions
+- [x] `content-types/cv-page.json` — adopted + `"draftToPublish": true`
+- [x] `content-types/en-it-vocab.json` — adopted + `"draftToPublish": true`
+- [ ] **Checkpoint 10:** build/typecheck/lint/`test:cov` all clean — **commit here**
+
+## Phase 11 — e2e (real Postgres, manual/flagged if unreachable)
+
+- [x] `test/content-engine.e2e-spec.ts` — boot sync creates real tables; mode-A full lifecycle;
+      mode-B 400 on publish; 401/403; bulk happy/partial; 3-level component round-trip; schema-edit
+      data preservation
+- [x] **Checkpoint 11:** `bun run test:e2e` green against reachable Postgres (grant the 7 new slugs
+      to pre-existing `super_admin`/`admin` roles via `PUT /api/roles/:id` if needed — same
+      expected gap as the media cycle)
+
+## Phase 12 — Docs
+
+- [x] `docs/documents/content-type.md`
+- [x] `docs/documents/document.md`
+- [x] `docs/ENTRYPOINT.md` — add index lines
+- [x] `SPEC.md` — trim to pointer line
+- [x] **Checkpoint 12:** doc read-through — commit

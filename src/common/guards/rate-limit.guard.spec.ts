@@ -10,9 +10,11 @@ describe("RateLimitGuard", () => {
   let guard: RateLimitGuard;
   let nowMs: number;
 
-  const contextForIp = (ip: string): ExecutionContext =>
+  const contextForIp = (ip: string, handlerName = "someHandler"): ExecutionContext =>
     ({
       switchToHttp: () => ({ getRequest: () => ({ ip }) }),
+      getClass: () => ({ name: "SomeController" }),
+      getHandler: () => ({ name: handlerName }),
     }) as unknown as ExecutionContext;
 
   beforeEach(() => {
@@ -73,5 +75,17 @@ describe("RateLimitGuard", () => {
     expect(() => guard.canActivate(first)).toThrow(HttpException);
 
     expect(guard.canActivate(second)).toBe(true);
+  });
+
+  it("tracks separate buckets per route for the same IP", () => {
+    const registerContext = contextForIp("1.2.3.4", "register");
+    const loginContext = contextForIp("1.2.3.4", "login");
+
+    guard.canActivate(registerContext);
+    guard.canActivate(registerContext);
+    guard.canActivate(registerContext);
+    expect(() => guard.canActivate(registerContext)).toThrow(HttpException);
+
+    expect(guard.canActivate(loginContext)).toBe(true);
   });
 });

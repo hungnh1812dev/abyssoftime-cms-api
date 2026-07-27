@@ -13,6 +13,11 @@ For any new feature/page/module:
 7. **Clean up** — delete the completed spec from `/specs/*.md`, must be run after Review complete.
 8. **Complete** — workflow done.
 
+### `[CAREFUL]` features
+
+- If a feature's request/spec is tagged `[CAREFUL]`, use the Opus model for the **Spec**, **Build (plan)** and **Review** phases.
+- Use the Sonnet model for all other phases (Spec, Build (execute), Update spec, Update docs, Clean up).
+
 ## Module rules
 
 - Build each feature as its own module (same convention as `src/modules/*`).
@@ -47,6 +52,10 @@ For any new feature/page/module:
 ## Formatting
 
 - All changed `.js`, `.ts`, `.tsx` files must be run through Prettier before testing or committing.
+
+## Linting
+
+- Always lint via `bun run lint` — never invoke `eslint` directly (e.g. `bunx eslint .`, `bunx eslint <glob>`). The project's own script is already correctly scoped and finishes in ~5-10s; ad-hoc `eslint .` invocations re-run type-aware checking across the whole repo and can take 10+ minutes, pegging a CPU core the whole time.
 
 ## Naming convention
 

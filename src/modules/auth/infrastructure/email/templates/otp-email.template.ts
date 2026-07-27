@@ -1,0 +1,19 @@
+export interface BuildOtpEmailHtmlParams {
+  otp: string;
+}
+
+export function buildOtpEmailHtml({ otp }: BuildOtpEmailHtmlParams): string {
+  return `
+<!DOCTYPE html>
+<html>
+  <body style="font-family: sans-serif; background-color: #f4f4f5; padding: 24px;">
+    <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 8px; padding: 32px;">
+      <h1 style="font-size: 20px; margin-bottom: 16px;">Verify your email</h1>
+      <p style="font-size: 14px; color: #333;">Use the code below to verify your email address:</p>
+      <p style="font-size: 32px; font-weight: bold; letter-spacing: 4px; text-align: center; margin: 24px 0;">${otp}</p>
+      <p style="font-size: 12px; color: #666;">This code expires in 10 minutes. If you didn't request this, you can safely ignore this email.</p>
+    </div>
+  </body>
+</html>
+`.trim();
+}

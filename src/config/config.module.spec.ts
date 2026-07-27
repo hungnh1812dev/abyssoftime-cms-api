@@ -18,7 +18,7 @@ describe("ConfigModule", () => {
   });
 
   it("loads .env.test.local before falling back to .env.local, relative to the app root", () => {
-    const appRoot = join(__dirname, "./../..", "..");
+    const appRoot = process.cwd();
 
     expect(options.envFilePath).toEqual([join(appRoot, ".env.test.local"), join(appRoot, ".env.local")]);
   });

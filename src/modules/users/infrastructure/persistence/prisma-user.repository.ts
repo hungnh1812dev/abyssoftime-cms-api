@@ -1,9 +1,14 @@
 import { UserEntity } from "../../domain/entities/user.entity";
-import { CreateUserData, IUserRepository, UpdateUserData } from "../../domain/repositories/user.repository";
+import { type CompleteVerificationRoles, CreateUserData, IUserRepository, UpdateUserData, UserAlreadyExistsError } from "../../domain/repositories/user.repository";
 
 import { Injectable } from "@nestjs/common";
 
+import { Prisma } from "@/prisma/application/client";
 import { PrismaService } from "@/prisma/application/prisma.service";
+
+// Bounded retry for the rare case two `completeVerification` calls race and Postgres aborts one
+// of them under Serializable isolation (P2034) — see docs/documents/auth-issues-fix.md #1.
+const COMPLETE_VERIFICATION_MAX_ATTEMPTS = 3;
 
 @Injectable()
 export class PrismaUserRepository implements IUserRepository {
@@ -25,7 +30,7 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async findByUsername(username: string): Promise<UserEntity | null> {
-    const user = await this.prisma.user.findFirst({ where: { username } });
+    const user = await this.prisma.user.findUnique({ where: { username } });
     return user ? this.toEntity(user) : null;
   }
 
@@ -35,20 +40,32 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async create(data: CreateUserData): Promise<UserEntity> {
-    const user = await this.prisma.user.create({
-      data: {
-        email: data.email,
-        name: data.name,
-        username: data.username,
-        password: data.password,
-        accountType: data.accountType,
-        verified: data.verified,
-        roleId: data.roleId,
-        otpCodeHash: data.otpCodeHash,
-        otpExpiresAt: data.otpExpiresAt,
-      },
-    });
-    return this.toEntity(user);
+    try {
+      const user = await this.prisma.user.create({
+        data: {
+          email: data.email,
+          name: data.name,
+          username: data.username,
+          password: data.password,
+          accountType: data.accountType,
+          verified: data.verified,
+          roleId: data.roleId,
+          otpCodeHash: data.otpCodeHash,
+          otpExpiresAt: data.otpExpiresAt,
+        },
+      });
+      return this.toEntity(user);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const target = error.meta?.target;
+        const violatesUsername = Array.isArray(target) && target.includes("username");
+        if (violatesUsername) {
+          throw new UserAlreadyExistsError("username", data.username);
+        }
+        throw new UserAlreadyExistsError("email", data.email);
+      }
+      throw error;
+    }
   }
 
   async update(documentId: string, data: UpdateUserData): Promise<UserEntity> {
@@ -83,6 +100,32 @@ export class PrismaUserRepository implements IUserRepository {
   async hasAnyVerified(): Promise<boolean> {
     const count = await this.prisma.user.count({ where: { verified: true } });
     return count > 0;
+  }
+
+  async completeVerification(documentId: string, roles: CompleteVerificationRoles): Promise<UserEntity> {
+    for (let attempt = 1; attempt <= COMPLETE_VERIFICATION_MAX_ATTEMPTS; attempt++) {
+      try {
+        const user = await this.prisma.$transaction(
+          async (tx) => {
+            const verifiedCount = await tx.user.count({ where: { verified: true } });
+            const roleId = verifiedCount === 0 ? roles.firstVerifiedRoleId : roles.otherwiseRoleId;
+            return tx.user.update({
+              where: { documentId },
+              data: { verified: true, roleId, otpCodeHash: null, otpExpiresAt: null },
+            });
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        );
+        return this.toEntity(user);
+      } catch (error) {
+        const isWriteConflict = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+        if (!isWriteConflict || attempt === COMPLETE_VERIFICATION_MAX_ATTEMPTS) {
+          throw error;
+        }
+      }
+    }
+    /* istanbul ignore next -- unreachable: loop always returns or throws */
+    throw new Error("completeVerification: unreachable");
   }
 
   private toEntity(user: {

@@ -1,9 +1,13 @@
+import { UserAlreadyExistsError } from "../../domain/repositories/user.repository";
+
+import { Prisma } from "@/prisma/application/client";
 import { PrismaService } from "@/prisma/application/prisma.service";
 
 import { PrismaUserRepository } from "./prisma-user.repository";
 
 describe("PrismaUserRepository", () => {
   let repository: PrismaUserRepository;
+  let txUser: { count: jest.Mock; update: jest.Mock };
   let prisma: {
     user: {
       findMany: jest.Mock;
@@ -14,7 +18,12 @@ describe("PrismaUserRepository", () => {
       delete: jest.Mock;
       count: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
+
+  const p2002Error = (target: string[]) => new Prisma.PrismaClientKnownRequestError("Unique constraint failed", { code: "P2002", clientVersion: "test", meta: { target } });
+
+  const p2034Error = () => new Prisma.PrismaClientKnownRequestError("Write conflict", { code: "P2034", clientVersion: "test" });
 
   const record = {
     documentId: "user-1",
@@ -34,6 +43,7 @@ describe("PrismaUserRepository", () => {
   };
 
   beforeEach(() => {
+    txUser = { count: jest.fn(), update: jest.fn() };
     prisma = {
       user: {
         findMany: jest.fn(),
@@ -44,6 +54,7 @@ describe("PrismaUserRepository", () => {
         delete: jest.fn(),
         count: jest.fn(),
       },
+      $transaction: jest.fn((fn: (tx: { user: typeof txUser }) => unknown) => fn({ user: txUser })),
     };
 
     repository = new PrismaUserRepository(prisma as unknown as PrismaService);
@@ -127,18 +138,17 @@ describe("PrismaUserRepository", () => {
     expect(result).toBeNull();
   });
 
-  it("findByUsername() looks up by username via findFirst (no unique constraint)", async () => {
-    prisma.user.findFirst.mockResolvedValue(record);
+  it("findByUsername() looks up by username via findUnique", async () => {
+    prisma.user.findUnique.mockResolvedValue(record);
 
     const result = await repository.findByUsername("janedoe");
 
-    expect(prisma.user.findFirst).toHaveBeenCalledWith({ where: { username: "janedoe" } });
-    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { username: "janedoe" } });
     expectMappedEntity(result!);
   });
 
   it("findByUsername() returns null when no record is found", async () => {
-    prisma.user.findFirst.mockResolvedValue(null);
+    prisma.user.findUnique.mockResolvedValue(null);
 
     const result = await repository.findByUsername("missing");
 
@@ -229,6 +239,31 @@ describe("PrismaUserRepository", () => {
       },
     });
     expectMappedEntity(result);
+  });
+
+  it("create() throws UserAlreadyExistsError(email) when the email unique constraint is violated", async () => {
+    prisma.user.create.mockRejectedValue(p2002Error(["email"]));
+
+    await expect(
+      repository.create({ email: "jane@example.com", name: "Jane Doe", username: "janedoe", password: "secret", accountType: true, verified: false, roleId: null }),
+    ).rejects.toThrow(UserAlreadyExistsError);
+  });
+
+  it("create() throws UserAlreadyExistsError(username) when the username unique constraint is violated", async () => {
+    prisma.user.create.mockRejectedValue(p2002Error(["username"]));
+
+    await expect(
+      repository.create({ email: "jane@example.com", name: "Jane Doe", username: "janedoe", password: "secret", accountType: true, verified: false, roleId: null }),
+    ).rejects.toThrow(UserAlreadyExistsError);
+  });
+
+  it("create() rethrows unrelated errors as-is", async () => {
+    const otherError = new Error("connection lost");
+    prisma.user.create.mockRejectedValue(otherError);
+
+    await expect(
+      repository.create({ email: "jane@example.com", name: "Jane Doe", username: "janedoe", password: "secret", accountType: true, verified: false, roleId: null }),
+    ).rejects.toThrow(otherError);
   });
 
   it("update() passes provided fields through to prisma and maps the result", async () => {
@@ -363,5 +398,61 @@ describe("PrismaUserRepository", () => {
     const result = await repository.hasAnyVerified();
 
     expect(result).toBe(false);
+  });
+
+  it("completeVerification() assigns firstVerifiedRoleId when no verified user exists yet, in a Serializable transaction", async () => {
+    txUser.count.mockResolvedValue(0);
+    txUser.update.mockResolvedValue({ ...record, verified: true, roleId: "role-super" });
+
+    const result = await repository.completeVerification("user-1", { firstVerifiedRoleId: "role-super", otherwiseRoleId: "role-guest" });
+
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    expect(txUser.count).toHaveBeenCalledWith({ where: { verified: true } });
+    expect(txUser.update).toHaveBeenCalledWith({
+      where: { documentId: "user-1" },
+      data: { verified: true, roleId: "role-super", otpCodeHash: null, otpExpiresAt: null },
+    });
+    expect(result.roleId).toBe("role-super");
+  });
+
+  it("completeVerification() assigns otherwiseRoleId once at least one verified user already exists", async () => {
+    txUser.count.mockResolvedValue(1);
+    txUser.update.mockResolvedValue({ ...record, verified: true, roleId: "role-guest" });
+
+    const result = await repository.completeVerification("user-1", { firstVerifiedRoleId: "role-super", otherwiseRoleId: "role-guest" });
+
+    expect(txUser.update).toHaveBeenCalledWith({
+      where: { documentId: "user-1" },
+      data: { verified: true, roleId: "role-guest", otpCodeHash: null, otpExpiresAt: null },
+    });
+    expect(result.roleId).toBe("role-guest");
+  });
+
+  it("completeVerification() retries once on a P2034 write conflict, then succeeds", async () => {
+    prisma.$transaction.mockRejectedValueOnce(p2034Error()).mockImplementationOnce((fn: (tx: { user: typeof txUser }) => unknown) => fn({ user: txUser }));
+    txUser.count.mockResolvedValue(0);
+    txUser.update.mockResolvedValue({ ...record, verified: true, roleId: "role-super" });
+
+    const result = await repository.completeVerification("user-1", { firstVerifiedRoleId: "role-super", otherwiseRoleId: "role-guest" });
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(result.roleId).toBe("role-super");
+  });
+
+  it("completeVerification() gives up after exhausting retries on repeated P2034 conflicts", async () => {
+    prisma.$transaction.mockRejectedValue(p2034Error());
+
+    await expect(repository.completeVerification("user-1", { firstVerifiedRoleId: "role-super", otherwiseRoleId: "role-guest" })).rejects.toMatchObject({
+      code: "P2034",
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(3);
+  });
+
+  it("completeVerification() rethrows non-conflict errors immediately without retrying", async () => {
+    const otherError = new Error("connection lost");
+    prisma.$transaction.mockRejectedValue(otherError);
+
+    await expect(repository.completeVerification("user-1", { firstVerifiedRoleId: "role-super", otherwiseRoleId: "role-guest" })).rejects.toThrow(otherError);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 });

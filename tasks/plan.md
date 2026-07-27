@@ -1,439 +1,433 @@
-# Plan: Access Token Feature (CRUD + standalone ApiTokenGuard)
+# Plan: Content-Type-Schema-Driven CMS Document Engine
 
-See `SPEC.md` for the full approved spec. This plan implements it.
+See `SPEC.md` for the active spec (709 lines — binding source of truth for every design decision
+below). This plan builds two new modules — `src/modules/content-type/` and
+`src/modules/document/` — a stack adaptation of the Go/GORM/MongoDB `covert/**` reference onto
+NestJS/Prisma/PostgreSQL raw SQL, **not** a verbatim port. This is a `[CAREFUL]`-tagged feature
+(`docs/rules/workflow.md`) — Opus was used for the Spec and this Plan phase.
 
 ## Context
 
-`SPEC.md` asks for a new `access-tokens` module: CRUD management of scoped, expiring API tokens (create/list/delete/revoke), guarded the same way `roles`/`permissions` are, plus a standalone `ApiTokenGuard` that can authenticate `Authorization: Bearer <token>` requests — built now but not wired into any route yet. This is the next feature cycle after the seeding/auth/permission-slug work (already shipped, documented in `docs/documents/{auth,roles,permissions,users}.md`).
-
-Codebase research surfaced one fact that forces a deviation from the spec's literal wording, and design gaps the spec left implicit that need a concrete resolution before code is written.
-
-## Deviation from spec (confirmed with user)
-
-**Schema scope: postgres-only, not "all three schema files."** `prisma/mysql/schema.prisma` and `prisma/sqlite/schema.prisma` are still empty stubs (generator/datasource blocks only) — `Permission`/`Role`/`User` were never backfilled into them, only `prisma/postgresql/schema.prisma` has real models. `AccessToken.user User? @relation(...)` requires a `User` model in the same schema file, so adding `AccessToken` to mysql/sqlite would require also creating `Permission`/`Role`/`User` there — a much bigger, unrelated change that violates `docs/rules/workflow.md`'s "minimize coupling on existing modules" rule. This is the same deviation the prior spec cycle made for the same reason. **User confirmed: postgres-only.**
-
-## Resolved design decisions (not spelled out in SPEC.md)
-
-1. **Payload naming collision.** `src/common/types/jwt-payload.ts` already exports `AccessTokenPayload` (the JWT session payload — unrelated to our new `AccessToken` Prisma model). New guard payload type is named `ApiTokenPayload` (`src/common/types/api-token-payload.ts`) to avoid any clash:
-   ```ts
-   export interface ApiTokenPayload {
-     documentId: string;
-     name: string;
-     permissions: string[];
-   }
-   ```
-   `AuthenticatedRequest` gains one optional field: `apiToken?: ApiTokenPayload`.
-
-2. **`ApiTokenGuard` DI/testability.** Confirmed via `jwt-auth.guard.spec.ts`: this repo's convention is direct construction in tests (`new JwtAuthGuard(mockTokenService)`), not `Test.createTestingModule`. `ApiTokenGuard` follows the same shape — plain `@Injectable()` class, constructor-injects `ACCESS_TOKEN_REPOSITORY`, unit-tested via direct construction with a mocked repository and a fake `ExecutionContext`. It's registered as a provider/export of `AccessTokenModule` (not global) — fine, since the spec confirms it's unwired in this change; any future consumer just needs `imports: [AccessTokenModule]`.
-
-3. **Small addition beyond the spec's file list:** `src/modules/access-tokens/application/services/access-token-secret.util.ts` — a tiny pure-function helper (`generateAccessTokenSecret()`, `resolveExpiresAt()`) shared by Create and Revoke to avoid duplicating token-gen/expiry-math logic. Flagged explicitly since it's not in `SPEC.md`'s file list.
-
-4. **Repository error handling.** Unlike `IRoleRepository` (domain error classes + catch-in-service), `IAccessTokenRepository.findById`/`findByTokenHash` return `T | null` (matching `IPermissionRepository`'s cleaner style). 404s are raised in the service layer from an explicit pre-check; the Prisma repository itself stays "dumb" — no error translation.
-
-## Patterns being reused (verified against actual source, not guessed)
-
-- **Entity/repository shape** — `role.entiry.ts` / `role.repository.ts` (plain class, `IXRepository` interface + `Symbol` DI token).
-- **Unknown-slug validation** — `CreateRoleService.assertPermissionsExist` (findAll + Set diff), copied verbatim for `AccessToken.permissions`:
-  ```ts
-  private async assertPermissionsExist(permissionSlugs: string[]): Promise<void> {
-    if (permissionSlugs.length === 0) return;
-    const catalog = await this.permissions.findAll();
-    const validSlugs = new Set(catalog.map((p) => p.slug));
-    const invalidSlugs = permissionSlugs.filter((slug) => !validSlugs.has(slug));
-    if (invalidSlugs.length > 0) throw new BadRequestException(`Unknown permission slug(s): ${invalidSlugs.join(", ")}`);
-  }
-  ```
-- **Token generation** — `ForgotPasswordService`'s `randomBytes(32).toString("hex")` + `createHash("sha256")` pattern, extended with the `cms_` prefix.
-- **Guards/decorators** — `@UseGuards(JwtAuthGuard, PermissionsGuard)` + `@RequirePermissions("slug")`, exactly as in `role.controller.ts`. This new controller is the **first** in the repo to read `req.user.sub` (existing controllers hardcode `updatedBy: ""` and never touch `req.user`) — new precedent, called out per spec's decision table.
-- **Module wiring** — `role.module.ts` (imports `PermissionModule` for cross-module slug validation, binds DI token to Prisma impl, exports the token).
-- **Seeding** — `seed-default-data.service.ts`'s `DEFAULT_PERMISSIONS`/`DEFAULT_ROLES` arrays, idempotent via `findBySlug` guard.
-- **`countReferences` stub** — `prisma-permission.repository.ts` hardcodes `accessTokenCount: 0`; `DeletePermissionService` already consumes it correctly (`refs.roleCount > 0 || refs.accessTokenCount`), so wiring the real count is a pure data-correctness fix, no consumer change needed.
-- **No `coverageThreshold`** — removed entirely from `package.json` in the most recent commit (`747761f`). Plan writes solid spec coverage but adds zero `coverageThreshold` config entries anywhere.
-
-## Dependency Graph
-
-```
-Phase 0 (ASK FIRST): schema + migration (postgres only)
-  → Phase 1: domain layer (entity + repository interface, no DB)
-    → Phase 2: PrismaAccessTokenRepository
-      → Phase 3: Create slice (dto+service+controller route+shared secret util)
-      → Phase 4: List slice
-      → Phase 5: Delete slice
-      → Phase 6: Revoke slice (reuses Phase 3's secret util)
-        → Phase 7: AccessTokenModule wiring + app.module.ts registration
-          → Phase 8: ApiTokenGuard (only needs Phase 2's findByTokenHash; can run parallel to 3-6)
-            → Phase 9 (ASK FIRST): seed-default-data.service.ts + prisma-permission.repository.ts edits
-              → Phase 10: full-stack checkpoint
-```
-
-## Task List
-
-### Phase 0: Schema + migration (ASK FIRST GATE)
-
-**Task 0.1** — Confirm with user before touching schema. Restate: postgres-only, mysql/sqlite untouched (documented deviation above).
-
-**Task 0.2** — Add to `prisma/postgresql/schema.prisma`, positioned after `Role`, before `User` (since `User` needs to reference it):
-```prisma
-model AccessToken {
-    id          Int       @default(autoincrement())
-    documentId  String    @id @unique @default(uuid()) @map("document_id")
-    name        String
-    token       String    @unique
-    permissions Json
-    expiresAt   DateTime? @map("expires_at")
-    createdAt   DateTime  @default(now()) @map("created_at")
-    updatedAt   DateTime  @updatedAt @map("updated_at")
-    user        User?     @relation("AccessTokenUpdatedBy", fields: [updatedBy], references: [documentId])
-    updatedBy   String?   @map("updated_by")
-    @@map("access_tokens")
-}
-```
-Add to `User` (next to `updatedRoles`/`updatedPermissions`): `updatedAccessTokens AccessToken[] @relation("AccessTokenUpdatedBy") @ignore`.
-
-**Task 0.3** — `bun run prisma:migrate` → new migration dir `prisma/postgresql/migrations/<YYYYMMDDHHMMSS>_add_access_tokens/migration.sql`. Must include `CREATE TABLE "access_tokens"`, unique constraints on `document_id`/`token`, FK: `ALTER TABLE "access_tokens" ADD CONSTRAINT "access_tokens_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "users"("document_id") ON DELETE SET NULL ON UPDATE CASCADE`.
-
-**Task 0.4** — `bun run prisma:generate` (client gains `prisma.accessToken.*`).
-
-**Acceptance:** `bun run build` succeeds even though nothing references `AccessToken` yet (proves schema/client change alone doesn't break compilation). `git diff prisma/postgresql/schema.prisma` shows only the new model + one added `User` line.
-
-**Checkpoint 0:** `bun run build` clean.
-
-### Phase 1: Domain layer
-
-**Task 1.1** — `src/modules/access-tokens/domain/entities/access-token.entity.ts`:
-```ts
-export class AccessTokenEntity {
-  constructor(
-    public readonly documentId: string,
-    public readonly name: string,
-    public readonly token: string, // hash, never plaintext
-    public readonly permissions: string[],
-    public readonly expiresAt: Date | null,
-    public readonly createdAt: Date,
-    public readonly updatedAt: Date,
-    public readonly updatedBy: string | null,
-  ) {}
-}
-```
-
-**Task 1.2** — `src/modules/access-tokens/domain/repositories/access-token.repository.ts`:
-```ts
-export interface CreateAccessTokenData {
-  name: string;
-  token: string;
-  permissions: string[];
-  expiresAt: Date | null;
-  updatedBy: string | null;
-}
-export interface UpdateAccessTokenData {
-  name?: string;
-  token?: string;
-  permissions?: string[];
-  expiresAt?: Date | null;
-  updatedBy: string | null;
-}
-export interface IAccessTokenRepository {
-  findAll(): Promise<AccessTokenEntity[]>;
-  findById(documentId: string): Promise<AccessTokenEntity | null>;
-  findByTokenHash(hash: string): Promise<AccessTokenEntity | null>;
-  create(data: CreateAccessTokenData): Promise<AccessTokenEntity>;
-  update(documentId: string, data: UpdateAccessTokenData): Promise<AccessTokenEntity>;
-  delete(documentId: string): Promise<void>;
-}
-export const ACCESS_TOKEN_REPOSITORY = Symbol("ACCESS_TOKEN_REPOSITORY");
-```
-
-**Acceptance:** compiles standalone (`tsc --noEmit`), no Prisma/Nest dependency. No `.spec.ts` needed (interfaces aren't tested directly, same as `role.repository.ts`).
-
-**Checkpoint 1:** `bunx tsc --noEmit` clean.
-
-### Phase 2: Prisma repository
-
-**Task 2.1** — `src/modules/access-tokens/infrastructure/persistence/prisma-access-token.repository.ts`, mirroring `prisma-permission.repository.ts`'s `| null` style:
-```ts
-@Injectable()
-export class PrismaAccessTokenRepository implements IAccessTokenRepository {
-  constructor(private readonly prisma: PrismaService) {}
-  async findAll(): Promise<AccessTokenEntity[]> { ... }
-  async findById(documentId: string): Promise<AccessTokenEntity | null> { ... }
-  async findByTokenHash(hash: string): Promise<AccessTokenEntity | null> {
-    const row = await this.prisma.accessToken.findUnique({ where: { token: hash } });
-    return row ? this.toEntity(row) : null;
-  }
-  async create(data: CreateAccessTokenData): Promise<AccessTokenEntity> { ... }
-  async update(documentId: string, data: UpdateAccessTokenData): Promise<AccessTokenEntity> { ... }
-  async delete(documentId: string): Promise<void> { await this.prisma.accessToken.delete({ where: { documentId } }); }
-  private toEntity(row): AccessTokenEntity { return new AccessTokenEntity(row.documentId, row.name, row.token, row.permissions as string[], row.expiresAt, row.createdAt, row.updatedAt, row.updatedBy); }
-}
-```
-
-**Task 2.2** — `prisma-access-token.repository.spec.ts` mocking `PrismaService` (check `prisma-role.repository.spec.ts` for the exact mocking convention): `findByTokenHash` found/not-found; `create` round-trips `permissions: string[]` through `Json` correctly.
-
-**Acceptance:** `findByTokenHash("nonexistent")` resolves `null`, doesn't throw. Round-trip test passes.
-
-**Checkpoint 2:** file-scoped tests green, `tsc --noEmit` clean.
-
-### Phase 3: Create flow (vertical slice)
-
-**Task 3.1** — `create-access-token.dto.ts`:
-```ts
-export class CreateAccessTokenDto {
-  @IsString() @IsNotEmpty() name!: string;
-  @IsArray() @IsString({ each: true }) @ArrayUnique() permissions!: string[];
-  @IsIn(["30m", "1h", "1d", "1m", "1y", "never"]) expiresIn!: "30m" | "1h" | "1d" | "1m" | "1y" | "never";
-}
-```
-
-**Task 3.2** — `access-token-secret.util.ts` (new file, flagged deviation from spec's literal file list — avoids duplicating logic between Create and Revoke):
-```ts
-export function generateAccessTokenSecret(): { plaintext: string; hash: string } {
-  const plaintext = `cms_${randomBytes(32).toString("hex")}`;
-  const hash = createHash("sha256").update(plaintext).digest("hex");
-  return { plaintext, hash };
-}
-export function resolveExpiresAt(expiresIn: ExpiresIn, now: Date = new Date()): Date | null {
-  if (expiresIn === "never") return null;
-  const ms = { "30m": 30 * 60_000, "1h": 60 * 60_000, "1d": 24 * 60 * 60_000, "1m": 30 * 24 * 60 * 60_000, "1y": 365 * 24 * 60 * 60_000 }[expiresIn];
-  return new Date(now.getTime() + ms);
-}
-```
-
-**Task 3.3** — `create-access-token.service.ts`, mirrors `CreateRoleService`'s permission-validation pattern, injects both `ACCESS_TOKEN_REPOSITORY` and `PERMISSSION_REPOSITORY`:
-```ts
-async execute(dto: CreateAccessTokenDto, callerId: string | null): Promise<{ entity: AccessTokenEntity; plaintext: string }> {
-  await this.assertPermissionsExist(dto.permissions);
-  const { plaintext, hash } = generateAccessTokenSecret();
-  const expiresAt = resolveExpiresAt(dto.expiresIn);
-  const entity = await this.accessTokens.create({ name: dto.name, token: hash, permissions: dto.permissions, expiresAt, updatedBy: callerId });
-  return { entity, plaintext };
-}
-```
-
-**Task 3.4** — Controller skeleton + `POST /api/access-tokens`:
-```ts
-@Controller("/api/access-tokens")
-export class AccessTokenController {
-  constructor(private readonly createAccessTokenService: CreateAccessTokenService /* + others added later phases */) {}
-
-  @Post()
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions("api_token:manager")
-  async create(@Body() dto: CreateAccessTokenDto, @Req() req: AuthenticatedRequest) {
-    const { entity, plaintext } = await this.createAccessTokenService.execute(dto, req.user.sub);
-    return { documentId: entity.documentId, name: entity.name, permissions: entity.permissions, expiresAt: entity.expiresAt, token: plaintext, createdAt: entity.createdAt, updatedAt: entity.updatedAt };
-  }
-}
-```
-First controller in the repo to read `req.user.sub` — new precedent per spec's decision table.
-
-**Acceptance:** service spec covers: unknown-slug → `BadRequestException`; `token` passed to `create()` is a 64-hex-char hash, not the `cms_...` plaintext; returned `plaintext` starts with `cms_`, 68 chars total; `expiresIn: "never"` → `expiresAt: null`; `expiresIn: "1h"` → `~now + 3600000ms`.
-
-**Checkpoint 3:** `bun run build && bun run lint && bun run test:cov` (module subtree) green.
-
-### Phase 4: List flow
-
-**Task 4.1** — `list-access-token.service.ts`: `execute(): Promise<AccessTokenEntity[]>`, thin passthrough to `findAll()`.
-
-**Task 4.2** — Controller `GET /api/access-tokens`, `@RequirePermissions("api_token:read")` — response must **strip `token`** via an explicit mapping step (not `delete entity.token`, since entity fields are `readonly`): `{ documentId, name, permissions, expiresAt, createdAt, updatedAt, updatedBy }[]`.
-
-**Acceptance:** response objects have no `token` key at all (test asserts `Object.keys` or `!("token" in item)`, not just `undefined`).
-
-**Checkpoint 4:** build/lint/test:cov gate.
-
-### Phase 5: Delete flow
-
-**Task 5.1** — `delete-access-token.service.ts`:
-```ts
-async execute(documentId: string): Promise<void> {
-  const existing = await this.accessTokens.findById(documentId);
-  if (!existing) throw new NotFoundException(`Access token "${documentId}" not found`);
-  await this.accessTokens.delete(documentId);
-}
-```
-
-**Task 5.2** — Controller `DELETE /api/access-tokens/:id` → `204`, `@RequirePermissions("api_token:manager")`, `@HttpCode(HttpStatus.NO_CONTENT)`.
-
-**Acceptance:** 404 on missing; happy path calls `delete()` exactly once; re-delete of same id → 404 (no soft-delete column exists to check — hard delete confirmed by its absence).
-
-**Checkpoint 5:** build/lint/test:cov gate.
-
-### Phase 6: Revoke flow
-
-**Task 6.1** — `revoke-access-token.dto.ts` (all optional):
-```ts
-export class RevokeAccessTokenDto {
-  @IsOptional() @IsString() @IsNotEmpty() name?: string;
-  @IsOptional() @IsArray() @IsString({ each: true }) @ArrayUnique() permissions?: string[];
-  @IsOptional() @IsIn(["30m", "1h", "1d", "1m", "1y", "never"]) expiresIn?: "30m" | "1h" | "1d" | "1m" | "1y" | "never";
-}
-```
-
-**Task 6.2** — `revoke-access-token.service.ts`:
-```ts
-async execute(documentId: string, dto: RevokeAccessTokenDto, callerId: string | null): Promise<{ entity: AccessTokenEntity; plaintext: string }> {
-  const existing = await this.accessTokens.findById(documentId);
-  if (!existing) throw new NotFoundException(`Access token "${documentId}" not found`);
-  if (dto.permissions !== undefined) await this.assertPermissionsExist(dto.permissions);
-
-  const { plaintext, hash } = generateAccessTokenSecret();
-  const expiresAt = dto.expiresIn !== undefined ? resolveExpiresAt(dto.expiresIn) : existing.expiresAt;
-
-  const entity = await this.accessTokens.update(documentId, {
-    name: dto.name ?? existing.name,
-    token: hash,
-    permissions: dto.permissions ?? existing.permissions,
-    expiresAt,
-    updatedBy: callerId,
-  });
-  return { entity, plaintext };
-}
-```
-Validation happens *before* secret rotation — an unknown-slug rejection must not rotate the secret.
-
-**Task 6.3** — Controller `POST /api/access-tokens/:id/revoke`, `@RequirePermissions("api_token:manager")`, same response shape as create.
-
-**Acceptance:** 404 when missing; secret rotates even with `dto: {}` (new hash differs from `existing.token`, plaintext fresh each call); `expiresIn` omitted → `expiresAt` unchanged from `existing`; unknown-slug in `permissions` → `BadRequestException` AND `accessTokens.update` never called; `name`/`permissions` omitted → preserved from `existing`.
-
-**Checkpoint 6:** build/lint/test:cov gate. This closes out the full CRUD service layer — run `test:cov` on the whole `access-tokens` tree.
-
-### Phase 7: Module + app wiring
-
-**Task 7.1** — `access-token.module.ts`:
-```ts
-@Module({
-  imports: [PermissionModule],
-  controllers: [AccessTokenController],
-  providers: [
-    ListAccessTokensService,
-    CreateAccessTokenService,
-    RevokeAccessTokenService,
-    DeleteAccessTokenService,
-    ApiTokenGuard,
-    { provide: ACCESS_TOKEN_REPOSITORY, useClass: PrismaAccessTokenRepository },
-  ],
-  exports: [ACCESS_TOKEN_REPOSITORY, ApiTokenGuard],
-})
-export class AccessTokenModule {}
-```
-(`ApiTokenGuard` is built in Phase 8 — sequence so both land together, or stub Phase 8's guard file minimally first.)
-
-**Task 7.2** — `access-token.module.spec.ts`, mirroring `role.module.spec.ts`'s metadata-reflection assertions.
-
-**Task 7.3** — Register `AccessTokenModule` in `src/app.module.ts`'s `imports` array.
-
-**Acceptance:** module metadata test passes; app boots (`bun run start:dev` or build+smoke run) without DI resolution errors — proves `PermissionModule` import correctly satisfies the slug-validation dependency. Note: `GET /api/access-tokens` manual check is blocked until Phase 9 seeds the permission slugs — not a Phase 7 bug.
-
-**Checkpoint 7:** full `bun run build && bun run lint && bun run test:cov`.
-
-### Phase 8: `ApiTokenGuard` (standalone, unwired)
-
-**Task 8.1** — `src/common/types/api-token-payload.ts` per resolved design decision above.
-
-**Task 8.2** — Edit `src/common/types/authenticated-request.ts`: add `apiToken?: ApiTokenPayload`.
-
-**Task 8.3** — `src/common/guards/api-token.guard.ts`:
-```ts
-@Injectable()
-export class ApiTokenGuard implements CanActivate {
-  constructor(@Inject(ACCESS_TOKEN_REPOSITORY) private readonly accessTokens: IAccessTokenRepository) {}
-
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const header = request.headers.authorization;
-    if (typeof header !== "string" || !header.startsWith("Bearer ")) {
-      throw new UnauthorizedException("Missing bearer token");
-    }
-    const plaintext = header.slice("Bearer ".length).trim();
-    if (plaintext.length === 0) throw new UnauthorizedException("Missing bearer token");
-
-    const hash = createHash("sha256").update(plaintext).digest("hex");
-    const record = await this.accessTokens.findByTokenHash(hash);
-    if (!record) throw new UnauthorizedException("Invalid access token");
-
-    if (record.expiresAt && record.expiresAt.getTime() < Date.now()) {
-      throw new UnauthorizedException("Access token expired");
-    }
-
-    request.apiToken = { documentId: record.documentId, name: record.name, permissions: record.permissions };
-    return true;
-  }
-}
-```
-
-**Task 8.4** — `api-token.guard.spec.ts`, direct-construction pattern per `jwt-auth.guard.spec.ts`, covering: missing header; malformed header (no `Bearer ` prefix); unknown hash; expired token; valid non-expired token (`request.apiToken` set correctly); never-expiring token (`expiresAt: null`) passes regardless of `Date.now()`.
-
-**Acceptance:** all 6 branches pass. Grep confirms `ApiTokenGuard` never appears inside a `@UseGuards(...)` call anywhere in the repo.
-
-**Checkpoint 8:** build/lint/test:cov gate + `rg "ApiTokenGuard" src --type ts -l` shows only guard file + spec + module provider registration.
-
-### Phase 9: Seed + cross-cutting edits (ASK FIRST GATE, two sub-confirmations)
-
-**Task 9.1 (ASK FIRST)** — Confirm before editing `seed-default-data.service.ts`:
-```diff
-  const DEFAULT_PERMISSIONS: Omit<CreatePermissionData, "updatedBy">[] = [
-    ...
-    { slug: "permission:read", name: "Read permissions", description: "View permissions" },
-+   { slug: "api_token:manager", name: "Manage access tokens", description: "Create, revoke, and delete access tokens" },
-+   { slug: "api_token:read", name: "Read access tokens", description: "View access tokens" },
-  ];
-
-  const DEFAULT_ROLES: Omit<CreateRoleData, "updatedBy">[] = [
--   { name: "Super Admin", slug: "super_admin", permissions: ["user:manager", "role:manager", "permission:manager"], level: 100, isDefault: true },
-+   { name: "Super Admin", slug: "super_admin", permissions: ["user:manager", "role:manager", "permission:manager", "api_token:manager"], level: 100, isDefault: true },
--   { name: "Admin", slug: "admin", permissions: ["user:read", "role:read", "permission:read"], level: 50, isDefault: true },
-+   { name: "Admin", slug: "admin", permissions: ["user:read", "role:read", "permission:read", "api_token:read"], level: 50, isDefault: true },
-    ...
-  ];
-```
-Slug regex check: `api_token:manager` / `api_token:read` both match `^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$` — confirmed clean.
-
-**Task 9.2 (ASK FIRST)** — Confirm before editing `prisma-permission.repository.ts`:
-```diff
-  async countReferences(slug: string): Promise<PermissionReferenceCount> {
--   const [roleCount] = await Promise.all([this.prisma.role.count({ where: { permissions: { array_contains: [slug] } } })]);
--   return { roleCount, accessTokenCount: 0 };
-+   const [roleCount, accessTokenCount] = await Promise.all([
-+     this.prisma.role.count({ where: { permissions: { array_contains: [slug] } } }),
-+     this.prisma.accessToken.count({ where: { permissions: { array_contains: [slug] } } }),
-+   ]);
-+   return { roleCount, accessTokenCount };
-  }
-```
-Architecture note: this creates a one-directional reverse dependency (`permissions` module's Prisma repository reaches into the `access_tokens` table), same pattern the repo already uses for `Role`'s table — no `AccessTokenModule` import needed since Prisma client access doesn't go through Nest DI/module boundaries. Update `prisma-permission.repository.spec.ts` to assert the combined `{ roleCount, accessTokenCount }` result.
-
-**Acceptance:** seed idempotency — two consecutive app boots log the new slugs only once, no unique-constraint error on the second. `roles` table for `super_admin`/`admin` contains the new slugs after seed. `prisma-permission.repository.spec.ts` updated and passing. Manual: `DELETE /api/permissions/:id` on a permission referenced by a live access token → 409 with a real (non-zero) `accessTokenCount`.
-
-**Checkpoint 9:** full-suite `bun run test:cov` (not just the new module — these are shared pre-existing files).
-
-### Phase 10: Final full-stack checkpoint
-
-**Task 10.1** — `bun run format` — clean diff, no unformatted new files.
-**Task 10.2** — `bun run lint` — zero errors.
-**Task 10.3** — `bun run build` — succeeds.
-**Task 10.4** — `bun run test:cov` — full suite green.
-**Task 10.5** — Manual end-to-end: login (existing flow) → `POST /api/access-tokens` → capture `token` → `GET /api/access-tokens` (no hash field) → `POST /api/access-tokens/:id/revoke {}` (new token, same `documentId`) → `DELETE /api/access-tokens/:id` (204, then 404) → DB spot-check (hash-only storage throughout, hard delete confirmed).
-**Task 10.6** — Grep sanity: `rg "cms_" src` → only util/tests; `rg "ApiTokenGuard" src -l` → no controller `@UseGuards` wiring; `rg "accessTokenCount: 0" src` → zero matches.
-
-**Checkpoint 10 (final):** all of the above pass; every `SPEC.md` Success Criteria item verified true.
-
-## Risks and Mitigations
-
-| Risk | Impact | Mitigation |
-|---|---|---|
-| Schema/migration touches a shared, "ask first" file | Med | Explicit confirmation gate, Task 0.1, before any edit. |
-| `seed-default-data.service.ts` / `prisma-permission.repository.ts` are shared files outside the new module | Med | Explicit confirmation gate, Tasks 9.1/9.2; full-suite regression run at Checkpoint 9, not just the new module's tests. |
-| First controller to read `req.user.sub` — new precedent, no existing reference implementation to copy exactly | Low | Documented explicitly in this plan and in code; small, isolated surface (one controller). |
-| Revoke rotating the secret before validating new `permissions` could leak a rotated-but-rejected state | Low | Validation runs before `generateAccessTokenSecret()`/`update()` in `RevokeAccessTokenService` — enforced by task ordering and a dedicated test case. |
-
-## Verification (end-to-end, ties to SPEC.md's Success Criteria)
-
-1. `POST /api/access-tokens` (as `api_token:manager`) → row created, plaintext `token` returned once; subsequent `GET` never shows it.
-2. `POST /api/access-tokens/:id/revoke` with no body → secret rotates, `name`/`permissions`/`expiresAt`/`createdAt`/`documentId` unchanged, new plaintext returned; old plaintext no longer authenticates via `ApiTokenGuard`. With a body → also updates given fields.
-3. `DELETE /api/access-tokens/:id` → row gone; re-delete → 404.
-4. Deleting a `Permission` still referenced by a live `AccessToken` → 409 with real `accessTokenCount` (no longer hardcoded `0`).
-5. `ApiTokenGuard`, unit-tested directly: valid hash → populates `request.apiToken`; expired/unknown → 401.
-6. `bun run build`, `bunx tsc --noEmit`, `bunx eslint`, `bun run test:cov` all pass.
-
-## Commit cadence
-
-Per project convention: batch commits at checkpoint boundaries (end of each phase above), not per file. Ask for explicit Yes/No confirmation (staged files + full message) before each commit; no `Co-Authored-By`. Phases 0 and 9 are additionally gated on explicit user confirmation *before* editing, per `SPEC.md`'s "ask first" boundaries.
+Content types are declared as JSON files (`content-types/*.json`) and reconciled into dedicated
+PostgreSQL tables by a boot-time sync engine (`ContentTypeSyncService`, `OnApplicationBootstrap`).
+A single generic Document engine then serves full CRUD + draft/publish + list/search/sort/
+pagination + bulk operations over *any* declared content type, dispatching purely on the URL
+`:slug` and the resolved schema — no per-content-type backend code. Two real content types ship as
+seeds (`cv-page`, `en-it-vocab`, adopted from `covert/content-type/*.json`), each nesting
+repeatable components up to 3 levels deep.
+
+The build order is forced by a hard dependency chain: SQL-safety foundations (pure, no DB) →
+content-type domain/sync/persistence → content-type application surface (commit point) → document
+domain/persistence (blocked on content-type's exports) → document support layer → document
+services → document presentation (commit point) → seed/permission wiring → e2e. `document` depends
+on `content-type` one-way only (never the reverse) — enforced by keeping the DDL-lifecycle port
+(`ISchemaTableRepository`) inside `content-type`, not on `IDocumentRepository` (a deliberate
+deviation from the reference's port shape, SPEC §8.3).
+
+Two decisions were resolved with the user during this Plan phase (not covered during Spec):
+
+1. **Both seed content types use `draftToPublish: true`** — reference-style draft/publish workflow
+   for both `cv-page` and `en-it-vocab`.
+2. **Multi-table writes (a document row + its component rows, recursively) are wrapped in a single
+   Postgres transaction** via `prisma.$transaction`, rather than left as separate non-transactional
+   statements — an improvement over the Go reference (which had no transaction abstraction at all).
+   `IDocumentRepository`/`IComponentRepository` DML methods take an optional trailing
+   `tx?: Prisma.TransactionClient` parameter, defaulting to the injected `PrismaService` when
+   omitted; `SaveDocumentService`/`PublishDocumentService`/`DeleteDocumentService` (and their
+   single-type twins) open the transaction and pass `tx` down through `component-io.service.ts`
+   into the component repository calls. DDL (Phase 3's `prisma-schema-table.repository.ts`) is not
+   required to use this — Postgres DDL is itself transactional per-statement-block, and sync only
+   ever processes one content type's diff at a time, so the risk there is low; wrapping a single
+   content type's CREATE/ALTER/DROP sequence in its own transaction is a reasonable implementation
+   choice but not a hard requirement.
+
+## Key files
+
+- `src/modules/media/infrastructure/persistence/prisma-media.repository.ts` — repository /
+  `toEntity` / P2025-catch shape to mirror for `prisma-content-type.repository.ts`.
+- `src/modules/media/presentation/media.controller.ts`, `src/modules/media/media.module.ts` —
+  per-route `@UseGuards(JwtAuthGuard, PermissionsGuard)` + `@RequirePermissions(...)` controller
+  pattern, and `{ provide: TOKEN, useClass: ... }` + `exports` module-wiring pattern, copied for
+  both new modules.
+- `src/bootstrap/seed-default-data.service.ts` + `.spec.ts` — additive, `findBySlug`-idempotent
+  permission/role seeding; the exact order-sensitive `toHaveBeenCalledTimes`/`toEqual` assertions
+  that need updating (mirrors how `media:manager`/`media:read` were added last cycle).
+- `src/prisma/application/prisma.service.ts`, `src/prisma/prisma.module.ts` — `@Global()`
+  `PrismaService` (`PrismaClient` + `@prisma/adapter-pg`), what all raw SQL and the new
+  `$transaction` usage builds on. **Zero prior raw-SQL usage anywhere in `src`** — this feature is
+  the first; Phase 1 exists specifically to build the injection-safety foundation before any DDL/
+  DML code touches a real query.
+- `src/config/env.validation.ts:63-65` — `CONTENT_TYPES_DIR: string = "content-types"` already
+  exists (added early in repo history, unused until now) — no new env var needed.
+- `test/utils/app-test.util.ts`, `test/media.e2e-spec.ts` — `bootTestApp`, the direct-`User`-row +
+  `JwtTokenService.signAccessToken(...)` JWT shortcut (no real register/login HTTP round trip),
+  cookie-based `access_token` auth, `runId = randomUUID().slice(0,8)` test isolation — reused for
+  the Phase 11 e2e suite.
+- `covert/content-type/cv-page.json`, `covert/content-type/en-it-vocab.json` — the two seeds to
+  adopt (each gets `"draftToPublish": true` added at the root).
+
+## Confirmed decisions (resolved with the user during Spec + this Plan phase)
+
+1. **Storage**: per-content-type dynamic Postgres tables (`documents_<slug>`,
+   `components_<slug>__<path>`) via raw SQL, mirroring the Go reference's approach — not a single
+   shared JSON-column table. PostgreSQL-only; `prisma/mysql`/`prisma/sqlite` stay untouched empty
+   stubs.
+2. **v1 scope**: full reference parity minus locale. Bulk create+publish, bulk delete, search
+   (`?search=`), dynamic sort allowlist (`?orderBy=`/`?sortDir=`), and pagination are all in scope.
+   `locale` is dropped everywhere (no column, no query param, no `/api/locales` route). REST-only
+   (no gRPC), API-only (no admin frontend exists in this repo).
+3. **Seed content types**: `covert/content-type/cv-page.json` and `.../en-it-vocab.json` are
+   adopted as the real, actual seed content types for this feature (not just reference material),
+   each with `"draftToPublish": true` added.
+4. **Schema-change reconciliation**: diff-based `ADD`/`DROP`/`ALTER COLUMN`, **never**
+   `DROP TABLE`+recreate — data for unchanged fields must survive a schema edit. An incompatible
+   `ALTER COLUMN ... TYPE` falls back to drop-old-column + add-new-column (that one field's data is
+   lost, everything else survives) with a `logger.warn` — matches SPEC §6.2's default; the
+   alternative (abort boot, demand manual migration) was considered and rejected as too disruptive
+   for v1.
+5. **Sync trigger**: automatic on every app boot (`OnApplicationBootstrap`, same hook
+   `SeedDefaultDataService` already uses) — safe because reconciliation is non-destructive per
+   decision 4.
+6. **`draftToPublish`** (new — not in the reference, where draft/publish is always on): a
+   root-level JSON boolean. `true` = two-row draft/publish workflow (Mode A, reference parity).
+   `false` = single live row, Save==Publish in one step, status short-circuits to `"published"`,
+   standalone publish/unpublish return `400` (Mode B). Table shape is identical in both modes —
+   only service-layer branching (`draft-publish.policy.ts`) differs. Both seeds use `true`.
+7. **Multi-table write atomicity**: wrapped in `prisma.$transaction` (this Plan phase's decision,
+   context above) rather than left non-transactional.
+8. **Permission slugs**: `content_type:read` (content-type structure is read-only via API —
+   preserved exactly from the reference's own boundary, no create/edit/delete route for schema
+   ever); `document:read`, `document:create`, `document:update`, `document:delete`,
+   `document:publish`, `document:unpublish`. `super_admin` gets all 7 (no single `document:manager`
+   slug exists, so super_admin is granted every write+read slug individually, consistent with how
+   it already gets every other module's full slug set); `admin` gets the two `:read` slugs
+   (`content_type:read`, `document:read`).
+9. **Route prefix**: this repo's own `/api/<resource>` convention, not the reference's
+   `/api/document-manager/...` — `/api/content-types`, `/api/documents/single-type/:slug`,
+   `/api/documents/collection-type/:slug`, `/api/public/documents/...`.
+10. **DDL-port placement**: `ISchemaTableRepository` (table create/alter/drop lifecycle) lives
+    entirely inside `content-type`, not on `IDocumentRepository` — keeps `document → content-type`
+    strictly one-way (SPEC §8.3).
+11. **Open JSON body validation**: no existing DTO precedent in this repo for
+    `Record<string, unknown>` bodies (every DTO here is flat and fully-typed). Thin `@IsObject()`
+    DTOs gate shape at the controller; real per-field validation happens in the application layer
+    against the resolved `ContentType.fields` schema.
+12. **Field-type → column mapping** deliberately deviates from the reference in 3 places:
+    `number → DOUBLE PRECISION` (not `REAL`, precision), `media → UUID REFERENCES
+    media_assets(document_id) ON DELETE SET NULL` (real FK — `media_assets` is Prisma-managed here,
+    unlike the reference), `json → JSONB` (not `TEXT` — queryable/indexable).
+13. **Nested component tables** extend the reference (which only documented single-level component
+    tables) to handle the seeds' real 3-level nesting: `components_<slug>__<path_underscored>`,
+    linked via `parent_component_id` (no hard FK — enforced in code, not SQL, since parent/child
+    live in separately-created dynamic tables), with deterministic hash-truncation if a derived
+    name would exceed Postgres's 63-byte identifier limit.
+
+## Tasks
+
+### Phase 0 — Prisma model + migration + dir scaffold
+
+- [ ] `prisma/postgresql/schema.prisma` — add `ContentType` model verbatim from SPEC §5.1
+      (`content_types` table: `documentId @id @default(uuid())`, `slug @unique`, `name`, `kind`,
+      `draftToPublish Boolean @map("draft_to_publish")`, `fields Json`,
+      `listFields Json @map("list_fields")`, timestamps). Do **not** touch `prisma/mysql`/
+      `prisma/sqlite`.
+- [ ] `bun run prisma:migrate` — name it `add_content_types`; writes
+      `prisma/postgresql/migrations/<timestamp>_add_content_types/`. **Needs a reachable
+      Postgres** — if unreachable, flag as a blocked user action (non-blocking for Phases 1–2's
+      pure work, same posture as the media cycle's Phase 0).
+- [ ] `bun run prisma:generate` — `ContentType` present in `src/prisma/application/client/`
+      (generate only reads the schema file, no DB connection needed).
+- [ ] **Checkpoint 0:** `bun run build` succeeds with `ContentType` in the generated client.
+
+### Phase 1 — SQL foundations (pure, no DB, highest-risk-first)
+
+- [ ] `content-type/domain/entities/field-definition.ts` — `ContentKind`, `FieldType`, recursive
+      `FieldDefinition`, `isComponentField` type guard (SPEC §4.1 verbatim).
+- [ ] `content-type/application/schema/sql-identifier.ts` + spec — `assertSafeSlug`
+      (`^[a-z0-9]+(?:-[a-z0-9]+)*$`, len 1–53), `assertSafeFieldName`
+      (`^[a-zA-Z][a-zA-Z0-9]*$`, len 1–53), `quoteIdent` (assert-then-double-quote, escape embedded
+      `"`). Spec adversarially: `slug; DROP TABLE`, empty, over-length, leading-digit field name,
+      hyphenated field name, unicode, embedded-quote round-trip. **This is the single choke-point
+      every DDL/DML string must pass through — build and test it before anything else.**
+- [ ] `content-type/application/schema/table-naming.ts` + spec — `documentTableName(slug)` →
+      `documents_<slug_underscored>`; `componentTableName(slug, path[])` →
+      `components_<slug>__<path_underscored>` with deterministic hash-truncation past 63 bytes
+      (`components_<slug>__<truncated>_<hash8>`). Spec: both seeds' real paths (`experience_role`,
+      `phonetic_syllablePart`) produce the expected names; a synthetic 80-char path truncates
+      stably across two calls (same input → same output).
+- [ ] `content-type/application/schema/field-type-mapping.ts` + spec — pure `columnTypeFor(field):
+      string` per the mapping in Confirmed Decision 12. Spec asserts each `FieldType` mapping and
+      that `component` yields no column.
+- [ ] **Checkpoint 1:** `bun run test content-type/application/schema` and
+      `bun run test field-definition` green; `bun run build` clean.
+
+### Phase 2 — Content-type domain + loader/validator/differ (pure/fs, no DB)
+
+- [ ] `content-type/domain/entities/content-type.entity.ts` — `ContentTypeEntity` (SPEC §4.1) +
+      `ContentTypeDefinition`/`ContentTypeSummary` types.
+- [ ] `content-type/domain/repositories/content-type.repository.ts` — `IContentTypeRepository` +
+      `UpsertContentTypeData` + `CONTENT_TYPE_REPOSITORY` token + `ContentTypeNotFoundError` (SPEC
+      §8.1/§11 verbatim).
+- [ ] `content-type/domain/repositories/schema-table.repository.ts` — `ISchemaTableRepository` +
+      `SCHEMA_TABLE_REPOSITORY` token + `ColumnDiffPlan`/`LiveColumn` types (SPEC §8.2).
+- [ ] `content-type/application/schema/schema-validator.ts` + spec — pure: runs
+      `assertSafeSlug`/`assertSafeFieldName` recursively over slug/field/component names;
+      `listFields` references real fields; reserved-name checks against system columns
+      (`id`/`document_id`/`version`/`created_at`/`updated_at`/`published_at`/`created_by`/
+      `updated_by`/`published_by`); recursive component validation. Spec: both seeds' 3-level
+      shapes validate cleanly; bad slug/field/component name → throw; `listFields` unknown
+      reference → throw.
+- [ ] `content-type/application/schema/schema-loader.service.ts` + spec — reads
+      `CONTENT_TYPES_DIR` (`ConfigService.get("CONTENT_TYPES_DIR", { infer: true })` →
+      `path.join(process.cwd(), dir)`), globs `*.json`, parses, applies the `listFields` default
+      (first 3 field names when omitted), calls the validator. Spec: valid dir → correct
+      `ContentTypeDefinition[]`; malformed JSON → throw; missing dir → decide behavior (empty list
+      vs throw) and test it.
+- [ ] `content-type/application/sync/schema-differ.ts` + spec — **pure**
+      `(liveColumns: LiveColumn[], desiredFields: FieldDefinition[]) → ColumnDiffPlan`
+      (`addColumns`/`dropColumns`/`retypeColumns`) plus component-table add/drop plans; never
+      diffs/drops system columns. Spec (the data-loss guardrail): field added → `addColumns`;
+      field removed → `dropColumns` (other columns untouched in the plan); type changed →
+      `retypeColumns` with a safe cast, incompatible → flagged drop+add; component field
+      added/removed → table create/drop plan; identical schema → empty plan (no spurious diffs).
+- [ ] **Checkpoint 2:** `bun run test content-type` (excluding not-yet-written persistence) green;
+      `bunx tsc --noEmit` clean.
+
+### Phase 3 — Content-type persistence (first DB-touching code)
+
+- [ ] `content-type/infrastructure/persistence/prisma-content-type.repository.ts` + spec —
+      `IContentTypeRepository` over Prisma `content_types`, mirroring
+      `prisma-media.repository.ts`'s `toEntity` mapper + P2025-catch-on-delete shape. `fields`/
+      `listFields` Json columns cast to typed arrays in `toEntity`. `findAllSummaries` selects only
+      `name`/`slug`/`kind`/`draftToPublish`. Spec mocks `PrismaService`.
+- [ ] `content-type/infrastructure/persistence/prisma-schema-table.repository.ts` + spec —
+      `ISchemaTableRepository` via `$executeRawUnsafe`/`$queryRawUnsafe`. **Every identifier goes
+      through `quoteIdent`/`table-naming`; every value is parameterized; `information_schema.
+      columns` introspection for `listDocumentColumns`/`listComponentColumns` uses bound params,
+      never interpolation.** Emits: document-table DDL (SPEC §7.2), component-table DDL including
+      `parent_component_id` + indexes (SPEC §7.3), `ADD`/`DROP`/`ALTER COLUMN`, `DROP TABLE`
+      cascading through component tables first. Spec (mocked prisma): assert the exact generated
+      SQL strings for create/alter/drop, assert every identifier is quoted, assert
+      `information_schema` queries use bound parameters. **Tightest spec in this plan — this file
+      carries the most injection risk and the least prior art in this codebase.**
+- [ ] **Checkpoint 3:** `bun run test content-type/infrastructure` green; `bun run build` clean.
+
+### Phase 4 — Content-type sync + services + controller + module (commit point)
+
+- [ ] `content-type/application/sync/content-type-sync.service.ts` + spec — `implements
+      OnApplicationBootstrap`; orchestrates load → for each definition, diff live-vs-desired via
+      `schema-differ` → apply DDL via `ISchemaTableRepository` → upsert the `ContentType` row via
+      `IContentTypeRepository`; handles deletions (slug in DB, no matching file → delete the row +
+      drop tables, cascading component tables). Recurses into nested components. Spec (mocked
+      ports): new file → create table + component tables + insert row; changed file → alter +
+      update row; deleted file → delete row + drop tables; malformed definition → throw loudly (the
+      app must not boot with an un-syncable definition).
+- [ ] `content-type/application/services/list-content-type.service.ts` + spec — returns
+      `ContentTypeSummary[]`.
+- [ ] `content-type/application/services/get-content-type.service.ts` + spec — full entity by
+      slug; `ContentTypeNotFoundError` → `NotFoundException`. **Exported for the document module.**
+- [ ] `content-type/presentation/content-type.controller.ts` + spec — `@Controller(
+      "/api/content-types")`, `GET /` + `GET /:slug`, per-route `@UseGuards(JwtAuthGuard,
+      PermissionsGuard)` + `@RequirePermissions("content_type:read")`, slug validated (400 on
+      invalid format). **Read-only — no write routes, ever** (Confirmed Decision 8/boundary).
+- [ ] `content-type/content-type.module.ts` (+ module spec, mirroring `media.module.spec.ts`) —
+      binds `{ provide: CONTENT_TYPE_REPOSITORY, useClass: PrismaContentTypeRepository }`,
+      `{ provide: SCHEMA_TABLE_REPOSITORY, useClass: PrismaSchemaTableRepository }`, all services +
+      the sync service; **exports `GetContentTypeService` + `CONTENT_TYPE_REPOSITORY`**.
+- [ ] `src/app.module.ts` — insert `ContentTypeModule` into the imports array (before `SeedModule`,
+      after `MediaModule`).
+- [ ] **Checkpoint 4 (automated):** `bun run build`, `bunx tsc --noEmit`, `bunx eslint .`,
+      `bun run test content-type` all green — **commit here**. Content-type sync creating real
+      tables is only observable against real Postgres, proven at Phase 11 — unit level is fully
+      green at this point regardless.
+
+### Phase 5 — Document domain + SQL helpers + raw DML repos
+
+- [ ] `document/domain/entities/document.entity.ts` — `DocumentEntity`, `DocumentVersion`,
+      `DocumentStatus` (SPEC §4.2).
+- [ ] `document/domain/entities/component.entity.ts` — `ComponentEntity` including
+      `parentComponentId` + `children` (SPEC §4.3).
+- [ ] `document/domain/repositories/document.repository.ts` — `IDocumentRepository` +
+      `DOCUMENT_REPOSITORY` + `ListOptions` (SPEC §8.4, row-level DML only). Every mutating method
+      (`upsert`, `deleteAllVersions`, `deleteVersion`) takes an optional trailing
+      `tx?: Prisma.TransactionClient` parameter per Confirmed Decision 7.
+- [ ] `document/domain/repositories/component.repository.ts` — `IComponentRepository` +
+      `COMPONENT_REPOSITORY` (SPEC §8.5). Same `tx?` parameter on `upsertAll`/`deleteByDocument`.
+- [ ] `document/infrastructure/persistence/sql/row-mapper.ts` + spec — raw row ⇆ typed field map
+      using `FieldDefinition` + `field-type-mapping`; handles `JSONB`, `media` UUID,
+      `DOUBLE PRECISION`, `BOOLEAN`. Pure.
+- [ ] `document/infrastructure/persistence/sql/where-builder.ts` + spec — builds the `ILIKE` search
+      clause (escaping `%`/`_`/`\` with `ESCAPE '\'`, OR'd across searchable `text`/`richtext`
+      `listFields`) + `ORDER BY` clause from the schema allowlist (system fields plus any
+      `text`/`number`/`boolean` content field); re-validates `orderBy`/`search` column names against
+      the allowlist immediately before interpolation as defence-in-depth; invalid → throw (→ 400 at
+      the controller). Pure.
+- [ ] `document/infrastructure/persistence/prisma-document.repository.ts` + spec — raw
+      parameterized SQL over `documents_<slug>` implementing every `IDocumentRepository` method;
+      `findManyByVersion` batches for no-N+1 status computation; `listPaginated` uses
+      `where-builder`; every mutating method executes via `(tx ?? this.prisma)`. Spec mocks prisma,
+      asserts SQL text + parameter bindings, and asserts the `tx` client is used when supplied.
+- [ ] `document/infrastructure/persistence/prisma-component.repository.ts` + spec — raw SQL over
+      `components_<slug>__<path>` (SPEC §8.5); ordering by autoincrement `id`; same `tx ??
+      this.prisma` pattern. Spec mocks prisma.
+- [ ] **Checkpoint 5:** `bun run test document/infrastructure` green; `bun run build` clean.
+
+### Phase 6 — Document support layer
+
+- [ ] `document/application/support/schema-resolver.service.ts` + spec — resolves `:slug →
+      ContentTypeEntity` via the injected `GetContentTypeService`; unknown slug → 404. The one
+      place the `document → content-type` module edge is actually exercised at runtime.
+- [ ] `document/application/support/draft-publish.policy.ts` + spec — pure; centralizes every
+      mode-specific branch on `contentType.draftToPublish` (Confirmed Decision 6): which version
+      Save writes to, whether publish/unpublish is allowed.
+- [ ] `document/application/support/status-resolver.ts` + spec — pure; `draftToPublish === false`
+      → `"published"` short-circuit (no timestamp comparison); else draft/modified/published by
+      comparing `draft.updatedAt` vs `published.updatedAt`; a **batch variant** for list responses
+      (fetch all published rows for the page's documentIds in one query, compute in memory — no
+      N+1, a hard boundary carried from the reference).
+- [ ] `document/application/support/component-io.service.ts` + spec — recursive extract-on-save /
+      hydrate-on-read / cascade-delete across nested component tables; threads the optional `tx`
+      client through to `IComponentRepository` calls; maintains `parentComponentId` linkage and
+      insertion order. Spec covers the full 3-level shapes from both real seeds (`cv-page`:
+      `experiences → roles`; `en-it-vocab`: `phonetics → syllableParts`), order preservation, and
+      cascade-on-delete. **Highest data-integrity risk in the document module.**
+- [ ] `document/application/support/list-query.parser.ts` + spec — pure; parses/validates
+      `start`/`size` (≤100, else 400)/`orderBy`/`sortDir`/`search` against the resolved content
+      type's schema, producing `ListOptions`.
+- [ ] **Checkpoint 6:** `bun run test document/application/support` green; `bunx tsc --noEmit`
+      clean.
+
+### Phase 7 — Document collection services
+
+- [ ] `save-document.service.ts` + spec — create-or-update. Mode A: upserts the draft row inside a
+      `prisma.$transaction`, delegating component subtrees to `component-io` with the `tx` client.
+      Mode B: upserts the single live row (sets `publishedAt`/`publishedBy` too), same transaction
+      wrapping. Generates a UUID v4 `documentId` when absent.
+- [ ] `publish-document.service.ts` + spec — Mode A: copies draft → published (document row +
+      components) inside a transaction. **Mode B: throws `BadRequestException` via
+      `draft-publish.policy`, no repo call.**
+- [ ] `unpublish-document.service.ts` + spec — Mode A: deletes the published row + its components
+      inside a transaction. **Mode B: 400.**
+- [ ] `get-document-for-edit.service.ts` + spec — returns draft (A) / live (B) + computed status.
+- [ ] `get-public-document.service.ts` + spec — published row only; 404 if none; never leaks draft
+      data.
+- [ ] `delete-document.service.ts` + spec — deletes all versions + cascades all component rows,
+      inside a transaction.
+- [ ] `list-documents.service.ts` + spec — paginated, projected to `listFields`, batch status
+      (no N+1), `total`, search/sort via `where-builder`/`list-query.parser`.
+- [ ] `duplicate-document.service.ts` + spec — copies the source draft (A) / live (B) into a fresh
+      `documentId`; media refs shared (same UUIDs, no re-upload).
+- [ ] **Checkpoint 7:** `bun run test document/application/services` (collection subset) green.
+
+### Phase 8 — Bulk + single-type services
+
+- [ ] `bulk-create-publish.service.ts` + spec — ≤100 items (400 if 0 or >100). Sequential
+      Save→Publish (Mode A) / Save (Mode B) per item. **All-or-nothing via compensating `Delete`**
+      on the first failure — not a DB transaction across items (each item's own Save/Publish is
+      still internally transactional per Phase 7, but the batch-level rollback stays the
+      reference's compensating-delete approach, since a single cross-item DB transaction would
+      hold a lot of locks across up to 100 create+publish cycles). Spec: all-valid ordering;
+      mid-batch Save failure rolls back all prior items; a Publish failure rolls back the current
+      item too, not just prior ones.
+- [ ] `bulk-delete.service.ts` + spec — ≤100 IDs. Loops the existing `Delete` service independently
+      per ID; **partial success, no rollback**; returns `[{ documentId, error? }]`. Spec: all
+      succeed; one fails and the rest still process; all fail; empty slice returns empty results
+      without panicking.
+- [ ] `get-single-type.service.ts` + spec — draft/live + status; 404 if none exists.
+- [ ] `save-single-type.service.ts` + spec — create-or-update the singleton (no `:documentId`),
+      same transaction wrapping as `save-document.service.ts`.
+- [ ] `publish-single-type.service.ts` + spec — Mode A only; **Mode B: 400.**
+- [ ] `unpublish-single-type.service.ts` + spec — Mode A only; **Mode B: 400.**
+- [ ] **Checkpoint 8:** `bun run test document/application/services` (full) green; `bun run build`
+      clean.
+
+### Phase 9 — Document presentation + DTOs + module wiring
+
+- [ ] `document/presentation/dto/save-document.dto.ts` — `{ data: Record<string, unknown> }`,
+      `@IsObject()` on `data` (shape-gate only; real validation is in the application layer per
+      Confirmed Decision 11).
+- [ ] `bulk-create.dto.ts` — `{ items: { data: Record<string,unknown> }[] }`, `@ArrayMinSize(1)`
+      `@ArrayMaxSize(100)`.
+- [ ] `bulk-delete.dto.ts` — `{ documentIds: string[] }`, `@ArrayMinSize(1)` `@ArrayMaxSize(100)`.
+- [ ] `list-query.dto.ts` — `start`/`size`/`orderBy`/`sortDir`/`search` query params.
+- [ ] `single-type-document.controller.ts` + spec — `@Controller("/api/documents/single-type")`;
+      GET/PUT/publish/unpublish; per-route guards + permissions per SPEC §10.2; slug 400 on
+      invalid.
+- [ ] `collection-type-document.controller.ts` + spec — `@Controller(
+      "/api/documents/collection-type")`; **the two `/bulk` routes declared before `/:documentId`
+      routes** (or Nest captures `"bulk"` as a `documentId` — SPEC §10.3's documented footgun);
+      list/get/create/update/delete/publish/unpublish/duplicate/bulk; bulk-create requires
+      `document:create` **and** `document:publish` (chained guards); slug + documentId (UUID v4)
+      400 on invalid.
+- [ ] `public-document.controller.ts` + spec — `@Controller("/api/public/documents")`; **no
+      guards**; `GET collection-type/:slug/:documentId` + `GET single-type/:slug`; published data
+      only.
+- [ ] `document/document.module.ts` — `imports: [ContentTypeModule]`; binds
+      `DOCUMENT_REPOSITORY`/`COMPONENT_REPOSITORY`; wires every service + all three controllers.
+- [ ] `src/app.module.ts` — add `DocumentModule` (after `ContentTypeModule`, before `SeedModule`).
+- [ ] **Checkpoint 9:** `bun run build`, `bunx tsc --noEmit`, `bunx eslint .`,
+      `bun run test document` all green.
+
+### Phase 10 — Seed permissions + seed JSON (commit point)
+
+- [ ] `src/bootstrap/seed-default-data.service.ts` — append 7 slugs to `DEFAULT_PERMISSIONS`:
+      `content_type:read`, `document:read`, `document:create`, `document:update`,
+      `document:delete`, `document:publish`, `document:unpublish`. Grant all 7 to
+      `super_admin.permissions`; grant `content_type:read` + `document:read` to
+      `admin.permissions` (Confirmed Decision 8). Additive, `findBySlug`-guarded — same pattern as
+      every prior module's addition.
+- [ ] `src/bootstrap/seed-default-data.service.spec.ts` — update
+      `expect(permissions.create).toHaveBeenCalledTimes(N)` (10 → 17), the ordered `createdSlugs`
+      array (append the 7 in declaration order), the partial-seed count (9 → 16), and the
+      `superAdminCall.permissions`/`adminCall.permissions` `toEqual` arrays and their test
+      descriptions (mirroring how `media:manager`/`media:read` were added last cycle).
+- [ ] `content-types/cv-page.json` — adopt `covert/content-type/cv-page.json` verbatim plus
+      `"draftToPublish": true` at the root. No `listFields` override needed (defaults to first 3:
+      `position`, `isMain`, `company`).
+- [ ] `content-types/en-it-vocab.json` — adopt `covert/content-type/en-it-vocab.json` verbatim plus
+      `"draftToPublish": true`. Defaults `listFields` to `wordGroup`, `word`, `partsOfSpeech`.
+- [ ] **Checkpoint 10 (automated):** `bun run build`, `bunx tsc --noEmit`, `bunx eslint .`,
+      `bun run test:cov` all green — **commit here**. This is the full feature at unit level;
+      Phase 11's DB-dependent work doesn't block this commit (same rule as the media cycle).
+
+### Phase 11 — e2e (real Postgres, manual/flagged if unreachable)
+
+- [ ] `test/content-engine.e2e-spec.ts` — reuse `bootTestApp`; create `User` rows directly via
+      `PrismaService`, sign JWTs via `JwtTokenService.signAccessToken({ sub, roleSlug, level,
+      permissions })`, send as `Cookie: access_token=...`; `runId` suffix for isolation; delete
+      created rows **and drop the seeded dynamic tables** in `afterAll`. Scenarios (SPEC §13/§14):
+      boot sync materializes `documents_cv_page`/`documents_en_it_vocab` + their nested component
+      tables; full create→publish→public-read path (Mode A, both seeds are Mode A); publish on
+      a hypothetical Mode-B type → 400 (can use a throwaway third content-type JSON just for this
+      test, or a unit-level proof if a real Mode-B e2e fixture is too heavy — decide at
+      implementation time); 401 unauthenticated; 403 under-permissioned; bulk create+publish +
+      bulk delete happy/partial paths; 3-level component round-trip with order preserved; schema
+      edit (add/remove a field on a throwaway content type) + reboot-equivalent re-sync call
+      preserves other fields' data.
+- [ ] **Checkpoint 11 (manual, needs reachable Postgres):** `bun run test:e2e` green. As with the
+      media cycle, a pre-existing dev DB may have `super_admin`/`admin` roles predating the 7 new
+      slugs — grant via real `PUT /api/roles/:id` calls if so (expected, not a defect). The commit
+      is already taken at Checkpoint 10 — don't hold it open waiting on this.
+
+### Phase 12 — Docs
+
+- [ ] `docs/documents/content-type.md` — mirror `docs/documents/media.md`'s structure for the
+      content-type module.
+- [ ] `docs/documents/document.md` — same, for the document module (entity, repos, services,
+      draft/publish modes, API contracts, boundaries, known gaps).
+- [ ] `docs/ENTRYPOINT.md` — add the two new index lines.
+- [ ] `SPEC.md` — trim to a pointer line, per the "Root docs" rule.
+- [ ] **Checkpoint 12:** doc read-through — commit.
+
+## Verification (end-to-end)
+
+1. `bun run build && bunx tsc --noEmit && bunx eslint . && bun run test:cov` — all green through
+   Phase 10, no DB required.
+2. `bun run test:e2e` — `content-engine.e2e-spec.ts` green against real Postgres: sync creates real
+   tables on boot, Mode-A draft/publish lifecycle, bulk semantics, 3-level component round-trip,
+   diff-based schema reconciliation preserves data.
+3. No test performs a real external network call (this feature has no external service dependency,
+   unlike media/storage).
+4. Manual (Phase 11, user-performed if no e2e Postgres is available in this environment): confirm
+   the e2e suite against the user's own reachable Postgres, same pattern as the media cycle's
+   Checkpoint 5.
