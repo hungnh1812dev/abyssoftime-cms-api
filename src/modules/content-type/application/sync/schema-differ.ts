@@ -77,7 +77,7 @@ function pathKey(path: string[]): string {
   return path.join("/");
 }
 
-function collectComponentPaths(fields: FieldDefinition[], prefix: string[] = []): string[][] {
+export function collectComponentPaths(fields: FieldDefinition[], prefix: string[] = []): string[][] {
   const paths: string[][] = [];
 
   for (const field of fields) {
