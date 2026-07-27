@@ -96,7 +96,7 @@ describe("Content engine (e2e)", () => {
 
     // A pre-existing dev DB may have super_admin/admin roles predating the 7 permission slugs
     // this feature adds (SeedDefaultDataService only creates missing roles/permissions, it never
-    // patches an existing role's permissions array). Grant the gap via a real PUT /api/roles/:id
+    // patches an existing role's permissions array). Grant the gap via a real PUT /api/v1/roles/:id
     // call, same expected pattern as the media cycle's Checkpoint 5. `role:manager` (needed to
     // call that route) is part of super_admin's original permission set, predating this feature,
     // so bootstrap every grant off super_admin's own current permissions (never the target
@@ -119,7 +119,7 @@ describe("Content engine (e2e)", () => {
       }
 
       await request(app.getHttpServer())
-        .put(`/api/roles/${role.documentId}`)
+        .put(`/api/v1/roles/${role.documentId}`)
         .set("Cookie", [`access_token=${bootstrapToken}`])
         .send({ permissions: [...permissions, ...missing] })
         .expect(200);
@@ -197,12 +197,12 @@ describe("Content engine (e2e)", () => {
 
     for (const documentId of pendingCleanupCvPageIds) {
       await request(app.getHttpServer())
-        .delete(`/api/documents/collection-type/cv-page/${documentId}`)
+        .delete(`/api/v1/documents/collection-type/cv-page/${documentId}`)
         .set("Cookie", [`access_token=${superAdminToken}`]);
     }
     for (const documentId of pendingCleanupVocabIds) {
       await request(app.getHttpServer())
-        .delete(`/api/documents/collection-type/en-it-vocab/${documentId}`)
+        .delete(`/api/v1/documents/collection-type/en-it-vocab/${documentId}`)
         .set("Cookie", [`access_token=${superAdminToken}`]);
     }
 
@@ -226,9 +226,9 @@ describe("Content engine (e2e)", () => {
       expect(vocabTable[0].reg).toBe("documents_en_it_vocab");
     });
 
-    it("lists both seeds via GET /api/content-types", async () => {
+    it("lists both seeds via GET /api/v1/content-types", async () => {
       const response = await request(app.getHttpServer())
-        .get("/api/content-types")
+        .get("/api/v1/content-types")
         .set("Cookie", [`access_token=${superAdminToken}`])
         .expect(200);
 
@@ -240,7 +240,7 @@ describe("Content engine (e2e)", () => {
   describe("mode-A full lifecycle (cv-page)", () => {
     it("walks create (draft) -> publish -> edit (modified) -> unpublish -> delete", async () => {
       const createResponse = await request(app.getHttpServer())
-        .post("/api/documents/collection-type/cv-page")
+        .post("/api/v1/documents/collection-type/cv-page")
         .set("Cookie", [`access_token=${superAdminToken}`])
         .send({ data: { position: "Engineer", isMain: true, company: `Acme-${runId}`, summary: "<p>Summary</p>" } })
         .expect(201);
@@ -248,53 +248,53 @@ describe("Content engine (e2e)", () => {
       pendingCleanupCvPageIds.add(documentId);
       expect((createResponse.body as DocumentResponseBody).data.status).toBe("draft");
 
-      await request(app.getHttpServer()).get(`/api/public/documents/collection-type/cv-page/${documentId}`).expect(404);
+      await request(app.getHttpServer()).get(`/api/v1/public/documents/collection-type/cv-page/${documentId}`).expect(404);
 
       await request(app.getHttpServer())
-        .post(`/api/documents/collection-type/cv-page/${documentId}/publish`)
+        .post(`/api/v1/documents/collection-type/cv-page/${documentId}/publish`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .expect(200, { status: "published" });
 
-      const publicAfterPublish = await request(app.getHttpServer()).get(`/api/public/documents/collection-type/cv-page/${documentId}`).expect(200);
+      const publicAfterPublish = await request(app.getHttpServer()).get(`/api/v1/public/documents/collection-type/cv-page/${documentId}`).expect(200);
       expect((publicAfterPublish.body as DocumentResponseBody).data.company).toBe(`Acme-${runId}`);
 
       const editAfterPublish = await request(app.getHttpServer())
-        .get(`/api/documents/collection-type/cv-page/${documentId}`)
+        .get(`/api/v1/documents/collection-type/cv-page/${documentId}`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .expect(200);
       expect((editAfterPublish.body as DocumentResponseBody).data.status).toBe("published");
 
       await request(app.getHttpServer())
-        .put(`/api/documents/collection-type/cv-page/${documentId}`)
+        .put(`/api/v1/documents/collection-type/cv-page/${documentId}`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .send({ data: { position: "Senior Engineer", isMain: true, company: `Acme-${runId}`, summary: "<p>Updated</p>" } })
         .expect(200);
 
       const editAfterUpdate = await request(app.getHttpServer())
-        .get(`/api/documents/collection-type/cv-page/${documentId}`)
+        .get(`/api/v1/documents/collection-type/cv-page/${documentId}`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .expect(200);
       expect((editAfterUpdate.body as DocumentResponseBody).data.status).toBe("modified");
       expect((editAfterUpdate.body as DocumentResponseBody).data.position).toBe("Senior Engineer");
 
-      const publicBeforeUnpublish = await request(app.getHttpServer()).get(`/api/public/documents/collection-type/cv-page/${documentId}`).expect(200);
+      const publicBeforeUnpublish = await request(app.getHttpServer()).get(`/api/v1/public/documents/collection-type/cv-page/${documentId}`).expect(200);
       expect((publicBeforeUnpublish.body as DocumentResponseBody).data.position).toBe("Engineer");
 
       await request(app.getHttpServer())
-        .post(`/api/documents/collection-type/cv-page/${documentId}/unpublish`)
+        .post(`/api/v1/documents/collection-type/cv-page/${documentId}/unpublish`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .expect(200, { status: "draft" });
 
-      await request(app.getHttpServer()).get(`/api/public/documents/collection-type/cv-page/${documentId}`).expect(404);
+      await request(app.getHttpServer()).get(`/api/v1/public/documents/collection-type/cv-page/${documentId}`).expect(404);
 
       await request(app.getHttpServer())
-        .delete(`/api/documents/collection-type/cv-page/${documentId}`)
+        .delete(`/api/v1/documents/collection-type/cv-page/${documentId}`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .expect(204);
       pendingCleanupCvPageIds.delete(documentId);
 
       await request(app.getHttpServer())
-        .get(`/api/documents/collection-type/cv-page/${documentId}`)
+        .get(`/api/v1/documents/collection-type/cv-page/${documentId}`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .expect(404);
     });
@@ -303,7 +303,7 @@ describe("Content engine (e2e)", () => {
   describe("3-level component round-trip (cv-page)", () => {
     it("preserves nested repeatable components and their order through save -> publish -> read", async () => {
       const createResponse = await request(app.getHttpServer())
-        .post("/api/documents/collection-type/cv-page")
+        .post("/api/v1/documents/collection-type/cv-page")
         .set("Cookie", [`access_token=${superAdminToken}`])
         .send({
           data: {
@@ -339,12 +339,12 @@ describe("Content engine (e2e)", () => {
       pendingCleanupCvPageIds.add(documentId);
 
       await request(app.getHttpServer())
-        .post(`/api/documents/collection-type/cv-page/${documentId}/publish`)
+        .post(`/api/v1/documents/collection-type/cv-page/${documentId}/publish`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .expect(200, { status: "published" });
 
       const response = await request(app.getHttpServer())
-        .get(`/api/documents/collection-type/cv-page/${documentId}`)
+        .get(`/api/v1/documents/collection-type/cv-page/${documentId}`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .expect(200);
 
@@ -368,23 +368,23 @@ describe("Content engine (e2e)", () => {
   describe("mode-B behavior (draftToPublish: false)", () => {
     it("is immediately public on create, and publish/unpublish return 400", async () => {
       const createResponse = await request(app.getHttpServer())
-        .post(`/api/documents/collection-type/${modeBSlug}`)
+        .post(`/api/v1/documents/collection-type/${modeBSlug}`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .send({ data: { title: "Instant" } })
         .expect(201);
       const documentId = (createResponse.body as DocumentResponseBody).data.documentId;
       expect((createResponse.body as DocumentResponseBody).data.status).toBe("published");
 
-      const publicResponse = await request(app.getHttpServer()).get(`/api/public/documents/collection-type/${modeBSlug}/${documentId}`).expect(200);
+      const publicResponse = await request(app.getHttpServer()).get(`/api/v1/public/documents/collection-type/${modeBSlug}/${documentId}`).expect(200);
       expect((publicResponse.body as DocumentResponseBody).data.title).toBe("Instant");
 
       await request(app.getHttpServer())
-        .post(`/api/documents/collection-type/${modeBSlug}/${documentId}/publish`)
+        .post(`/api/v1/documents/collection-type/${modeBSlug}/${documentId}/publish`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .expect(400);
 
       await request(app.getHttpServer())
-        .post(`/api/documents/collection-type/${modeBSlug}/${documentId}/unpublish`)
+        .post(`/api/v1/documents/collection-type/${modeBSlug}/${documentId}/unpublish`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .expect(400);
     });
@@ -393,7 +393,7 @@ describe("Content engine (e2e)", () => {
   describe("schema-edit data preservation", () => {
     it("preserves untouched columns and drops/adds columns after a re-sync (reboot-equivalent)", async () => {
       const createResponse = await request(app.getHttpServer())
-        .post(`/api/documents/collection-type/${schemaEditSlug}`)
+        .post(`/api/v1/documents/collection-type/${schemaEditSlug}`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .send({ data: { title: "Keep me", note: "Drop me" } })
         .expect(201);
@@ -403,7 +403,7 @@ describe("Content engine (e2e)", () => {
       await syncService.sync([...realDefs, modeBDef(), schemaEditDefV2()]);
 
       const afterEdit = await request(app.getHttpServer())
-        .get(`/api/documents/collection-type/${schemaEditSlug}/${documentId}`)
+        .get(`/api/v1/documents/collection-type/${schemaEditSlug}/${documentId}`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .expect(200);
       expect((afterEdit.body as DocumentResponseBody).data.title).toBe("Keep me");
@@ -411,7 +411,7 @@ describe("Content engine (e2e)", () => {
       expect((afterEdit.body as DocumentResponseBody).data.extra).toBeNull();
 
       const newDocResponse = await request(app.getHttpServer())
-        .post(`/api/documents/collection-type/${schemaEditSlug}`)
+        .post(`/api/v1/documents/collection-type/${schemaEditSlug}`)
         .set("Cookie", [`access_token=${superAdminToken}`])
         .send({ data: { title: "New", extra: 42 } })
         .expect(201);
@@ -423,7 +423,7 @@ describe("Content engine (e2e)", () => {
   describe("bulk create+publish and bulk delete (en-it-vocab)", () => {
     it("creates+publishes a batch, then deletes it with one bogus id (partial success, no rollback)", async () => {
       const bulkCreateResponse = await request(app.getHttpServer())
-        .post("/api/documents/collection-type/en-it-vocab/bulk")
+        .post("/api/v1/documents/collection-type/en-it-vocab/bulk")
         .set("Cookie", [`access_token=${superAdminToken}`])
         .send({
           items: [
@@ -444,7 +444,7 @@ describe("Content engine (e2e)", () => {
       const idsToDelete = [items[0].data.documentId, items[1].data.documentId, bogusId];
 
       const bulkDeleteResponse = await request(app.getHttpServer())
-        .delete("/api/documents/collection-type/en-it-vocab/bulk")
+        .delete("/api/v1/documents/collection-type/en-it-vocab/bulk")
         .set("Cookie", [`access_token=${superAdminToken}`])
         .send({ documentIds: idsToDelete })
         .expect(200);
@@ -460,19 +460,19 @@ describe("Content engine (e2e)", () => {
 
   describe("auth", () => {
     it("rejects an unauthenticated request with 401", async () => {
-      await request(app.getHttpServer()).get("/api/documents/collection-type/cv-page").expect(401);
+      await request(app.getHttpServer()).get("/api/v1/documents/collection-type/cv-page").expect(401);
     });
 
     it("rejects an under-permissioned request with 403", async () => {
       await request(app.getHttpServer())
-        .get("/api/documents/collection-type/cv-page")
+        .get("/api/v1/documents/collection-type/cv-page")
         .set("Cookie", [`access_token=${noPermToken}`])
         .expect(403);
     });
 
     it("rejects create for a read-only token with 403", async () => {
       await request(app.getHttpServer())
-        .post("/api/documents/collection-type/cv-page")
+        .post("/api/v1/documents/collection-type/cv-page")
         .set("Cookie", [`access_token=${readOnlyToken}`])
         .send({ data: { position: "X", isMain: false, company: "X" } })
         .expect(403);
