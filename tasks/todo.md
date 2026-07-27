@@ -78,13 +78,13 @@ See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
 
 ## Phase 8 — Bulk + single-type services
 
-- [ ] `bulk-create-publish.service.ts` + spec — compensating rollback
-- [ ] `bulk-delete.service.ts` + spec — partial success, no rollback
-- [ ] `get-single-type.service.ts` + spec
-- [ ] `save-single-type.service.ts` + spec — transactional
-- [ ] `publish-single-type.service.ts` + spec — mode B → 400
-- [ ] `unpublish-single-type.service.ts` + spec — mode B → 400
-- [ ] **Checkpoint 8:** all `document/application/services` specs green, build clean
+- [x] `bulk-create-publish.service.ts` + spec — compensating rollback
+- [x] `bulk-delete.service.ts` + spec — partial success, no rollback
+- [x] `get-single-type.service.ts` + spec
+- [x] `save-single-type.service.ts` + spec — transactional
+- [x] `publish-single-type.service.ts` + spec — mode B → 400
+- [x] `unpublish-single-type.service.ts` + spec — mode B → 400
+- [x] **Checkpoint 8:** all `document/application/services` specs green, build clean
 
 ## Phase 9 — Document presentation + DTOs + module wiring
 
