@@ -48,13 +48,11 @@ export class UserController {
   }
 
   @Put(":id")
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions("user:manager")
-  @ApiOperation({ summary: "Update a user" })
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Update a user's name/password — the caller's own record, or any user's if the caller holds user:manager" })
   @ApiResponse({ status: 200, type: UserResponseDto })
-  @ApiResponse({ status: 403, description: "Caller's role level doesn't outrank the target's role, or the target is being promoted to super_admin by a non-super_admin caller" })
+  @ApiResponse({ status: 403, description: "Caller is updating someone else's record without holding user:manager" })
   @ApiResponse({ status: 404, description: "User not found" })
-  @ApiResponse({ status: 409, description: "Email or username already in use by another user" })
   async update(@Param("id") documentId: string, @Body() dto: UpdateUserDto, @Req() req: AuthenticatedRequest): Promise<UserResponseDto> {
     const user = await this.updateUser.execute(documentId, dto, req.user);
     return UserResponseDto.fromEntity(user);
