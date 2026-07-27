@@ -108,10 +108,10 @@ See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
 
 ## Phase 11 — e2e (real Postgres, manual/flagged if unreachable)
 
-- [ ] `test/content-engine.e2e-spec.ts` — boot sync creates real tables; mode-A full lifecycle;
+- [x] `test/content-engine.e2e-spec.ts` — boot sync creates real tables; mode-A full lifecycle;
       mode-B 400 on publish; 401/403; bulk happy/partial; 3-level component round-trip; schema-edit
       data preservation
-- [ ] **Checkpoint 11:** `bun run test:e2e` green against reachable Postgres (grant the 7 new slugs
+- [x] **Checkpoint 11:** `bun run test:e2e` green against reachable Postgres (grant the 7 new slugs
       to pre-existing `super_admin`/`admin` roles via `PUT /api/roles/:id` if needed — same
       expected gap as the media cycle)
 

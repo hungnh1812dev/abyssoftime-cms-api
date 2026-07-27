@@ -1,6 +1,6 @@
 import { columnTypeFor } from "../../application/schema/field-type-mapping";
 import { quoteIdent } from "../../application/schema/sql-identifier";
-import { componentTableName, documentTableName } from "../../application/schema/table-naming";
+import { componentTableName, documentTableName, indexName } from "../../application/schema/table-naming";
 import { FieldDefinition, isComponentField } from "../../domain/entities/field-definition";
 import { ColumnDiffPlan, ISchemaTableRepository, LiveColumn } from "../../domain/repositories/schema-table.repository";
 
@@ -67,7 +67,7 @@ export class PrismaSchemaTableRepository implements ISchemaTableRepository {
       );
     `);
 
-    await this.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS ${quoteIdent(`${tableName}_document_id_idx`)} ON ${quotedTableName} (document_id);`);
+    await this.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS ${quoteIdent(indexName(tableName, "document_id_idx"))} ON ${quotedTableName} (document_id);`);
   }
 
   async alterDocumentTable(slug: string, plan: ColumnDiffPlan): Promise<void> {
@@ -103,8 +103,8 @@ export class PrismaSchemaTableRepository implements ISchemaTableRepository {
       );
     `);
 
-    await this.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS ${quoteIdent(`${tableName}_document_version_idx`)} ON ${quotedTableName} (document_id, version);`);
-    await this.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS ${quoteIdent(`${tableName}_parent_idx`)} ON ${quotedTableName} (parent_component_id);`);
+    await this.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS ${quoteIdent(indexName(tableName, "document_version_idx"))} ON ${quotedTableName} (document_id, version);`);
+    await this.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS ${quoteIdent(indexName(tableName, "parent_idx"))} ON ${quotedTableName} (parent_component_id);`);
   }
 
   async alterComponentTable(slug: string, componentPath: string[], plan: ColumnDiffPlan): Promise<void> {
