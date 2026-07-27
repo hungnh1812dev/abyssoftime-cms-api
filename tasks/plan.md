@@ -49,10 +49,19 @@ mapped from `sortableColumnsFor`'s existing columns:
   spec's literal wording, even though `id` is numeric
 - `document_id` system column → `$eq` `$ne` only (opaque UUID text, no coercion)
 - `created_at`/`updated_at`/`published_at` → `$eq` `$ne` `$gt` `$gte` `$lt` `$lte` (value validated
-  as a parseable date string via `new Date(value)`, bound as the original string — Postgres casts a
-  text parameter to `timestamptz` in a comparison context; **verify this against real Postgres at
-  the e2e step, not just mocked unit tests** — fall back to an explicit `CAST($n AS timestamptz)` in
-  `buildFilterWhere` if the implicit cast doesn't hold)
+  as a parseable date string via `new Date(value)`, bound as the original string — **confirmed at
+  the Phase 3 e2e step against real Postgres**: the implicit text→timestamptz cast holds with no
+  explicit `CAST` needed)
+
+**Post-Phase-2 discovery, fixed in Phase 3**: `filters[field][$op]=value` requires Express's
+"extended" (qs-based) query parser to arrive as a real nested object. Express 5 (this repo's actual
+version) defaults to "simple" parsing, which kept the bracket notation as one flat string key —
+`class-validator`'s `whitelist`/`forbidNonWhitelisted` then rejected it outright
+(`"property filters[position][$contains] should not exist"`). Fixed with a global
+`app.set("query parser", "extended")` in `configure-app.ts` (TDD'd, verified backward-compatible
+against the full suite — "extended" is a superset of "simple" for every existing flat query param).
+This invalidates the original assumption (stated in `SPEC.md`/this plan) that bracket-notation
+parsing needed zero config in this repo.
 
 **New file `application/support/filter-query.parser.ts`** (not folded into `list-query.parser.ts`)
 mirrors the existing one-concern-per-file split (`draft-publish.policy.ts`, `status-resolver.ts`,

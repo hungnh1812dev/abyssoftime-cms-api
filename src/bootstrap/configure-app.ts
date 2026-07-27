@@ -30,6 +30,11 @@ function configureSwagger(app: NestExpressApplication): void {
 }
 
 export function configureApp(app: NestExpressApplication): void {
+  // Express 5 defaults to the "simple" query parser (no bracket-notation nesting); the document
+  // list route's filters[field][$op]=value params need "extended" (qs-based) parsing to arrive as
+  // a real nested object instead of one flat "filters[field][$op]" string key.
+  app.set("query parser", "extended");
+
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   app.use(cookieParser());
 
