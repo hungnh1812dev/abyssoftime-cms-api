@@ -20,13 +20,13 @@ See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
 
 ## Phase 2 — Content-type domain + loader/validator/differ (pure/fs, no DB)
 
-- [ ] `content-type.entity.ts`
-- [ ] `content-type.repository.ts` — `IContentTypeRepository` + `ContentTypeNotFoundError`
-- [ ] `schema-table.repository.ts` — `ISchemaTableRepository`
-- [ ] `schema-validator.ts` + spec
-- [ ] `schema-loader.service.ts` + spec
-- [ ] `schema-differ.ts` + spec — pure diff plan (add/drop/retype), no `DROP TABLE`
-- [ ] **Checkpoint 2:** content-type specs green (excl. persistence), typecheck clean
+- [x] `content-type.entity.ts`
+- [x] `content-type.repository.ts` — `IContentTypeRepository` + `ContentTypeNotFoundError`
+- [x] `schema-table.repository.ts` — `ISchemaTableRepository`
+- [x] `schema-validator.ts` + spec
+- [x] `schema-loader.service.ts` + spec
+- [x] `schema-differ.ts` + spec — pure diff plan (add/drop/retype), no `DROP TABLE`
+- [x] **Checkpoint 2:** content-type specs green (excl. persistence), typecheck clean
 
 ## Phase 3 — Content-type persistence (first DB-touching code)
 
