@@ -68,19 +68,33 @@ See `tasks/plan.md` for full context, approach, and confirmed decisions.
 
 ## Phase 4 — Manual verification, docs, spec cleanup
 
-- [ ] `bun run start:dev` + manual smoke test: create user (POST, confirm fixed
-      accountType/verified/roleId in response), self-update (PUT, no `user:manager`), admin-update
-      another user (PUT, with `user:manager`), update-without-permission-403, role-assign as
-      `super_admin` (PATCH, 200), role-assign-without-permission-403; confirm `/api-docs-json` shows
-      the new route
-- [ ] `docs/documents/users.md` — rewrite Entity/DTOs/Services/Endpoints sections; remove the
-      now-closed "no roleId existence check" Known Gap; document new endpoint, self-or-manager rule,
-      `user:role_manager`
-- [ ] `docs/documents/permissions.md` — add `user:role_manager`, matching existing structure
-- [ ] `docs/documents/roles.md` — update `super_admin`'s documented permission list if enumerated
-      literally
-- [ ] `docs/documents/swagger.md` — bump "35 paths, 47 operations" → "36 paths, 48 operations" once
-      confirmed live
-- [ ] `SPEC.md` — trim to one-line pointer at `docs/documents/users.md`, per "Root docs" rule
-- [ ] **Checkpoint 4 (final):** five-axis code review (`agent-skills:code-reviewer`), apply any
-      Critical/Important findings, re-verify, confirm final commit(s) with user
+- [x] `bun run start:dev` + manual smoke test against a real dev DB: create user (POST, confirmed
+      fixed accountType:false/verified:false/roleId:null in response), self-verify via
+      resend-otp/verify-otp into `guest` (proves the admin-created path works exactly like
+      self-registration), self-update (PUT, no `user:manager`), admin-update another user (PUT, with
+      `user:manager`), immutable-field rejection (posting `email`/`roleId` to `PUT :id` → `400`
+      whitelist error), role-assign as `super_admin` (PATCH, 200 after bumping this dev DB's
+      pre-existing `super_admin` role — the seeder only creates missing roles, doesn't patch existing
+      ones' permissions, a pre-existing limitation unrelated to this feature); confirmed
+      `/api-docs-json` shows 36 paths/48 operations with the new route and reduced DTO schemas
+- [x] `docs/documents/users.md` — rewrote Entity/DTOs/Services/Endpoints sections; removed the
+      now-closed "no roleId existence check" Known Gap; documented the new endpoint, self-or-manager
+      rule, `user:role_manager`, and the seeder-doesn't-patch-existing-roles gap found during the
+      smoke test
+- [x] `docs/documents/permissions.md`/`docs/documents/roles.md` — checked both; neither enumerates
+      individual permission slugs or a role's literal permission list (that lives in each consuming
+      module's own doc, e.g. `document:read` is only in `document.md`), so no edit needed — skipped,
+      deviating from the original plan item which assumed otherwise
+- [x] `docs/documents/swagger.md` — bumped "35 paths, 47 operations" → "36 paths, 48 operations" in
+      the Coverage section (left the dated "Verified state" section as-is — historical snapshot of
+      the swagger cycle itself, not a living count)
+- [x] `SPEC.md` — trimmed to one-line pointer at `docs/documents/users.md`, per "Root docs" rule
+- [x] **Checkpoint 4 (final):** five-axis code review (`agent-skills:code-reviewer`) — **APPROVE**,
+      zero Critical/Important findings. Three low-severity items, all applied: (1)
+      `UpdateUserService` ran its 404 lookup before the self-or-manager check, letting an
+      unauthorized caller distinguish existing vs. missing `documentId`s now that `PermissionsGuard`
+      no longer gates this route — reordered, with a new pinning test; (2) added a defensive
+      `caller.permissions ?? []` fallback matching `PermissionsGuard`'s own pattern; (3) added an
+      explicit "can't reassign own role" test to `update-user-role.service.spec.ts` (previously only
+      incidental coverage). Re-verified: `bun run build && bun run test && bun run lint` green (647
+      tests, 117 suites). Confirm final commit(s) with user.
