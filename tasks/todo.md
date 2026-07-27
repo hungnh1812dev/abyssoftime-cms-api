@@ -37,13 +37,13 @@ See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
 
 ## Phase 4 — Content-type sync + services + controller + module
 
-- [ ] `content-type-sync.service.ts` + spec — `OnApplicationBootstrap`
-- [ ] `list-content-type.service.ts` + spec
-- [ ] `get-content-type.service.ts` + spec — exported for `document` module
-- [ ] `content-type.controller.ts` + spec — `/api/content-types`, read-only
-- [ ] `content-type.module.ts` — exports `GetContentTypeService` + `CONTENT_TYPE_REPOSITORY`
-- [ ] `app.module.ts` — register `ContentTypeModule`
-- [ ] **Checkpoint 4:** build/typecheck/lint/`test content-type` all clean — **commit here**
+- [x] `content-type-sync.service.ts` + spec — `OnApplicationBootstrap`
+- [x] `list-content-type.service.ts` + spec
+- [x] `get-content-type.service.ts` + spec — exported for `document` module
+- [x] `content-type.controller.ts` + spec — `/api/content-types`, read-only
+- [x] `content-type.module.ts` — exports `GetContentTypeService` + `CONTENT_TYPE_REPOSITORY`
+- [x] `app.module.ts` — register `ContentTypeModule`
+- [x] **Checkpoint 4:** build/typecheck/lint/`test content-type` all clean — **commit here**
 
 ## Phase 5 — Document domain + SQL helpers + raw DML repos
 
