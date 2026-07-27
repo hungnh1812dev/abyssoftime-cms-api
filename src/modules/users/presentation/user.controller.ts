@@ -1,11 +1,13 @@
 import { CreateUserDto } from "../application/dto/create-user.dto";
+import { UpdateUserRoleDto } from "../application/dto/update-user-role.dto";
 import { UpdateUserDto } from "../application/dto/update-user.dto";
 import { CreateUserService } from "../application/services/create-user.service";
 import { DeleteUserService } from "../application/services/delete-user.service";
 import { ListUserService } from "../application/services/list-user.service";
+import { UpdateUserRoleService } from "../application/services/update-user-role.service";
 import { UpdateUserService } from "../application/services/update-user.service";
 
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Req, UseGuards } from "@nestjs/common";
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
@@ -23,6 +25,7 @@ export class UserController {
     private readonly listUsers: ListUserService,
     private readonly createUser: CreateUserService,
     private readonly updateUser: UpdateUserService,
+    private readonly updateUserRole: UpdateUserRoleService,
     private readonly deleteUser: DeleteUserService,
   ) {}
 
@@ -55,6 +58,21 @@ export class UserController {
   @ApiResponse({ status: 404, description: "User not found" })
   async update(@Param("id") documentId: string, @Body() dto: UpdateUserDto, @Req() req: AuthenticatedRequest): Promise<UserResponseDto> {
     const user = await this.updateUser.execute(documentId, dto, req.user);
+    return UserResponseDto.fromEntity(user);
+  }
+
+  @Patch(":id/role")
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("user:role_manager")
+  @ApiOperation({ summary: "Assign a role to a user" })
+  @ApiResponse({ status: 200, type: UserResponseDto })
+  @ApiResponse({
+    status: 403,
+    description: "Caller's role level doesn't outrank the target's current or new role, or the target is being promoted to super_admin by a non-super_admin caller",
+  })
+  @ApiResponse({ status: 404, description: "User or role not found" })
+  async updateRole(@Param("id") documentId: string, @Body() dto: UpdateUserRoleDto, @Req() req: AuthenticatedRequest): Promise<UserResponseDto> {
+    const user = await this.updateUserRole.execute(documentId, dto, req.user);
     return UserResponseDto.fromEntity(user);
   }
 

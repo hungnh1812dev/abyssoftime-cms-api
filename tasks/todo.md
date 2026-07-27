@@ -38,29 +38,33 @@ See `tasks/plan.md` for full context, approach, and confirmed decisions.
 
 ## Phase 3 — Role-assignment endpoint
 
-- [ ] New `update-user-role.dto.ts` — `{ roleId: string }` (`@ApiProperty`, `@IsString`,
+- [x] New `update-user-role.dto.ts` — `{ roleId: string }` (`@ApiProperty`, `@IsString`,
       `@IsNotEmpty`)
-- [ ] New `update-user-role.service.ts` — inject `USER_REPOSITORY` + `ROLE_REPOSITORY`; 404 user not
+- [x] New `update-user-role.service.ts` — inject `USER_REPOSITORY` + `ROLE_REPOSITORY`; 404 user not
       found → 404 `dto.roleId` not resolved → level-hierarchy check vs. target's current role (if
       any) → new-role check (super_admin-promotion carve-out, else `caller.level` > new role's level)
       → `users.update(documentId, { roleId })` → return updated entity
-- [ ] `user.controller.ts` — add `PATCH /:id/role`, `@UseGuards(JwtAuthGuard, PermissionsGuard)`,
+- [x] `user.controller.ts` — added `PATCH /:id/role`, `@UseGuards(JwtAuthGuard, PermissionsGuard)`,
       `@RequirePermissions("user:role_manager")`, `@Req() req: AuthenticatedRequest`, returns
       `UserResponseDto.fromEntity(...)`; `@ApiOperation`/`@ApiResponse` (200/403/404)
-- [ ] `user.module.ts` — add `UpdateUserRoleService` to `providers`
-- [ ] `seed-default-data.service.ts` — add `{ slug: "user:role_manager", name: "Manage user roles",
-      description: "Assign roles to users" }` to `DEFAULT_PERMISSIONS`; add `"user:role_manager"` to
+- [x] `user.module.ts` — added `UpdateUserRoleService` to `providers`; also updated
+      `user.module.spec.ts`'s provider-list assertion (not anticipated in the original plan, but
+      needed once the new service was registered)
+- [x] `seed-default-data.service.ts` — added `{ slug: "user:role_manager", name: "Manage user roles",
+      description: "Assign roles to users" }` to `DEFAULT_PERMISSIONS`; added `"user:role_manager"` to
       `super_admin`'s permissions only (not `admin`)
-- [ ] New `update-user-role.service.spec.ts` — relocate hierarchy/new-role-check cases from Phase 2's
-      removed tests, renamed to the new SUT, plus the new roleId-not-found 404 case; add
-      `coverageThreshold` entry per project convention
-- [ ] `user.controller.spec.ts` — add `PATCH /:id/role` cases (success, 403, 404)
-- [ ] `seed-default-data.service.spec.ts` — bump `toHaveBeenCalledTimes(17)`→`18` and `(16)`→`17`; add
-      slug to `createdSlugs` and `superAdminCall.permissions`; confirm `adminCall.permissions`
+- [x] New `update-user-role.service.spec.ts` — hierarchy/new-role-check cases relocated from Phase 2's
+      removed tests, renamed to the new SUT, plus the new roleId-not-found 404 case. Skipped the
+      `coverageThreshold` sub-item — this repo's Jest config (`package.json`) has no
+      `coverageThreshold` key at all, so there's no existing per-path convention to extend.
+- [x] `user.controller.spec.ts` — added one `PATCH /:id/role` delegation test, matching this file's
+      existing one-test-per-route convention (permission/hierarchy edge cases are covered at the
+      service-spec level, not re-asserted here for the other routes either)
+- [x] `seed-default-data.service.spec.ts` — bumped `toHaveBeenCalledTimes(17)`→`18` and `(16)`→`17`;
+      added slug to `createdSlugs` and `superAdminCall.permissions`; confirmed `adminCall.permissions`
       unchanged
-- [ ] **Checkpoint 3:** `bun run build && bun run test && bun run lint` green (run
-      `seed-default-data.service.spec.ts` in isolation first — hardcoded counts are the easiest silent
-      miscount); confirm before committing
+- [x] **Checkpoint 3:** `bun run build && bun run test && bun run lint` green (645 tests, 117 suites);
+      confirm before committing
 
 ## Phase 4 — Manual verification, docs, spec cleanup
 

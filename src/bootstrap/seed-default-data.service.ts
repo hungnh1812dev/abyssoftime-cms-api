@@ -6,6 +6,7 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap } from "@nestjs/comm
 const DEFAULT_PERMISSIONS: Omit<CreatePermissionData, "updatedBy">[] = [
   { slug: "user:manager", name: "Manage users", description: "Create, update, and delete users" },
   { slug: "user:read", name: "Read users", description: "View users" },
+  { slug: "user:role_manager", name: "Manage user roles", description: "Assign roles to users" },
   { slug: "role:manager", name: "Manage roles", description: "Create, update, and delete roles" },
   { slug: "role:read", name: "Read roles", description: "View roles" },
   { slug: "permission:manager", name: "Manage permissions", description: "Create, update, and delete permissions" },
@@ -29,6 +30,7 @@ const DEFAULT_ROLES: Omit<CreateRoleData, "updatedBy">[] = [
     slug: "super_admin",
     permissions: [
       "user:manager",
+      "user:role_manager",
       "role:manager",
       "permission:manager",
       "api_token:manager",
