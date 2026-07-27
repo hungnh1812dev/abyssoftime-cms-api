@@ -88,22 +88,22 @@ See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
 
 ## Phase 9 — Document presentation + DTOs + module wiring
 
-- [ ] `save-document.dto.ts`, `bulk-create.dto.ts`, `bulk-delete.dto.ts`, `list-query.dto.ts`
-- [ ] `single-type-document.controller.ts` + spec
-- [ ] `collection-type-document.controller.ts` + spec — `/bulk` routes before `/:documentId`
-- [ ] `public-document.controller.ts` + spec — no guards
-- [ ] `document.module.ts` — imports `ContentTypeModule`
-- [ ] `app.module.ts` — register `DocumentModule`
-- [ ] **Checkpoint 9:** build/typecheck/lint/`test document` all clean
+- [x] `save-document.dto.ts`, `bulk-create.dto.ts`, `bulk-delete.dto.ts`, `list-query.dto.ts`
+- [x] `single-type-document.controller.ts` + spec
+- [x] `collection-type-document.controller.ts` + spec — `/bulk` routes before `/:documentId`
+- [x] `public-document.controller.ts` + spec — no guards
+- [x] `document.module.ts` — imports `ContentTypeModule`
+- [x] `app.module.ts` — register `DocumentModule`
+- [x] **Checkpoint 9:** build/typecheck/lint/`test document` all clean
 
 ## Phase 10 — Seed permissions + seed JSON
 
-- [ ] `seed-default-data.service.ts` — add 7 slugs (`content_type:read`, `document:read/create/
+- [x] `seed-default-data.service.ts` — add 7 slugs (`content_type:read`, `document:read/create/
       update/delete/publish/unpublish`); all 7 → `super_admin`; `content_type:read`+`document:read`
       → `admin`
-- [ ] `seed-default-data.service.spec.ts` — update counts/ordered-slug/permissions-array assertions
-- [ ] `content-types/cv-page.json` — adopted + `"draftToPublish": true`
-- [ ] `content-types/en-it-vocab.json` — adopted + `"draftToPublish": true`
+- [x] `seed-default-data.service.spec.ts` — update counts/ordered-slug/permissions-array assertions
+- [x] `content-types/cv-page.json` — adopted + `"draftToPublish": true`
+- [x] `content-types/en-it-vocab.json` — adopted + `"draftToPublish": true`
 - [ ] **Checkpoint 10:** build/typecheck/lint/`test:cov` all clean — **commit here**
 
 ## Phase 11 — e2e (real Postgres, manual/flagged if unreachable)
