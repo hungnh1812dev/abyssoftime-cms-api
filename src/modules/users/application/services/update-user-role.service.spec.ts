@@ -135,6 +135,15 @@ describe("UpdateUserRoleService", () => {
     expect(repo.update).not.toHaveBeenCalled();
   });
 
+  it("throws ForbiddenException when a caller tries to change their own role, even to one just above their current level", async () => {
+    const callerTargetingSelf: AccessTokenPayload = { sub: "user-1", roleSlug: "editor", level: 10, permissions: ["user:role_manager"] };
+    repo.findById.mockResolvedValue(existing);
+
+    const dto: UpdateUserRoleDto = { roleId: peerRole.documentId };
+    await expect(service.execute("user-1", dto, callerTargetingSelf)).rejects.toThrow(ForbiddenException);
+    expect(repo.update).not.toHaveBeenCalled();
+  });
+
   it("allows promoting to super_admin when the caller is super_admin", async () => {
     repo.findById.mockResolvedValue(existing);
     repo.update.mockResolvedValue(updated);

@@ -1,6 +1,8 @@
 # Users Module
 
-`src/modules/users/**` — clean-architecture module for managing user accounts. Fully wired: registered in `AppModule`, all CRUD routes live, Prisma-backed, and guarded by real JWT + permission-slug authorization plus a level-hierarchy/super-admin-promotion business rule layered on top (see [Endpoints](#endpoints) and [Services & business rules](#services--business-rules)). This module is the **admin-facing CRUD surface** for user records; the end-user-facing register/verify/login/forgot-password lifecycle lives in the separate `auth` module (see [auth.md](./auth.md)) and shares the same `User` entity/repository.
+`src/modules/users/**` — clean-architecture module for managing user accounts. Fully wired: registered in `AppModule`, all CRUD routes plus a dedicated role-assignment route are live, Prisma-backed, and guarded by real JWT + permission-slug authorization (see [Endpoints](#endpoints) and [Services & business rules](#services--business-rules)). This module is the **admin-facing CRUD surface** for user records; the end-user-facing register/verify/login/forgot-password lifecycle lives in the separate `auth` module (see [auth.md](./auth.md)) and shares the same `User` entity/repository.
+
+`email`/`username` are permanent, immutable identifiers once a user is created — no route on this module (or `auth`) ever changes them. `accountType`/`verified`/`roleId` are internal/fixed on this module's create/update routes: `verified` only ever flips via `auth`'s self-serve `resend-otp`/`verify-otp` flow (works identically regardless of whether the account was created via public `register` or this module's `POST /api/users` — see [auth.md](./auth.md)); `accountType` is a placeholder reserved for a future OAuth (Google/Facebook) account-type flag, not implemented yet, and stays a fixed `false`; `roleId` is set only via the dedicated `PATCH /api/users/:id/role` endpoint (see below).
 
 ## Entity
 
@@ -52,58 +54,79 @@ Implementation: `infrastructure/persistence/prisma-user.repository.ts` (`PrismaU
 - `name` — `@IsString() @IsNotEmpty()`
 - `username` — `@IsString() @IsNotEmpty()`
 - `password` — `@IsString() @IsNotEmpty()` (plaintext; no hashing decorator)
-- `accountType` — `@IsBoolean()`
-- `verified` — `@IsOptional() @IsBoolean()` (service defaults to `false` when omitted)
-- `roleId` — `@IsString() @IsNotEmpty()` (not validated against the roles catalog — no existence check)
 
-`update-user.dto.ts` — same fields, all `@IsOptional()`.
+`accountType`/`verified`/`roleId` are **not** on this DTO — `CreateUserService` always writes fixed values (`accountType: false`, `verified: false`, `roleId: null`). The global `ValidationPipe` is whitelist-enforced, so posting any of those three properties is rejected with `400 Bad Request` ("property X should not exist"), not silently dropped.
+
+`update-user.dto.ts`:
+
+- `name?` — `@IsOptional() @IsString() @IsNotEmpty()`
+- `password?` — `@IsOptional() @IsString() @IsNotEmpty()`
+
+`email`/`username`/`accountType`/`verified`/`roleId` are **not** on this DTO either, for the same whitelist-rejection reason — `email`/`username` are permanently immutable, and `roleId` moves to `update-user-role.dto.ts` below.
+
+`update-user-role.dto.ts`:
+
+- `roleId` — `@IsString() @IsNotEmpty()`, required. Triggers the level-hierarchy / super-admin-promotion check described below when it differs from the user's current role.
 
 ## Services & business rules
 
-All four services inject `@Inject(USER_REPOSITORY)`; `UpdateUserService`/`DeleteUserService` additionally inject `@Inject(ROLE_REPOSITORY)` (cross-module, via `RoleModule` import — see [Module wiring](#module-wiring)) for the level-hierarchy check below.
+- **Create** (`CreateUserService`, injects `USER_REPOSITORY`) — `409 ConflictException` if `email` already in use; `409 ConflictException` if `username` already in use. Always writes `accountType: false, verified: false, roleId: null`, regardless of any dto content — there is no code path on this route that can produce a different value. The created account becomes usable exactly like a self-registered one: `POST /auth/resend-otp` with its email (works for any unverified user regardless of how the record was created) → `POST /auth/verify-otp` (existing first-verifier-wins logic applies here too, so an admin-created account can still become `super_admin` if it happens to be the first ever to verify).
+- **Update** (`UpdateUserService`, injects `USER_REPOSITORY` only) — `execute(documentId, dto, caller: AccessTokenPayload)`:
+  1. **Self-or-manager check**: if `documentId !== caller.sub` (caller isn't updating their own record) and `caller.permissions` doesn't include `user:manager` → `403 ForbiddenException`. Runs **before** the existence lookup, deliberately — since this route dropped `PermissionsGuard` (see [Endpoints](#endpoints)), any authenticated user can now reach this service, so checking authorization first prevents an unauthorized caller from distinguishing "this documentId exists" (403) from "it doesn't" (404) by probing arbitrary IDs.
+  2. `404 NotFoundException` if `documentId` not found.
+  3. Passes `{ name: dto.name, password: dto.password }` through to `IUserRepository.update` — nothing else is ever written by this route.
 
-- **Create** — `409 ConflictException` if `email` already in use; `409 ConflictException` if `username` already in use. `verified` defaults to `false` if omitted. No caller-level check (creating a user isn't scoped by the target's role, since it doesn't have one yet at creation... unless `dto.roleId` sets one directly — this path is intentionally not hierarchy-checked; only `update`/`delete` are, per the approved spec).
-- **Update** (`execute(documentId, dto, caller: AccessTokenPayload)`) —
+  No role-repository dependency, no level-hierarchy check, no email/username uniqueness check on this route anymore — those existed only to gate identifier/role changes that no longer happen here.
+- **Assign role** (`UpdateUserRoleService`, injects `USER_REPOSITORY` + `ROLE_REPOSITORY`) — `execute(documentId, dto, caller: AccessTokenPayload)`:
   1. `404 NotFoundException` if `documentId` not found.
-  2. Email/username uniqueness checks, unchanged from before (skip if unchanged from the existing value; `409` if taken by another user).
-  3. **Level-hierarchy check**: if the target currently has a role (`existing.roleId` set), fetch it via `roles.findById` and require `caller.level` to be **strictly greater** than that role's `level` → `403 ForbiddenException` otherwise. Skipped if the target has no role yet (unverified account, `roleId: null`).
-  4. **New-role check**: if `dto.roleId` is provided and differs from `existing.roleId`, fetch the new role. If its slug is `super_admin`, require `caller.roleSlug === "super_admin"` (see note below) — otherwise require `caller.level` strictly greater than the new role's `level` → `403` otherwise.
-  5. Passes through to `IUserRepository.update`.
-- **Delete** (`execute(documentId, caller: AccessTokenPayload)`) — `404` if not found; same level-hierarchy check as update's step 3 (skipped if the target has no role); then deletes. No "still referenced" guard (unlike permissions/roles — deleting a user doesn't check for dependent records).
+  2. `404 NotFoundException` if `dto.roleId` doesn't resolve to an existing role (closes the "no existence check" gap the old `UpdateUserService` had).
+  3. **Current-role hierarchy check**: if the target currently has a role, fetch it and require `caller.level` to be **strictly greater** than that role's `level` → `403` otherwise. Skipped if the target has no role yet.
+  4. **New-role check**: if `dto.roleId` differs from the target's current `roleId` — if the new role's slug is `super_admin`, require `caller.roleSlug === "super_admin"` (see note below); otherwise require `caller.level` strictly greater than the new role's `level` → `403` otherwise.
+  5. `IUserRepository.update(documentId, { roleId: dto.roleId })`.
+
+  This is the same level-hierarchy/super-admin-promotion logic `UpdateUserService` used to run before `roleId` changes moved to their own endpoint — relocated wholesale, not rewritten, plus the new existence check in step 2.
+- **Delete** (`DeleteUserService`, injects `USER_REPOSITORY` + `ROLE_REPOSITORY`, unchanged by this cycle) — `404` if not found; same level-hierarchy check as assign-role's step 3 (skipped if the target has no role); then deletes. No "still referenced" guard (unlike permissions/roles — deleting a user doesn't check for dependent records).
 - **List** — passthrough `findAll()`.
 
-**Why the super_admin case skips the level check**: the seeded `super_admin` role sits at `level: 100`, which is also `CreateRoleDto`'s validated ceiling (`@Max(100)`). A literal "`caller.level` strictly greater than `newRole.level`" check can never pass when `newRole.level` is already the maximum possible value — no one could ever promote anyone to `super_admin`. Confirmed with the project owner that the `roleSlug === "super_admin"` check is meant to **replace**, not stack with, the generic level check for this one case; implemented that way in `UpdateUserService`.
+**Why the super_admin case skips the level check**: the seeded `super_admin` role sits at `level: 100`, which is also `CreateRoleDto`'s validated ceiling (`@Max(100)`). A literal "`caller.level` strictly greater than `newRole.level`" check can never pass when `newRole.level` is already the maximum possible value — no one could ever promote anyone to `super_admin`. Confirmed with the project owner that the `roleSlug === "super_admin"` check is meant to **replace**, not stack with, the generic level check for this one case; implemented that way in `UpdateUserRoleService`.
 
 ## Endpoints
 
-`presentation/user.controller.ts`, `@Controller("/api/users")`. Every route is guarded by `JwtAuthGuard` + `PermissionsGuard`; `update`/`delete` additionally take `@Req() req: AuthenticatedRequest` and pass `req.user` straight through as the `caller` argument (no extra DB lookup — the JWT payload already carries the caller's own `level`/`roleSlug`).
+`presentation/user.controller.ts`, `@Controller("/api/users")`.
 
-`list`/`create`/`update` map their `UserEntity` result through `presentation/user-response.dto.ts` (`UserResponseDto.fromEntity`) before returning it — a manual E2E pass caught this controller returning the raw entity, which leaked `password` (the bcrypt hash), `otpCodeHash`, `otpExpiresAt`, `resetTokenHash`, and `resetTokenExpiresAt` directly in API responses, violating the "never return password/OTP/reset-token hashes" rule that the `auth` module's own routes already honored correctly. `UserResponseDto` only carries `documentId`/`email`/`name`/`username`/`accountType`/`verified`/`roleId`/`createdAt`/`updatedAt`.
+| Method   | Path                        | Service                | Auth                                              |
+| -------- | --------------------------- | ----------------------- | -------------------------------------------------- |
+| `GET`    | `/api/users`                | `ListUserService`      | `JwtAuthGuard` + `PermissionsGuard("user:read")`   |
+| `POST`   | `/api/users`                | `CreateUserService`    | `JwtAuthGuard` + `PermissionsGuard("user:manager")`|
+| `PUT`    | `/api/users/:id`            | `UpdateUserService`    | `JwtAuthGuard` only — self-or-`user:manager` is checked inside the service, not the guard |
+| `PATCH`  | `/api/users/:id/role`       | `UpdateUserRoleService`| `JwtAuthGuard` + `PermissionsGuard("user:role_manager")` |
+| `DELETE` | `/api/users/:id` (204)      | `DeleteUserService`    | `JwtAuthGuard` + `PermissionsGuard("user:manager")`|
 
-| Method   | Path                   | Service             | Required permission |
-| -------- | ---------------------- | -------------------- | --------------------- |
-| `GET`    | `/api/users`           | `ListUserService`   | `user:read`            |
-| `POST`   | `/api/users`           | `CreateUserService` | `user:manager`         |
-| `PUT`    | `/api/users/:id`       | `UpdateUserService` | `user:manager`         |
-| `DELETE` | `/api/users/:id` (204) | `DeleteUserService` | `user:manager`         |
+`update`/`updateRole`/`delete` all take `@Req() req: AuthenticatedRequest` and pass `req.user` straight through as the `caller` argument (no extra DB lookup — the JWT payload already carries the caller's own `sub`/`level`/`roleSlug`/`permissions`).
 
-Holding `user:manager` is necessary but not sufficient for `update`/`delete` — the level-hierarchy (and, for role promotion, super-admin) checks in the services above are an additional, stricter authorization layer on top of the permission-slug guard.
+`PUT :id` deliberately drops `PermissionsGuard` — `PermissionsGuard` is a documented no-op when a route has no `@RequirePermissions` metadata (`src/common/guards/permissions.guard.ts`), so leaving it attached with no metadata would be a silently-inert guard. Authorization for this route is "the caller's own record, or any record if `caller.permissions` includes `user:manager`", which only the service can evaluate (it needs `documentId` vs. `caller.sub`).
+
+`list`/`create`/`update`/`updateRole` map their `UserEntity` result through `presentation/user-response.dto.ts` (`UserResponseDto.fromEntity`) before returning it — a manual E2E pass caught this controller returning the raw entity, which leaked `password` (the bcrypt hash), `otpCodeHash`, `otpExpiresAt`, `resetTokenHash`, and `resetTokenExpiresAt` directly in API responses, violating the "never return password/OTP/reset-token hashes" rule that the `auth` module's own routes already honored correctly. `UserResponseDto` only carries `documentId`/`email`/`name`/`username`/`accountType`/`verified`/`roleId`/`createdAt`/`updatedAt`.
 
 ## Module wiring
 
-`user.module.ts` imports `RoleModule` (for `UpdateUserService`/`DeleteUserService`'s `ROLE_REPOSITORY` dependency), registers the controller and all four services, and binds `USER_REPOSITORY → PrismaUserRepository`. Exports `USER_REPOSITORY`, consumed by `AuthModule`. Imported into `src/app.module.ts`.
+`user.module.ts` imports `RoleModule` (for `UpdateUserRoleService`/`DeleteUserService`'s `ROLE_REPOSITORY` dependency), registers the controller and all five services (`ListUserService`, `CreateUserService`, `UpdateUserService`, `UpdateUserRoleService`, `DeleteUserService`), and binds `USER_REPOSITORY → PrismaUserRepository`. Exports `USER_REPOSITORY`, consumed by `AuthModule`. Imported into `src/app.module.ts`.
 
 ## Known gaps (deferred, out of scope for the current pass)
 
 - No password hashing on this module's own create/update routes — `password` is round-tripped as plain text (only the `auth` module hashes passwords). Do not treat this module's routes as production-ready for setting a user's password directly.
-- `roleId` on create/update is not validated for existence against the `roles` catalog (the level-hierarchy check in `UpdateUserService` does call `roles.findById` for a *changing* `roleId`, but there's no guard against a `roleId` that resolves to nothing — same falsy-result convention as `roles`' own services).
 - No `updatedBy`/audit trail on the `User` model, unlike `Role`/`Permission`.
 - Delete has no dependent-record guard.
+- The boot-time seeder (`SeedDefaultDataService`) only creates roles/permissions that don't already exist by slug — it never patches an already-seeded role's `permissions` array. A dev/prod database seeded before the `user:role_manager` permission was added needs `super_admin`'s role record updated manually (via `PUT /api/roles/:id`) to actually gain the new permission; a fresh database seeds correctly from first boot. This is a pre-existing seeder limitation, not new to this permission.
 
 ## Tests
 
-Unit tests (Jest, mocked `IUserRepository`/`IRoleRepository`, ≥80% branch coverage) live next to each source file: `create-user.service.spec.ts`, `update-user.service.spec.ts` (now covers the hierarchy check, the new-role check, and the super-admin-promotion carve-out), `delete-user.service.spec.ts` (hierarchy check), `list-user.service.spec.ts`, `user.controller.spec.ts` (provides a mocked `JwtTokenService` for `JwtAuthGuard` instantiation, asserts `req.user` is forwarded as the `caller` arg, and asserts every response is the mapped `UserResponseDto` shape with no `password` property), `user-response.dto.spec.ts` (asserts `fromEntity` strips all five sensitive fields), `prisma-user.repository.spec.ts` (covers `findByUsername`/`findByResetTokenHash` → `findFirst` no-unique-constraint behavior, and the OTP/reset-token field pass-through).
+Unit tests (Jest, mocked `IUserRepository`/`IRoleRepository`, ≥80% branch coverage) live next to each source file: `create-user.service.spec.ts`, `update-user.service.spec.ts` (self-or-manager authorization only, no role logic), `update-user-role.service.spec.ts` (the relocated hierarchy/new-role-check/super-admin-promotion cases, plus the new roleId-not-found 404), `delete-user.service.spec.ts` (hierarchy check), `list-user.service.spec.ts`, `user.controller.spec.ts` (provides a mocked `JwtTokenService` for `JwtAuthGuard` instantiation, one delegation test per route, asserts every response is the mapped `UserResponseDto` shape with no `password` property), `user-response.dto.spec.ts` (asserts `fromEntity` strips all five sensitive fields), `user.module.spec.ts` (provider/import wiring), `prisma-user.repository.spec.ts` (covers `findByUsername`/`findByResetTokenHash` → `findFirst` no-unique-constraint behavior, and the OTP/reset-token field pass-through).
 
-## Verified state (2026-07-23)
+## Review notes
 
-`bun run build`, `bunx tsc --noEmit`, `bunx eslint`, and `bun run test:cov` all pass with zero errors for this module.
+A five-axis code review (`agent-skills:code-reviewer`) flagged one real, low-severity issue: `UpdateUserService` originally ran its existence lookup before the self-or-manager authorization check, which — now that `PermissionsGuard` no longer gates this route — let any authenticated caller distinguish an existing `documentId` (403) from a missing one (404). Fixed by reordering (see [Services & business rules](#services--business-rules) above). Also added a defensive `caller.permissions ?? []` fallback for consistency with `PermissionsGuard`'s own pattern, and an explicit test in `update-user-role.service.spec.ts` pinning that a caller can't reassign their own role (previously only incidentally covered by the generic hierarchy-check test). No Critical/Important findings.
+
+## Verified state (2026-07-27)
+
+`bun run build`, `bun run test` (645 tests, 117 suites), and `bun run lint` all pass with zero errors. Live-verified against a real dev DB (`bun run start:dev` + `curl`): `/api-docs-json` shows 36 paths / 48 operations (up from 35/47) with the reduced `CreateUserDto`/`UpdateUserDto` schemas and the new `UpdateUserRoleDto` schema; a full register → verify-otp → login walkthrough confirmed the first verifier still becomes `super_admin`; an admin-created user (`POST /api/users`, no `accountType`/`verified`/`roleId` in the request) came back with the fixed `false`/`false`/`null` values, then successfully self-verified via `resend-otp`/`verify-otp` into the `guest` role, exactly like a self-registered account; self-update, admin-update-another-user, immutable-field rejection (posting `email`/`roleId` to `PUT :id` → `400`), and role assignment via `PATCH :id/role` (`403` without `user:role_manager`, `200` with it) were all confirmed live.

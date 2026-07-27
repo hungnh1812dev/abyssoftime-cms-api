@@ -85,6 +85,12 @@ describe("UpdateUserService", () => {
     expect(repo.update).not.toHaveBeenCalled();
   });
 
+  it("throws ForbiddenException (not NotFoundException) for an unauthorized caller targeting a nonexistent record, so existence isn't leaked", async () => {
+    await expect(service.execute("missing", { name: "Jane Doe 2" }, callerNoPermission)).rejects.toThrow(ForbiddenException);
+    expect(repo.findById).not.toHaveBeenCalled();
+    expect(repo.update).not.toHaveBeenCalled();
+  });
+
   it("rethrows unexpected repository errors", async () => {
     repo.findById.mockResolvedValue(existing);
     const unexpected = new Error("db down");

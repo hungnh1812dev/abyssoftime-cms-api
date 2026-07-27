@@ -13,13 +13,13 @@ export class UpdateUserService {
   constructor(@Inject(USER_REPOSITORY) private readonly users: IUserRepository) {}
 
   async execute(documentId: string, dto: UpdateUserDto, caller: AccessTokenPayload): Promise<UserEntity> {
+    if (documentId !== caller.sub && !(caller.permissions ?? []).includes(MANAGE_USERS_PERMISSION)) {
+      throw new ForbiddenException("Cannot update another user's record without user:manager");
+    }
+
     const existing = await this.users.findById(documentId);
     if (!existing) {
       throw new NotFoundException(`User "${documentId}" not found`);
-    }
-
-    if (documentId !== caller.sub && !caller.permissions.includes(MANAGE_USERS_PERMISSION)) {
-      throw new ForbiddenException("Cannot update another user's record without user:manager");
     }
 
     return this.users.update(documentId, {
