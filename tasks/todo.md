@@ -47,13 +47,13 @@ See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
 
 ## Phase 5 — Document domain + SQL helpers + raw DML repos
 
-- [ ] `document.entity.ts`, `component.entity.ts`
-- [ ] `document.repository.ts`, `component.repository.ts` — ports w/ optional `tx` param
-- [ ] `row-mapper.ts` + spec
-- [ ] `where-builder.ts` + spec — `ILIKE` search + `ORDER BY` allowlist
-- [ ] `prisma-document.repository.ts` + spec — `tx ?? this.prisma`
-- [ ] `prisma-component.repository.ts` + spec — `tx ?? this.prisma`
-- [ ] **Checkpoint 5:** `document/infrastructure` specs green, build clean
+- [x] `document.entity.ts`, `component.entity.ts`
+- [x] `document.repository.ts`, `component.repository.ts` — ports w/ optional `tx` param
+- [x] `row-mapper.ts` + spec
+- [x] `where-builder.ts` + spec — `ILIKE` search + `ORDER BY` allowlist
+- [x] `prisma-document.repository.ts` + spec — `tx ?? this.prisma`
+- [x] `prisma-component.repository.ts` + spec — `tx ?? this.prisma`
+- [x] **Checkpoint 5:** `document/infrastructure` specs green, build clean
 
 ## Phase 6 — Document support layer
 
