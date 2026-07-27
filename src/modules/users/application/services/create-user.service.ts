@@ -24,9 +24,9 @@ export class CreateUserService {
       name: dto.name,
       username: dto.username,
       password: dto.password,
-      accountType: dto.accountType,
-      verified: dto.verified ?? false,
-      roleId: dto.roleId,
+      accountType: false,
+      verified: false,
+      roleId: null,
     });
   }
 }

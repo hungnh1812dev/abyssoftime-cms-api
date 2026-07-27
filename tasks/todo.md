@@ -1,147 +1,80 @@
-# Todo — Swagger/OpenAPI Documentation
+# Todo — Users module lockdown + role-assignment endpoint
 
-See `tasks/plan.md` for full context, build order, and confirmed decisions.
+See `tasks/plan.md` for full context, approach, and confirmed decisions.
 
-## Phase 0 — Dependency + bootstrap wiring
+## Phase 1 — Create endpoint lockdown
 
-- [x] `bun add @nestjs/swagger` (`11.4.6`)
-- [x] `src/bootstrap/configure-app.ts` — `DocumentBuilder().setTitle("Abyssoftime CMS
-      API").setDescription(...).setVersion("0.0.1").addCookieAuth("access_token",
-      {...}).addBearerAuth().build()`, `SwaggerModule.createDocument` +
-      `SwaggerModule.setup("api-docs", app, document)`
-- [x] **Checkpoint 0:** `bun run build` succeeds; `bun run start:dev` + `curl localhost:3000/api-docs`
-      confirmed `200` against the real dev DB; `bun run lint` clean (pre-existing unrelated
-      `main.ts` warning only); `configure-app.spec.ts` (6 tests) still green
+- [x] `create-user.dto.ts` — remove `accountType`/`verified`/`roleId` fields + decorators/imports;
+      keep `email`/`name`/`username`/`password`
+- [x] `create-user.service.ts` — replace `accountType: dto.accountType, verified: dto.verified ??
+      false, roleId: dto.roleId` with fixed literals `accountType: false, verified: false, roleId:
+      null`
+- [x] `create-user.service.spec.ts` — rewrite field-passthrough assertions to assert fixed literals;
+      fix any fixture still constructing the removed DTO fields
+- [x] `user.controller.spec.ts` — fix any `POST` fixture/body referencing the removed fields
+- [x] **Checkpoint 1:** `bun run build && bun run test src/modules/users && bun run lint` green;
+      confirm staged files + commit message with user before committing
 
-## Phase 1 — `permissions` module
+## Phase 2 — Update endpoint lockdown (self-or-manager, immutable identifiers)
 
-- [x] `create-permission.dto.ts` / `update-permission.dto.ts` — `@ApiProperty`/`@ApiPropertyOptional`
-      per field (slug pattern example `"document:read"`, name/description examples)
-- [x] New `presentation/dto/permission-response.dto.ts` (domain entities stay undecorated;
-      controller still returns the real `PermissionEntity`)
-- [x] `permission.controller.ts` — `@ApiTags("permissions")` + class-level `@ApiCookieAuth()`; `GET`
-      200; `POST` 201/409; `PUT` 200/404; `DELETE` 204/404/409 (still-referenced, incl. schema)
-- [x] **Checkpoint 1:** `bun run build && bun run test` green (permissions suite: 7/7, 27 tests)
+- [ ] `update-user.dto.ts` — shrink to `name?`/`password?` only
+- [ ] `update-user.service.ts` — delete email/username uniqueness block, level-hierarchy block,
+      new-role-check block; drop unused `ROLE_REPOSITORY` injection/`IRoleRepository`
+      import/`SUPER_ADMIN_ROLE_SLUG`; add self-or-`user:manager` check after the 404 lookup;
+      `users.update(...)` now only passes `name`/`password`
+- [ ] `user.controller.ts` — on `PUT :id`, remove `@RequirePermissions("user:manager")` and drop
+      `PermissionsGuard` from `@UseGuards` (keep `JwtAuthGuard` only); update 403 `@ApiResponse`
+      description; add `Patch` to the `@nestjs/common` import
+- [ ] `update-user.service.spec.ts` — remove role-repository mocking and all hierarchy/new-role-check
+      cases (behavior no longer exists); add self-update-allowed, other-user-with-`user:manager`,
+      other-user-without-permission-403, and `users.update` called with only `name`/`password` cases
+- [ ] `user.controller.spec.ts` — remove/rewrite any `@RequirePermissions` metadata assertion on
+      `PUT :id`; add a self-update-without-`user:manager` case
+- [ ] **Checkpoint 2:** `bun run build && bun run test src/modules/users && bun run lint` green
+      (expect deliberate test-count changes vs. baseline — old hierarchy cases removed); confirm
+      before committing
 
-## Phase 2 — `roles` module
+## Phase 3 — Role-assignment endpoint
 
-- [x] `create-role.dto.ts` / `update-role.dto.ts` — properties incl. `level` (`0`-`100` range in
-      the property doc), `permissions` array
-- [x] New `presentation/dto/role-response.dto.ts`
-- [x] `role.controller.ts` — `@ApiTags("roles")` + class-level `@ApiCookieAuth()`; `GET` 200;
-      `POST` 201/400(unknown permission slug)/409; `PUT` 200/400/404; `DELETE` 204/400/404/409
-      (still-assigned-to-users)
-- [x] **Checkpoint 2:** build green (verified together with Phase 3 below)
+- [ ] New `update-user-role.dto.ts` — `{ roleId: string }` (`@ApiProperty`, `@IsString`,
+      `@IsNotEmpty`)
+- [ ] New `update-user-role.service.ts` — inject `USER_REPOSITORY` + `ROLE_REPOSITORY`; 404 user not
+      found → 404 `dto.roleId` not resolved → level-hierarchy check vs. target's current role (if
+      any) → new-role check (super_admin-promotion carve-out, else `caller.level` > new role's level)
+      → `users.update(documentId, { roleId })` → return updated entity
+- [ ] `user.controller.ts` — add `PATCH /:id/role`, `@UseGuards(JwtAuthGuard, PermissionsGuard)`,
+      `@RequirePermissions("user:role_manager")`, `@Req() req: AuthenticatedRequest`, returns
+      `UserResponseDto.fromEntity(...)`; `@ApiOperation`/`@ApiResponse` (200/403/404)
+- [ ] `user.module.ts` — add `UpdateUserRoleService` to `providers`
+- [ ] `seed-default-data.service.ts` — add `{ slug: "user:role_manager", name: "Manage user roles",
+      description: "Assign roles to users" }` to `DEFAULT_PERMISSIONS`; add `"user:role_manager"` to
+      `super_admin`'s permissions only (not `admin`)
+- [ ] New `update-user-role.service.spec.ts` — relocate hierarchy/new-role-check cases from Phase 2's
+      removed tests, renamed to the new SUT, plus the new roleId-not-found 404 case; add
+      `coverageThreshold` entry per project convention
+- [ ] `user.controller.spec.ts` — add `PATCH /:id/role` cases (success, 403, 404)
+- [ ] `seed-default-data.service.spec.ts` — bump `toHaveBeenCalledTimes(17)`→`18` and `(16)`→`17`; add
+      slug to `createdSlugs` and `superAdminCall.permissions`; confirm `adminCall.permissions`
+      unchanged
+- [ ] **Checkpoint 3:** `bun run build && bun run test && bun run lint` green (run
+      `seed-default-data.service.spec.ts` in isolation first — hardcoded counts are the easiest silent
+      miscount); confirm before committing
 
-## Phase 3 — `users` module
+## Phase 4 — Manual verification, docs, spec cleanup
 
-- [x] `create-user.dto.ts` / `update-user.dto.ts` — noted in the property doc that `password` is
-      round-tripped in plaintext by this module (pre-existing gap, not something Swagger should
-      paper over) — obvious placeholder example (`"changeme123"`), not a realistic-looking secret
-- [x] `user-response.dto.ts` — decorated directly (already the real runtime return type, strips
-      sensitive fields)
-- [x] `user.controller.ts` — `@ApiTags("users")` + class-level `@ApiCookieAuth()`; `POST` 201/409;
-      `PUT` 200/403(level-hierarchy/super-admin-promotion)/404/409; `DELETE` 204/403/404
-- [x] **Checkpoint 3:** `bun run build && bun run test src/modules/roles src/modules/users` green
-      (16 suites, 114 tests)
-
-## Phase 4 — `access-tokens` module
-
-- [x] `create-access-token.dto.ts` / `revoke-access-token.dto.ts` — `expiresIn` enum values as the
-      property's `enum`; never a real token example
-- [x] New `presentation/dto/access-token-response.dto.ts` (`AccessTokenResponseDto` for list,
-      `AccessTokenSecretResponseDto` for create/revoke) — replaced the controller's two local
-      plain-object interfaces with these classes (same shape, zero behavior change)
-- [x] `access-token.controller.ts` — `@ApiTags("access-tokens")` + class-level `@ApiCookieAuth()`;
-      `GET` 200 (no `token` field); `POST` 201/400(unknown slug); `POST /:id/revoke`
-      200/400/404; `DELETE` 204/404
-- [x] **Checkpoint 4:** verified together with Phases 5-6 below
-
-## Phase 5 — `auth` module
-
-- [x] All 6 DTOs (`register`/`login`/`verify-otp`/`resend-otp`/`forgot-password`/`reset-password`)
-      — placeholder examples only (`"user@example.com"`, `"SecurePass123!"`, OTP `"123456"`), never
-      anything resembling a real credential
-- [x] New `presentation/dto/auth-response.dto.ts` (`MessageResponseDto`, `HasUsersResponseDto`)
-- [x] `auth.controller.ts` — `@ApiTags("auth")`; **no** `@ApiCookieAuth()` anywhere (every route is
-      public); a class-level comment documents that login/refresh set cookies and logout clears
-      them (Swagger has no first-class "sets a cookie" decorator); status codes: register 201/409;
-      verify-otp 200/400/404/409; resend-otp 200/404/409; has-users 200; login 200/401/403; refresh
-      200/401; logout 200; forgot-password 200; reset-password 200/400
-- [x] **Checkpoint 5:** verified together with Phases 4/6
-
-## Phase 6 — `media` module
-
-- [x] New `presentation/dto/media-asset-response.dto.ts`
-- [x] `media.controller.ts` — `@ApiTags("media")` + class-level `@ApiCookieAuth()`; `upload` gets
-      `@ApiConsumes("multipart/form-data")` + `@ApiBody({ schema: { type: "object", properties: {
-      file: { type: "string", format: "binary" } } } })` (no DTO class exists for this route — it's
-      Multer-handled); `GET` 200; `POST /upload` 201/400(no file)/413/422; `DELETE` 204/404
-- [x] **Checkpoint 4-6:** `bun run build && bun run test src/modules/access-tokens
-      src/modules/auth src/modules/media` green (30 suites, 131 tests)
-
-## Phase 7 — `content-type` module
-
-- [x] New `presentation/dto/content-type-response.dto.ts` (`FieldDefinitionResponseDto` self-
-      referential for nested component fields, `ContentTypeSummaryResponseDto`,
-      `ContentTypeResponseDto` extends it) — caught a real TS1272 build error requiring `import
-      type` for the `FieldType` union used in a decorated property
-- [x] `content-type.controller.ts` — `@ApiTags("content-types")` + class-level `@ApiCookieAuth()`
-      (guarded, read-only); `GET /` 200; `GET /:slug` 200/400(unsafe slug)/404; class-level comment
-      notes the deliberate no-write-route design
-- [x] **Checkpoint 7:** `bun run build && bun run test src/modules/content-type` green (14 suites,
-      101 tests)
-
-## Phase 8 — `document` module (3 controllers)
-
-- [x] `save-document.dto.ts` / `bulk-create.dto.ts` / `bulk-delete.dto.ts` / `list-query.dto.ts` —
-      `save-document.dto.ts`'s `data` documented as `type: "object", additionalProperties: true`
-      with a description pointing at `GET /api/content-types/:slug` for the real per-type schema
-- [x] New `presentation/dto/document-response.dto.ts` — `DocumentDataResponseDto`,
-      `DocumentResponseDto`, `PublishStatusResponseDto`, `ListedDocumentItemResponseDto`,
-      `ListDocumentsResponseDto`, `BulkCreateResponseDto`, `BulkDeleteFailureDto`,
-      `BulkDeleteResponseDto` — all documentation-only, mirroring the existing plain-object return
-      shapes (an index-signature field can't carry `@ApiProperty` in TS, so
-      `DocumentDataResponseDto` documents that via a class-level comment instead)
-- [x] `single-type-document.controller.ts` — `@ApiTags("documents-single-type")` + class-level
-      `@ApiCookieAuth()`; `GET` 200/404; `PUT` 200; `POST /publish` 200/400(Mode B); `POST
-      /unpublish` 200/400(Mode B)
-- [x] `collection-type-document.controller.ts` — `@ApiTags("documents-collection-type")` +
-      class-level `@ApiCookieAuth()`; the `/bulk` route-ordering footgun noted in a class comment;
-      all 9 routes annotated with real status codes
-- [x] `public-document.controller.ts` — `@ApiTags("documents-public")`; **no** `@ApiCookieAuth()`
-      (no guards); both routes 200/404
-- [x] **Checkpoint 8:** `bun run build` green; full suite `bun run test` green (116 suites, 646
-      tests — matches the pre-change baseline exactly, confirming zero behavior change); one
-      unrelated pre-existing 1ms timestamp flake in
-      `bulk-create-publish.service.spec.ts` reproduced and confirmed untouched by this diff (passes
-      on retry)
-
-## Phase 9 — Manual verification
-
-- [x] `bun run start:dev`, `curl /api-docs` (200) and `/api-docs-json` — confirmed all 10 module
-      tags present (`access-tokens`, `auth`, `content-types`, `documents-collection-type`,
-      `documents-public`, `documents-single-type`, `media`, `permissions`, `roles`, `users`), 35
-      paths / 47 operations, both `cookie`/`bearer` security schemes registered, and every
-      `auth`/`documents-public` route correctly shows no security requirement
-- [x] `bun run lint` clean (only the pre-existing unrelated `main.ts` warning)
-
-## Phase 10 — Update spec/docs
-
-- [x] New `docs/documents/swagger.md`
-- [x] `docs/ENTRYPOINT.md` — added the new doc file's index entry
-- [x] Trimmed `SPEC.md` back to a one-line pointer at `docs/documents/swagger.md`, per the "Root
-      docs" rule
-
-## Phase 11 — Review + cleanup
-
-- [x] Five-axis code review (`agent-skills:code-reviewer`) — **APPROVE**, zero Critical/Important
-      findings. Three Suggestion-level items: (1) `/api-docs` mounted unconditionally in all
-      environments — already a deliberate, user-confirmed decision (spec explicitly declined
-      env-gating), left as-is; (2) `bulkCreate`'s operation summary under-described the
-      Publish-stage rollback edge case — fixed; (3) pre-existing `updatedBy` type drift in
-      `permissions.md`/`access-tokens.md` (docs say `string`, entity is `string | null`) — predates
-      this cycle, out of scope, not touched
-- [x] Applied finding (2); rebuilt + retested `src/modules/document` (28 suites, 187 tests) green
-- [x] `SPEC.md` already trimmed to the "No active spec" pointer form (Phase 10) — no separate
-      `/specs/*.md` file exists in this repo's convention to delete
+- [ ] `bun run start:dev` + manual smoke test: create user (POST, confirm fixed
+      accountType/verified/roleId in response), self-update (PUT, no `user:manager`), admin-update
+      another user (PUT, with `user:manager`), update-without-permission-403, role-assign as
+      `super_admin` (PATCH, 200), role-assign-without-permission-403; confirm `/api-docs-json` shows
+      the new route
+- [ ] `docs/documents/users.md` — rewrite Entity/DTOs/Services/Endpoints sections; remove the
+      now-closed "no roleId existence check" Known Gap; document new endpoint, self-or-manager rule,
+      `user:role_manager`
+- [ ] `docs/documents/permissions.md` — add `user:role_manager`, matching existing structure
+- [ ] `docs/documents/roles.md` — update `super_admin`'s documented permission list if enumerated
+      literally
+- [ ] `docs/documents/swagger.md` — bump "35 paths, 47 operations" → "36 paths, 48 operations" once
+      confirmed live
+- [ ] `SPEC.md` — trim to one-line pointer at `docs/documents/users.md`, per "Root docs" rule
+- [ ] **Checkpoint 4 (final):** five-axis code review (`agent-skills:code-reviewer`), apply any
+      Critical/Important findings, re-verify, confirm final commit(s) with user

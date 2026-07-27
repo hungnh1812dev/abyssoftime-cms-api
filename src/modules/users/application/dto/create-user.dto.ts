@@ -1,6 +1,6 @@
-import { IsBoolean, IsEmail, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsEmail, IsNotEmpty, IsString } from "class-validator";
 
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty } from "@nestjs/swagger";
 
 export class CreateUserDto {
   @ApiProperty({ example: "user@example.com" })
@@ -21,18 +21,4 @@ export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
   password!: string;
-
-  @ApiProperty({ example: false })
-  @IsBoolean()
-  accountType!: boolean;
-
-  @ApiPropertyOptional({ example: false, description: "Defaults to false when omitted." })
-  @IsOptional()
-  @IsBoolean()
-  verified?: boolean;
-
-  @ApiProperty({ description: "Not validated for existence against the roles catalog." })
-  @IsString()
-  @IsNotEmpty()
-  roleId!: string;
 }
