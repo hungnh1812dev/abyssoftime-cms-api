@@ -1,56 +1,76 @@
-# Plan: Users module — lock down create/update, add role-assignment endpoint
+# Plan: Document list — API filter params (collection-type)
 
 See `SPEC.md` for the active spec — binding source of truth for scope/boundaries below.
 
 ## Context
 
-`SPEC.md`'s four confirmed decisions tighten the admin-facing `users` module: `email`/`username`
-become permanently immutable; `accountType`/`verified`/`roleId` stop being client-settable on both
-create and update (they're internal/fixed — `verified` only ever flips via the existing self-serve
-OTP-verify flow, `roleId` moves to a brand-new dedicated endpoint); and `PUT /api/users/:id` becomes
-callable by the record owner as well as anyone holding `user:manager`, not admin-only. This closes
-the gap where the DTO shape let a caller with `user:manager` silently rewrite login identifiers and
-set arbitrary internal state at creation time, and gives role reassignment its own narrowly-scoped
-permission (`user:role_manager`) instead of bundling it into general profile updates.
+`GET /api/v1/documents/collection-type/:slug` (`list-query.parser.ts` / `where-builder.ts` /
+`PrismaDocumentRepository.listPaginated`) currently supports `start`/`size`/`orderBy`/`sortDir` and a
+single `search` substring match, but has no way to filter rows by a field's value (e.g.
+`status = "active"`, `age >= 18`). This adds `filters[field][$op]=value` query params to that route,
+reusing the module's existing "validate against an allowlist, then build parameterized SQL" pattern
+already proven for `orderBy` and `search` — same defense-in-depth style (allowlist re-checked at both
+the parse layer and the raw-SQL layer), same file layout (a `support/*.ts` parser + a
+`where-builder.ts` SQL-builder), same DTO philosophy (shape gate only, real validation in the
+parser).
 
-Confirmed via direct reads of `user.controller.ts`, `update-user.service.ts`, `permissions.guard.ts`,
-`jwt-payload.ts`, plus a design review — no remaining unknowns.
+Confirmed via direct reads of `list-query.parser.ts`, `where-builder.ts`,
+`prisma-document.repository.ts`, `list-query.dto.ts`, `list-documents.service.ts`,
+`collection-type-document.controller.ts`, `configure-app.ts` (global `ValidationPipe`), and the
+real `cv-page`/`en-it-vocab` seed field definitions — no remaining unknowns.
 
 ## Confirmed decisions (from Spec phase, restated)
 
-1. `POST /api/users` stays; DTO drops `accountType`/`verified`/`roleId`. Service always writes fixed
-   values `accountType: false`, `verified: false`, `roleId: null`. New account becomes usable via the
-   existing `resend-otp` → `verify-otp` flow (unchanged).
-2. `email`/`username` permanently immutable — dropped from update entirely, uniqueness-on-update
-   checks removed.
-3. `PUT /api/users/:id` DTO shrinks to `name`/`password` only. Callable by the caller on their own
-   record OR anyone holding `user:manager` on someone else's. Level-hierarchy/super-admin-promotion
-   checks removed (existed only to gate `roleId`, which moves to decision 4).
-4. New `PATCH /api/users/:id/role` endpoint, `{ roleId }`, gated by new permission `user:role_manager`
-   (seeded to `super_admin` only, same pattern as every other `*:manager` slug).
+1. Scope: `GET /api/v1/documents/collection-type/:slug` only — not content-type list, not public
+   document routes, not single-type.
+2. Syntax: Strapi-style nested bracket notation `filters[field][$op]=value`, parsed for free by
+   Express's default `qs` query parser into `{ filters: { field: { $op: value } } }`.
+3. Operators: `$eq`, `$ne`, `$contains` (text only), `$gt`/`$gte`/`$lt`/`$lte` (number fields +
+   timestamp system columns). AND-only across fields; one operator per field per request.
+4. Filterable fields = the existing `sortableColumnsFor` allowlist (system columns +
+   text/number/boolean content fields). Reused, not duplicated.
+5. Operator-to-type gating: illegal operator for a field's type, unknown field, or unknown `$op` →
+   `400 BadRequestException` at parse time, never silently dropped or passed through unvalidated.
+6. Value coercion: `number` → finite JS `number`; `boolean` → literal `"true"`/`"false"` only;
+   text/timestamp → string. All values bound as parameterized placeholders.
+7. `ListQueryDto.filters` is a shape gate only (`@IsOptional() @IsObject()`), matching
+   `save-document.dto.ts`'s existing precedent.
+8. `filters` and `search` combine as independent ANDed clauses.
 
 ## Approach
 
-**Guard/authorization design for `PUT /:id`:** `PermissionsGuard` is a documented no-op when a route
-has no `@RequirePermissions` metadata (`permissions.guard.ts:14` — `if (!required || required.length
-=== 0) return true`), so the route drops `PermissionsGuard` entirely (keeps `JwtAuthGuard` only)
-rather than leave a silently-inert guard, and authorization moves fully into
-`UpdateUserService.execute`: after the existing 404 lookup, `if (documentId !== caller.sub &&
-!caller.permissions.includes("user:manager")) throw new ForbiddenException(...)`. Mirrors existing
-precedent — the service layer, not the guard, already owns the level-hierarchy business rule here.
+**Column "value class" drives operator legality**, not just allowlist membership. Six classes,
+mapped from `sortableColumnsFor`'s existing columns:
 
-**Role-assignment endpoint:** new `UpdateUserRoleService` gets its own `USER_REPOSITORY` +
-`ROLE_REPOSITORY` and *ports* (not deletes) the existing level-hierarchy + new-role-check +
-super-admin-promotion-carve-out logic being removed from `UpdateUserService` — same checks,
-relocated, plus a new 404 when the target `roleId` doesn't resolve (closes a documented gap in
-`docs/documents/users.md`'s Known Gaps: no existence check exists today). Kept as defense-in-depth
-even though `user:role_manager` is `super_admin`-only for now, since the point of a dedicated
-permission slug is that it's independently grantable later.
+- `text` field → `$eq` `$ne` `$contains` (string value, `$contains` reuses `escapeSearchValue`)
+- `number` field → `$eq` `$ne` `$gt` `$gte` `$lt` `$lte` (value coerced to a finite JS `number`)
+- `boolean` field → `$eq` `$ne` (value must be literal `"true"`/`"false"`, coerced to JS `boolean`)
+- `id` system column → `$eq` `$ne` only (coerced to `number`) — excluded from range ops per the
+  spec's literal wording, even though `id` is numeric
+- `document_id` system column → `$eq` `$ne` only (opaque UUID text, no coercion)
+- `created_at`/`updated_at`/`published_at` → `$eq` `$ne` `$gt` `$gte` `$lt` `$lte` (value validated
+  as a parseable date string via `new Date(value)`, bound as the original string — Postgres casts a
+  text parameter to `timestamptz` in a comparison context; **verify this against real Postgres at
+  the e2e step, not just mocked unit tests** — fall back to an explicit `CAST($n AS timestamptz)` in
+  `buildFilterWhere` if the implicit cast doesn't hold)
 
-**Repository/DI layer needs no changes** — `IUserRepository.update`/`UpdateUserData` already accepts
-a `roleId`-only partial update; `RoleModule` is already imported into `user.module.ts` (its consumer
-just changes from `UpdateUserService` to the new `UpdateUserRoleService`).
+**New file `application/support/filter-query.parser.ts`** (not folded into `list-query.parser.ts`)
+mirrors the existing one-concern-per-file split (`draft-publish.policy.ts`, `status-resolver.ts`,
+`component-io.service.ts` are all separate support files). Exports `parseFilters(contentType,
+rawFilters)`, called once from `parseListQuery`.
 
-Build order: Phase 1 (create) → Phase 2 (update) → Phase 3 (new role endpoint) → Phase 4 (manual
-verify, docs, spec cleanup). Each phase verified (`bun run build`/`test`/`lint`) before its checkpoint
-commit — see `tasks/todo.md`.
+**`where-builder.ts` gains the SQL-building half**: `FilterOperator` type, `ParsedFilter` interface
+(`{ column, operator, value }`), and `buildFilterWhere(filters, paramIndex)` — same shape as the
+existing `buildSearchWhere`, AND-joining each filter's clause, one parameter per filter (not a
+shared placeholder like `search`, since each filter is a distinct value). Types live in
+`where-builder.ts`, imported by both the parser and the Prisma repository — same direction
+`sortableColumnsFor` already flows.
+
+**No controller change needed** — `collection-type-document.controller.ts`'s `list()` already
+forwards the whole `ListQueryDto` into `ListDocumentsService.execute` untouched; adding `filters` to
+the DTO is enough to reach the parser.
+
+Build order: Phase 1 (SQL builder + parser primitives, independently testable) → Phase 2 (wire into
+`ListOptions`/repository/DTO — one full vertical slice) → Phase 3 (e2e proof against real Postgres +
+docs + spec cleanup + review). Each phase verified (`bun run build`/`test`/`lint`) before its
+checkpoint commit — see `tasks/todo.md`.
