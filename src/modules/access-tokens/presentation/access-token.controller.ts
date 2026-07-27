@@ -7,32 +7,17 @@ import { RevokeAccessTokenService } from "../application/services/revoke-access-
 import { AccessTokenEntity } from "../domain/entities/access-token.entity";
 
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Req, UseGuards } from "@nestjs/common";
+import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "@/common/guards/permissions.guard";
 import { type AuthenticatedRequest } from "@/common/types/authenticated-request";
 
-interface AccessTokenSecretResponse {
-  documentId: string;
-  name: string;
-  permissions: string[];
-  expiresAt: Date | null;
-  token: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import { AccessTokenResponseDto, AccessTokenSecretResponseDto } from "./dto/access-token-response.dto";
 
-interface AccessTokenResponse {
-  documentId: string;
-  name: string;
-  permissions: string[];
-  expiresAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  updatedBy: string | null;
-}
-
+@ApiTags("access-tokens")
+@ApiCookieAuth()
 @Controller("/api/access-tokens")
 export class AccessTokenController {
   constructor(
@@ -45,7 +30,9 @@ export class AccessTokenController {
   @Get()
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("api_token:read")
-  async list(): Promise<AccessTokenResponse[]> {
+  @ApiOperation({ summary: "List all access tokens (never includes the secret)" })
+  @ApiResponse({ status: 200, type: [AccessTokenResponseDto] })
+  async list(): Promise<AccessTokenResponseDto[]> {
     const entities = await this.listAccessTokensService.execute();
     return entities.map((entity) => this.toResponse(entity));
   }
@@ -53,7 +40,10 @@ export class AccessTokenController {
   @Post()
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("api_token:manager")
-  async create(@Body() dto: CreateAccessTokenDto, @Req() req: AuthenticatedRequest): Promise<AccessTokenSecretResponse> {
+  @ApiOperation({ summary: "Create an access token — returns the plaintext secret once" })
+  @ApiResponse({ status: 201, type: AccessTokenSecretResponseDto })
+  @ApiResponse({ status: 400, description: "One or more permission slugs don't exist" })
+  async create(@Body() dto: CreateAccessTokenDto, @Req() req: AuthenticatedRequest): Promise<AccessTokenSecretResponseDto> {
     const { entity, plaintext } = await this.createAccessTokenService.execute(dto, req.user.sub);
     return this.toSecretResponse(entity, plaintext);
   }
@@ -62,6 +52,9 @@ export class AccessTokenController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("api_token:manager")
+  @ApiOperation({ summary: "Delete an access token" })
+  @ApiResponse({ status: 204, description: "Deleted" })
+  @ApiResponse({ status: 404, description: "Access token not found" })
   async delete(@Param("id") documentId: string): Promise<void> {
     return this.deleteAccessTokenService.execute(documentId);
   }
@@ -69,12 +62,16 @@ export class AccessTokenController {
   @Post(":id/revoke")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("api_token:manager")
-  async revoke(@Param("id") documentId: string, @Body() dto: RevokeAccessTokenDto, @Req() req: AuthenticatedRequest): Promise<AccessTokenSecretResponse> {
+  @ApiOperation({ summary: "Rotate an access token's secret — returns the new plaintext secret once" })
+  @ApiResponse({ status: 200, type: AccessTokenSecretResponseDto })
+  @ApiResponse({ status: 400, description: "One or more permission slugs don't exist (rejected before rotating the secret)" })
+  @ApiResponse({ status: 404, description: "Access token not found" })
+  async revoke(@Param("id") documentId: string, @Body() dto: RevokeAccessTokenDto, @Req() req: AuthenticatedRequest): Promise<AccessTokenSecretResponseDto> {
     const { entity, plaintext } = await this.revokeAccessTokenService.execute(documentId, dto, req.user.sub);
     return this.toSecretResponse(entity, plaintext);
   }
 
-  private toResponse(entity: AccessTokenEntity): AccessTokenResponse {
+  private toResponse(entity: AccessTokenEntity): AccessTokenResponseDto {
     return {
       documentId: entity.documentId,
       name: entity.name,
@@ -86,7 +83,7 @@ export class AccessTokenController {
     };
   }
 
-  private toSecretResponse(entity: AccessTokenEntity, plaintext: string): AccessTokenSecretResponse {
+  private toSecretResponse(entity: AccessTokenEntity, plaintext: string): AccessTokenSecretResponseDto {
     return {
       documentId: entity.documentId,
       name: entity.name,
