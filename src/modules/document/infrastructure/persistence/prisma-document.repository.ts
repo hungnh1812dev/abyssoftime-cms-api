@@ -28,7 +28,7 @@ export class PrismaDocumentRepository implements IDocumentRepository {
 
   async findSingle(slug: string, version: DocumentVersion, fields: FieldDefinition[]): Promise<DocumentEntity | null> {
     const table = quoteIdent(documentTableName(slug));
-    const rows = await this.prisma.$queryRawUnsafe<Record<string, unknown>[]>(`SELECT * FROM ${table} WHERE version = $1 LIMIT 1`, version);
+    const rows = await this.prisma.$queryRawUnsafe<Record<string, unknown>[]>(`SELECT * FROM ${table} WHERE version = $1 ORDER BY id ASC LIMIT 1`, version);
     return rows.length > 0 ? mapRowToDocument(rows[0], fields) : null;
   }
 

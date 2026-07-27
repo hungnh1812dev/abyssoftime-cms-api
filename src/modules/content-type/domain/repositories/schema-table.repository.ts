@@ -1,4 +1,4 @@
-import { FieldDefinition } from "../entities/field-definition";
+import { ContentKind, FieldDefinition } from "../entities/field-definition";
 
 export interface LiveColumn {
   name: string;
@@ -23,7 +23,7 @@ export interface ColumnDiffPlan {
 }
 
 export interface ISchemaTableRepository {
-  ensureDocumentTable(slug: string, fields: FieldDefinition[]): Promise<void>;
+  ensureDocumentTable(slug: string, fields: FieldDefinition[], kind: ContentKind): Promise<void>;
   alterDocumentTable(slug: string, plan: ColumnDiffPlan): Promise<void>;
   dropDocumentTable(slug: string): Promise<void>;
   listDocumentColumns(slug: string): Promise<LiveColumn[]>;

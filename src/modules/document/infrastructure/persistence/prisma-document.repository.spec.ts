@@ -77,6 +77,15 @@ describe("PrismaDocumentRepository", () => {
       expect(String(sql)).toContain("version = $1");
       expect(params).toEqual(["published"]);
     });
+
+    it("orders by id ASC — deterministic defense-in-depth in case more than one row ever exists for a single type", async () => {
+      prisma.$queryRawUnsafe.mockResolvedValue([]);
+
+      await repository.findSingle("cv-page", "published", FIELDS);
+
+      const [sql] = prisma.$queryRawUnsafe.mock.calls[0];
+      expect(String(sql)).toContain("ORDER BY id ASC");
+    });
   });
 
   describe("findManyByVersion", () => {

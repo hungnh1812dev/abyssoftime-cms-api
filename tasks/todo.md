@@ -121,4 +121,4 @@ See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
 - [x] `docs/documents/document.md`
 - [x] `docs/ENTRYPOINT.md` — add index lines
 - [x] `SPEC.md` — trim to pointer line
-- [ ] **Checkpoint 12:** doc read-through — commit
+- [x] **Checkpoint 12:** doc read-through — commit

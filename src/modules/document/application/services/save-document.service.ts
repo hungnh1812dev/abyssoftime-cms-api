@@ -1,7 +1,7 @@
 import { DocumentEntity } from "../../domain/entities/document.entity";
 import { DOCUMENT_REPOSITORY, type IDocumentRepository } from "../../domain/repositories/document.repository";
 import { ComponentIoService } from "../support/component-io.service";
-import { resolveSaveVersion } from "../support/draft-publish.policy";
+import { assertKind, resolveSaveVersion } from "../support/draft-publish.policy";
 import { SchemaResolverService } from "../support/schema-resolver.service";
 import { randomUUID } from "node:crypto";
 
@@ -20,6 +20,7 @@ export class SaveDocumentService {
 
   async execute(slug: string, data: Record<string, unknown>, documentId: string | undefined, userId: string | null): Promise<DocumentEntity> {
     const contentType = await this.schemaResolver.resolve(slug);
+    assertKind(contentType, "collection");
     const version = resolveSaveVersion(contentType);
     const id = documentId ?? randomUUID();
 

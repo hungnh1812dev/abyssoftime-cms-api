@@ -1,6 +1,7 @@
 import { DocumentEntity } from "../../domain/entities/document.entity";
 import { DOCUMENT_REPOSITORY, type IDocumentRepository } from "../../domain/repositories/document.repository";
 import { ComponentIoService } from "../support/component-io.service";
+import { assertKind } from "../support/draft-publish.policy";
 import { SchemaResolverService } from "../support/schema-resolver.service";
 
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
@@ -15,6 +16,7 @@ export class GetPublicDocumentService {
 
   async execute(slug: string, documentId: string): Promise<DocumentEntity> {
     const contentType = await this.schemaResolver.resolve(slug);
+    assertKind(contentType, "collection");
 
     const row = await this.documents.findByVersion(slug, documentId, "published", contentType.fields);
     if (!row) {

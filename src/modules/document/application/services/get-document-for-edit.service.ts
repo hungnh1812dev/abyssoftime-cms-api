@@ -1,7 +1,7 @@
 import { DocumentEntity, DocumentStatus } from "../../domain/entities/document.entity";
 import { DOCUMENT_REPOSITORY, type IDocumentRepository } from "../../domain/repositories/document.repository";
 import { ComponentIoService } from "../support/component-io.service";
-import { resolveSaveVersion } from "../support/draft-publish.policy";
+import { assertKind, resolveSaveVersion } from "../support/draft-publish.policy";
 import { SchemaResolverService } from "../support/schema-resolver.service";
 import { resolveStatus } from "../support/status-resolver";
 
@@ -22,6 +22,7 @@ export class GetDocumentForEditService {
 
   async execute(slug: string, documentId: string): Promise<DocumentForEdit> {
     const contentType = await this.schemaResolver.resolve(slug);
+    assertKind(contentType, "collection");
     const version = resolveSaveVersion(contentType);
 
     const row = await this.documents.findByVersion(slug, documentId, version, contentType.fields);

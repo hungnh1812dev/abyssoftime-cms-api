@@ -1,7 +1,7 @@
 import { DocumentEntity } from "../../domain/entities/document.entity";
 import { DOCUMENT_REPOSITORY, type IDocumentRepository } from "../../domain/repositories/document.repository";
 import { ComponentIoService } from "../support/component-io.service";
-import { resolveSaveVersion } from "../support/draft-publish.policy";
+import { assertKind, resolveSaveVersion } from "../support/draft-publish.policy";
 import { SchemaResolverService } from "../support/schema-resolver.service";
 import { resolveStatus } from "../support/status-resolver";
 
@@ -19,6 +19,7 @@ export class GetSingleTypeService {
 
   async execute(slug: string): Promise<DocumentForEdit> {
     const contentType = await this.schemaResolver.resolve(slug);
+    assertKind(contentType, "single");
     const version = resolveSaveVersion(contentType);
 
     const row = await this.documents.findSingle(slug, version, contentType.fields);
