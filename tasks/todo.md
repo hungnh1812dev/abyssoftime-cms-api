@@ -17,20 +17,22 @@ See `tasks/plan.md` for full context, approach, and confirmed decisions.
 
 ## Phase 2 — Update endpoint lockdown (self-or-manager, immutable identifiers)
 
-- [ ] `update-user.dto.ts` — shrink to `name?`/`password?` only
-- [ ] `update-user.service.ts` — delete email/username uniqueness block, level-hierarchy block,
+- [x] `update-user.dto.ts` — shrink to `name?`/`password?` only
+- [x] `update-user.service.ts` — delete email/username uniqueness block, level-hierarchy block,
       new-role-check block; drop unused `ROLE_REPOSITORY` injection/`IRoleRepository`
       import/`SUPER_ADMIN_ROLE_SLUG`; add self-or-`user:manager` check after the 404 lookup;
       `users.update(...)` now only passes `name`/`password`
-- [ ] `user.controller.ts` — on `PUT :id`, remove `@RequirePermissions("user:manager")` and drop
+- [x] `user.controller.ts` — on `PUT :id`, remove `@RequirePermissions("user:manager")` and drop
       `PermissionsGuard` from `@UseGuards` (keep `JwtAuthGuard` only); update 403 `@ApiResponse`
-      description; add `Patch` to the `@nestjs/common` import
-- [ ] `update-user.service.spec.ts` — remove role-repository mocking and all hierarchy/new-role-check
-      cases (behavior no longer exists); add self-update-allowed, other-user-with-`user:manager`,
-      other-user-without-permission-403, and `users.update` called with only `name`/`password` cases
-- [ ] `user.controller.spec.ts` — remove/rewrite any `@RequirePermissions` metadata assertion on
-      `PUT :id`; add a self-update-without-`user:manager` case
-- [ ] **Checkpoint 2:** `bun run build && bun run test src/modules/users && bun run lint` green
+      description. (`Patch` import for Phase 3 deferred to that phase.)
+- [x] `update-user.service.spec.ts` — rewritten: role-repository mocking and all hierarchy/new-role-
+      check cases removed (behavior no longer exists); added self-update-allowed,
+      other-user-with-`user:manager`, other-user-without-permission-403, and `users.update` called
+      with only `name`/`password` cases
+- [x] `user.controller.spec.ts` — no change needed: its `update()` test only asserts delegation to
+      `UpdateUserService.execute(documentId, dto, req.user)`, which is unchanged; guard behavior
+      isn't exercised at this level (per existing convention)
+- [x] **Checkpoint 2:** `bun run build && bun run test src/modules/users && bun run lint` green
       (expect deliberate test-count changes vs. baseline — old hierarchy cases removed); confirm
       before committing
 
