@@ -108,14 +108,14 @@ describe("Media (e2e)", () => {
   });
 
   it("rejects an unauthenticated request with 401", async () => {
-    await request(app.getHttpServer()).get("/api/media").expect(401);
+    await request(app.getHttpServer()).get("/api/v1/media").expect(401);
   });
 
   it("uploads an image successfully with a media:manager token", async () => {
     const buffer = buildPngBuffer(800, 600);
 
     const response = await request(app.getHttpServer())
-      .post("/api/media/upload")
+      .post("/api/v1/media/upload")
       .set("Cookie", [`access_token=${managerToken}`])
       .attach("file", buffer, "photo.png")
       .expect(201);
@@ -138,7 +138,7 @@ describe("Media (e2e)", () => {
     const oversized = Buffer.concat([buffer, Buffer.alloc(maxUploadBytes - buffer.length + 1)]);
 
     await request(app.getHttpServer())
-      .post("/api/media/upload")
+      .post("/api/v1/media/upload")
       .set("Cookie", [`access_token=${managerToken}`])
       .attach("file", oversized, "too-big.png")
       .expect(413);
@@ -151,7 +151,7 @@ describe("Media (e2e)", () => {
     const buffer = Buffer.from("just some plain text, not an image");
 
     await request(app.getHttpServer())
-      .post("/api/media/upload")
+      .post("/api/v1/media/upload")
       .set("Cookie", [`access_token=${managerToken}`])
       .attach("file", buffer, "note.txt")
       .expect(422);
@@ -163,7 +163,7 @@ describe("Media (e2e)", () => {
     const buffer = buildPngBuffer(400, 300);
 
     await request(app.getHttpServer())
-      .post("/api/media/upload")
+      .post("/api/v1/media/upload")
       .set("Cookie", [`access_token=${readOnlyToken}`])
       .attach("file", buffer, "photo.png")
       .expect(403);
@@ -171,7 +171,7 @@ describe("Media (e2e)", () => {
 
   it("lists media reachable by a media:read-only token", async () => {
     const response = await request(app.getHttpServer())
-      .get("/api/media")
+      .get("/api/v1/media")
       .set("Cookie", [`access_token=${readOnlyToken}`])
       .expect(200);
 
@@ -181,14 +181,14 @@ describe("Media (e2e)", () => {
   it("deletes a media asset, removing both the storage object and the DB row", async () => {
     const buffer = buildPngBuffer(200, 200);
     const uploadResponse = await request(app.getHttpServer())
-      .post("/api/media/upload")
+      .post("/api/v1/media/upload")
       .set("Cookie", [`access_token=${managerToken}`])
       .attach("file", buffer, "to-delete.png")
       .expect(201);
     const { documentId, publicId } = uploadResponse.body as MediaUploadResponseBody;
 
     await request(app.getHttpServer())
-      .delete(`/api/media/${documentId}`)
+      .delete(`/api/v1/media/${documentId}`)
       .set("Cookie", [`access_token=${managerToken}`])
       .expect(204);
 
@@ -200,7 +200,7 @@ describe("Media (e2e)", () => {
   it("returns 403 when deleting without a media:manager token", async () => {
     const buffer = buildPngBuffer(150, 150);
     const uploadResponse = await request(app.getHttpServer())
-      .post("/api/media/upload")
+      .post("/api/v1/media/upload")
       .set("Cookie", [`access_token=${managerToken}`])
       .attach("file", buffer, "protected.png")
       .expect(201);
@@ -208,14 +208,14 @@ describe("Media (e2e)", () => {
     createdMediaIds.push(documentId);
 
     await request(app.getHttpServer())
-      .delete(`/api/media/${documentId}`)
+      .delete(`/api/v1/media/${documentId}`)
       .set("Cookie", [`access_token=${readOnlyToken}`])
       .expect(403);
   });
 
   it("returns 404 when deleting an unknown media asset", async () => {
     await request(app.getHttpServer())
-      .delete("/api/media/00000000-0000-0000-0000-000000000000")
+      .delete("/api/v1/media/00000000-0000-0000-0000-000000000000")
       .set("Cookie", [`access_token=${managerToken}`])
       .expect(404);
   });
@@ -223,7 +223,7 @@ describe("Media (e2e)", () => {
   it("leaves the DB row intact when the storage delete fails", async () => {
     const buffer = buildPngBuffer(100, 100);
     const uploadResponse = await request(app.getHttpServer())
-      .post("/api/media/upload")
+      .post("/api/v1/media/upload")
       .set("Cookie", [`access_token=${managerToken}`])
       .attach("file", buffer, "keep.png")
       .expect(201);
@@ -233,7 +233,7 @@ describe("Media (e2e)", () => {
     storage.failNextDelete();
 
     await request(app.getHttpServer())
-      .delete(`/api/media/${documentId}`)
+      .delete(`/api/v1/media/${documentId}`)
       .set("Cookie", [`access_token=${managerToken}`])
       .expect(500);
 
