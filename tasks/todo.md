@@ -30,10 +30,10 @@ See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
 
 ## Phase 3 — Content-type persistence (first DB-touching code)
 
-- [ ] `prisma-content-type.repository.ts` + spec
-- [ ] `prisma-schema-table.repository.ts` + spec — raw DDL, identifiers quoted, values
+- [x] `prisma-content-type.repository.ts` + spec
+- [x] `prisma-schema-table.repository.ts` + spec — raw DDL, identifiers quoted, values
       parameterized, `information_schema` introspection
-- [ ] **Checkpoint 3:** persistence specs green, build clean
+- [x] **Checkpoint 3:** persistence specs green, build clean
 
 ## Phase 4 — Content-type sync + services + controller + module
 
