@@ -1,75 +1,124 @@
-# Todo — Media Module + Storage Module (Go → NestJS/Prisma conversion)
+# Todo — Content-Type-Schema-Driven CMS Document Engine
 
-See `tasks/plan.md` for full context and rationale.
+See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
 
-## Phase 0 — Dependencies + Schema
+## Phase 0 — Prisma model + migration + dir scaffold
 
-- [x] `bun add @aws-sdk/client-s3 cloudinary`
-- [x] `prisma/postgresql/schema.prisma` — `MediaAsset` model (`documentId` as `@id`, per confirmed
-      decision, not the source doc's `gormId`); field set is a best-guess inference, see
-      `tasks/plan.md`
-- [x] `bun run prisma:migrate` — applied `20260726074800_add_media_assets`
-- [x] `bun run prisma:generate` — `MediaAsset` present in generated client
+- [x] `prisma/postgresql/schema.prisma` — `ContentType` model (`content_types` table)
+- [x] `bun run prisma:migrate` — `add_content_types`
+- [x] `bun run prisma:generate`
 - [x] **Checkpoint 0:** `bun run build` succeeds
 
-## Phase 1 — Storage module
+## Phase 1 — SQL foundations (pure, no DB, highest-risk-first)
 
-- [x] `storage-adapter.repository.ts` — port
-- [x] `s3-storage.adapter.ts` + spec
-- [x] `cloudinary-storage.adapter.ts` + spec
-- [x] `lazy-storage.adapter.ts` + spec
-- [x] `storage.module.ts`
-- [x] **Checkpoint 1:** `bun run test storage` green, build clean
+- [ ] `field-definition.ts` — `ContentKind`/`FieldType`/`FieldDefinition`/`isComponentField`
+- [ ] `sql-identifier.ts` + spec — `assertSafeSlug`/`assertSafeFieldName`/`quoteIdent` (the
+      injection choke-point)
+- [ ] `table-naming.ts` + spec — `documentTableName`/`componentTableName` + hash-truncation
+- [ ] `field-type-mapping.ts` + spec — `FieldType → Postgres column type`
+- [ ] **Checkpoint 1:** schema-helper specs green, build clean
 
-## Phase 2 — Media domain + persistence
+## Phase 2 — Content-type domain + loader/validator/differ (pure/fs, no DB)
 
-- [x] `media-asset.entity.ts`
-- [x] `media-asset.repository.ts` — interface + `MediaAssetNotFoundError`
-- [x] `prisma-media.repository.ts` + spec
-- [x] **Checkpoint 2:** repository spec green
+- [ ] `content-type.entity.ts`
+- [ ] `content-type.repository.ts` — `IContentTypeRepository` + `ContentTypeNotFoundError`
+- [ ] `schema-table.repository.ts` — `ISchemaTableRepository`
+- [ ] `schema-validator.ts` + spec
+- [ ] `schema-loader.service.ts` + spec
+- [ ] `schema-differ.ts` + spec — pure diff plan (add/drop/retype), no `DROP TABLE`
+- [ ] **Checkpoint 2:** content-type specs green (excl. persistence), typecheck clean
 
-## Phase 3 — Media application services
+## Phase 3 — Content-type persistence (first DB-touching code)
 
-- [x] `image-dimensions.util.ts` + spec
-- [x] `upload-media.service.ts` + spec
-- [x] `list-media.service.ts` + spec
-- [x] `delete-media.service.ts` + spec
-- [x] **Checkpoint 3:** service specs green
+- [ ] `prisma-content-type.repository.ts` + spec
+- [ ] `prisma-schema-table.repository.ts` + spec — raw DDL, identifiers quoted, values
+      parameterized, `information_schema` introspection
+- [ ] **Checkpoint 3:** persistence specs green, build clean
 
-## Phase 4 — Media presentation + wiring
+## Phase 4 — Content-type sync + services + controller + module
 
-- [x] `media.controller.ts`
-- [x] `media.module.ts`
-- [x] `app.module.ts` — register `StorageModule`, `MediaModule`
-- [x] `seed-default-data.service.ts` — add `media:manager`/`media:read`
-- [x] `seed-default-data.service.spec.ts` — update counts/slugs
-- [x] **Checkpoint 4:** build/typecheck/lint/test:cov all clean — commit
+- [ ] `content-type-sync.service.ts` + spec — `OnApplicationBootstrap`
+- [ ] `list-content-type.service.ts` + spec
+- [ ] `get-content-type.service.ts` + spec — exported for `document` module
+- [ ] `content-type.controller.ts` + spec — `/api/content-types`, read-only
+- [ ] `content-type.module.ts` — exports `GetContentTypeService` + `CONTENT_TYPE_REPOSITORY`
+- [ ] `app.module.ts` — register `ContentTypeModule`
+- [ ] **Checkpoint 4:** build/typecheck/lint/`test content-type` all clean — **commit here**
 
-## Phase 5 — Test infra + e2e
+## Phase 5 — Document domain + SQL helpers + raw DML repos
 
-- [x] `test/utils/noop-storage.adapter.ts`
-- [x] `test/utils/app-test.util.ts`
-- [x] `test/media.e2e-spec.ts` (11/11 passing against the user's Postgres)
-- [x] **Checkpoint 5:** `bun run test:e2e` green (11/11) — required granting `media:manager`/
-      `media:read` to the user's pre-existing `super_admin`/`admin` roles via `PUT /api/roles/:id`
-      first (expected: `SeedDefaultDataService` doesn't retroactively sync permissions onto roles
-      that already existed before this cycle).
+- [ ] `document.entity.ts`, `component.entity.ts`
+- [ ] `document.repository.ts`, `component.repository.ts` — ports w/ optional `tx` param
+- [ ] `row-mapper.ts` + spec
+- [ ] `where-builder.ts` + spec — `ILIKE` search + `ORDER BY` allowlist
+- [ ] `prisma-document.repository.ts` + spec — `tx ?? this.prisma`
+- [ ] `prisma-component.repository.ts` + spec — `tx ?? this.prisma`
+- [ ] **Checkpoint 5:** `document/infrastructure` specs green, build clean
 
-## Phase 6 — Docs
+## Phase 6 — Document support layer
 
-- [x] `docs/documents/media.md`
-- [x] `docs/documents/storage.md`
-- [x] `docs/ENTRYPOINT.md` — add index lines
-- [x] `SPEC.md` — trim to pointer line
-- [x] **Checkpoint 6:** doc read-through — commit
+- [ ] `schema-resolver.service.ts` + spec
+- [ ] `draft-publish.policy.ts` + spec — mode A/B branching
+- [ ] `status-resolver.ts` + spec — incl. batch variant (no N+1)
+- [ ] `component-io.service.ts` + spec — recursive extract/hydrate/cascade, 3-level seeds
+- [ ] `list-query.parser.ts` + spec
+- [ ] **Checkpoint 6:** `document/application/support` specs green, typecheck clean
 
-## Phase 7 — Manual verification (non-blocking for Phase 4/6 commits)
+## Phase 7 — Document collection services
 
-- [x] User sets real `CLOUDINARY_CLOUD_NAME`/`CLOUDINARY_API_KEY`/`CLOUDINARY_API_SECRET` in their
-      own `.env.local` (`STORAGE_PROVIDER` left unset, defaults to `cloudinary`; `AWS_*`/S3 not
-      exercised)
-- [x] Confirmed upload → list → delete against real Cloudinary: `POST /api/media/upload` → `201`
-      with a genuine `res.cloudinary.com` URL (fetched directly, `200`); `GET /api/media` → `200`
-      listing it; `DELETE /api/media/:id` → `204`, DB row gone from a follow-up list, and the
-      Cloudinary URL now `404`s (object actually deleted, not just the DB row)
-- [x] User confirms e2e suite against their own reachable Postgres — done, see Phase 5 Checkpoint 5
+- [ ] `save-document.service.ts` + spec — transactional
+- [ ] `publish-document.service.ts` + spec — mode B → 400
+- [ ] `unpublish-document.service.ts` + spec — mode B → 400
+- [ ] `get-document-for-edit.service.ts` + spec
+- [ ] `get-public-document.service.ts` + spec
+- [ ] `delete-document.service.ts` + spec — transactional
+- [ ] `list-documents.service.ts` + spec
+- [ ] `duplicate-document.service.ts` + spec
+- [ ] **Checkpoint 7:** collection service specs green
+
+## Phase 8 — Bulk + single-type services
+
+- [ ] `bulk-create-publish.service.ts` + spec — compensating rollback
+- [ ] `bulk-delete.service.ts` + spec — partial success, no rollback
+- [ ] `get-single-type.service.ts` + spec
+- [ ] `save-single-type.service.ts` + spec — transactional
+- [ ] `publish-single-type.service.ts` + spec — mode B → 400
+- [ ] `unpublish-single-type.service.ts` + spec — mode B → 400
+- [ ] **Checkpoint 8:** all `document/application/services` specs green, build clean
+
+## Phase 9 — Document presentation + DTOs + module wiring
+
+- [ ] `save-document.dto.ts`, `bulk-create.dto.ts`, `bulk-delete.dto.ts`, `list-query.dto.ts`
+- [ ] `single-type-document.controller.ts` + spec
+- [ ] `collection-type-document.controller.ts` + spec — `/bulk` routes before `/:documentId`
+- [ ] `public-document.controller.ts` + spec — no guards
+- [ ] `document.module.ts` — imports `ContentTypeModule`
+- [ ] `app.module.ts` — register `DocumentModule`
+- [ ] **Checkpoint 9:** build/typecheck/lint/`test document` all clean
+
+## Phase 10 — Seed permissions + seed JSON
+
+- [ ] `seed-default-data.service.ts` — add 7 slugs (`content_type:read`, `document:read/create/
+      update/delete/publish/unpublish`); all 7 → `super_admin`; `content_type:read`+`document:read`
+      → `admin`
+- [ ] `seed-default-data.service.spec.ts` — update counts/ordered-slug/permissions-array assertions
+- [ ] `content-types/cv-page.json` — adopted + `"draftToPublish": true`
+- [ ] `content-types/en-it-vocab.json` — adopted + `"draftToPublish": true`
+- [ ] **Checkpoint 10:** build/typecheck/lint/`test:cov` all clean — **commit here**
+
+## Phase 11 — e2e (real Postgres, manual/flagged if unreachable)
+
+- [ ] `test/content-engine.e2e-spec.ts` — boot sync creates real tables; mode-A full lifecycle;
+      mode-B 400 on publish; 401/403; bulk happy/partial; 3-level component round-trip; schema-edit
+      data preservation
+- [ ] **Checkpoint 11:** `bun run test:e2e` green against reachable Postgres (grant the 7 new slugs
+      to pre-existing `super_admin`/`admin` roles via `PUT /api/roles/:id` if needed — same
+      expected gap as the media cycle)
+
+## Phase 12 — Docs
+
+- [ ] `docs/documents/content-type.md`
+- [ ] `docs/documents/document.md`
+- [ ] `docs/ENTRYPOINT.md` — add index lines
+- [ ] `SPEC.md` — trim to pointer line
+- [ ] **Checkpoint 12:** doc read-through — commit
