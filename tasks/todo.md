@@ -47,34 +47,38 @@ See `tasks/plan.md` for full context, build order, and confirmed decisions.
 
 ## Phase 4 — `access-tokens` module
 
-- [ ] `create-access-token.dto.ts` / `revoke-access-token.dto.ts` — `expiresIn` enum values as the
+- [x] `create-access-token.dto.ts` / `revoke-access-token.dto.ts` — `expiresIn` enum values as the
       property's `enum`; never a real token example
-- [ ] `access-token.controller.ts` — `@ApiTags("access-tokens")`; all 4 routes `@ApiCookieAuth()`;
-      `GET` 200 (no `token` field in response — note that in the operation description); `POST`
-      201/400(unknown slug); `POST /:id/revoke` 200/400/404; `DELETE` 204/404
-- [ ] **Checkpoint 4:** build/lint/test:cov green
+- [x] New `presentation/dto/access-token-response.dto.ts` (`AccessTokenResponseDto` for list,
+      `AccessTokenSecretResponseDto` for create/revoke) — replaced the controller's two local
+      plain-object interfaces with these classes (same shape, zero behavior change)
+- [x] `access-token.controller.ts` — `@ApiTags("access-tokens")` + class-level `@ApiCookieAuth()`;
+      `GET` 200 (no `token` field); `POST` 201/400(unknown slug); `POST /:id/revoke`
+      200/400/404; `DELETE` 204/404
+- [x] **Checkpoint 4:** verified together with Phases 5-6 below
 
 ## Phase 5 — `auth` module
 
-- [ ] All 6 DTOs (`register`/`login`/`verify-otp`/`resend-otp`/`forgot-password`/`reset-password`)
+- [x] All 6 DTOs (`register`/`login`/`verify-otp`/`resend-otp`/`forgot-password`/`reset-password`)
       — placeholder examples only (`"user@example.com"`, `"SecurePass123!"`, OTP `"123456"`), never
       anything resembling a real credential
-- [ ] `auth.controller.ts` — `@ApiTags("auth")`; **no** `@ApiCookieAuth()` anywhere (every route is
-      public per `auth.md`); document that `login`/`refresh` set cookies and `logout` clears them
-      via each operation's description (Swagger has no first-class "sets a cookie" decorator, so
-      this is prose, not a typed annotation); status codes: register 201/409; verify-otp
-      200/400/404/409; resend-otp 200/404/409; has-users 200; login 200/401/403; refresh 200/401;
-      logout 200; forgot-password 200; reset-password 200/400
-- [ ] **Checkpoint 5:** build/lint/test:cov green
+- [x] New `presentation/dto/auth-response.dto.ts` (`MessageResponseDto`, `HasUsersResponseDto`)
+- [x] `auth.controller.ts` — `@ApiTags("auth")`; **no** `@ApiCookieAuth()` anywhere (every route is
+      public); a class-level comment documents that login/refresh set cookies and logout clears
+      them (Swagger has no first-class "sets a cookie" decorator); status codes: register 201/409;
+      verify-otp 200/400/404/409; resend-otp 200/404/409; has-users 200; login 200/401/403; refresh
+      200/401; logout 200; forgot-password 200; reset-password 200/400
+- [x] **Checkpoint 5:** verified together with Phases 4/6
 
 ## Phase 6 — `media` module
 
-- [ ] `media.controller.ts` — `@ApiTags("media")`; all 3 routes `@ApiCookieAuth()`; `upload` gets
+- [x] New `presentation/dto/media-asset-response.dto.ts`
+- [x] `media.controller.ts` — `@ApiTags("media")` + class-level `@ApiCookieAuth()`; `upload` gets
       `@ApiConsumes("multipart/form-data")` + `@ApiBody({ schema: { type: "object", properties: {
       file: { type: "string", format: "binary" } } } })` (no DTO class exists for this route — it's
-      Multer-handled, per `media.md`); `GET` 200; `POST /upload` 201/400(no file)/413/422; `DELETE`
-      204/404
-- [ ] **Checkpoint 6:** build/lint/test:cov green
+      Multer-handled); `GET` 200; `POST /upload` 201/400(no file)/413/422; `DELETE` 204/404
+- [x] **Checkpoint 4-6:** `bun run build && bun run test src/modules/access-tokens
+      src/modules/auth src/modules/media` green (30 suites, 131 tests)
 
 ## Phase 7 — `content-type` module
 
