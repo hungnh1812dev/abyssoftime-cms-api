@@ -135,7 +135,13 @@ See `tasks/plan.md` for full context, build order, and confirmed decisions.
 
 ## Phase 11 — Review + cleanup
 
-- [ ] Five-axis code review (`agent-skills:code-reviewer`)
-- [ ] Apply any Critical/Important findings
+- [x] Five-axis code review (`agent-skills:code-reviewer`) — **APPROVE**, zero Critical/Important
+      findings. Three Suggestion-level items: (1) `/api-docs` mounted unconditionally in all
+      environments — already a deliberate, user-confirmed decision (spec explicitly declined
+      env-gating), left as-is; (2) `bulkCreate`'s operation summary under-described the
+      Publish-stage rollback edge case — fixed; (3) pre-existing `updatedBy` type drift in
+      `permissions.md`/`access-tokens.md` (docs say `string`, entity is `string | null`) — predates
+      this cycle, out of scope, not touched
+- [x] Applied finding (2); rebuilt + retested `src/modules/document` (28 suites, 187 tests) green
 - [x] `SPEC.md` already trimmed to the "No active spec" pointer form (Phase 10) — no separate
       `/specs/*.md` file exists in this repo's convention to delete
