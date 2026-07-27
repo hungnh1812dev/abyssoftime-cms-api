@@ -11,12 +11,12 @@ See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
 
 ## Phase 1 — SQL foundations (pure, no DB, highest-risk-first)
 
-- [ ] `field-definition.ts` — `ContentKind`/`FieldType`/`FieldDefinition`/`isComponentField`
-- [ ] `sql-identifier.ts` + spec — `assertSafeSlug`/`assertSafeFieldName`/`quoteIdent` (the
+- [x] `field-definition.ts` — `ContentKind`/`FieldType`/`FieldDefinition`/`isComponentField`
+- [x] `sql-identifier.ts` + spec — `assertSafeSlug`/`assertSafeFieldName`/`quoteIdent` (the
       injection choke-point)
-- [ ] `table-naming.ts` + spec — `documentTableName`/`componentTableName` + hash-truncation
-- [ ] `field-type-mapping.ts` + spec — `FieldType → Postgres column type`
-- [ ] **Checkpoint 1:** schema-helper specs green, build clean
+- [x] `table-naming.ts` + spec — `documentTableName`/`componentTableName` + hash-truncation
+- [x] `field-type-mapping.ts` + spec — `FieldType → Postgres column type`
+- [x] **Checkpoint 1:** schema-helper specs green, build clean
 
 ## Phase 2 — Content-type domain + loader/validator/differ (pure/fs, no DB)
 
