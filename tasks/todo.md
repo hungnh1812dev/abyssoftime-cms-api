@@ -128,18 +128,14 @@ See `tasks/plan.md` for full context, build order, and confirmed decisions.
 
 ## Phase 10 — Update spec/docs
 
-- [ ] New `docs/documents/swagger.md` — mirrors this plan's Context section once the feature is
-      actually built (dependency version installed, exact bootstrap file touched, final route/tag
-      list)
-- [ ] `docs/ENTRYPOINT.md` — add the new doc file's index entry
-- [ ] Trim `SPEC.md` back to a one-line pointer at `docs/documents/swagger.md`, per the "Root docs"
-      rule
+- [x] New `docs/documents/swagger.md`
+- [x] `docs/ENTRYPOINT.md` — added the new doc file's index entry
+- [x] Trimmed `SPEC.md` back to a one-line pointer at `docs/documents/swagger.md`, per the "Root
+      docs" rule
 
 ## Phase 11 — Review + cleanup
 
 - [ ] Five-axis code review (`agent-skills:code-reviewer`)
 - [ ] Apply any Critical/Important findings
-- [ ] Delete this cycle's `SPEC.md` content back down to the "No active spec" pointer form (already
-      done in Phase 10, just confirm) — no `/specs/*.md` file exists in this repo's convention to
-      separately delete (per `docs/rules/workflow.md`'s cleanup step, SPEC.md itself is the artifact
-      that gets trimmed, matching the previous cycle's own closeout)
+- [x] `SPEC.md` already trimmed to the "No active spec" pointer form (Phase 10) — no separate
+      `/specs/*.md` file exists in this repo's convention to delete
