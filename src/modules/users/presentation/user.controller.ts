@@ -17,7 +17,7 @@ import { UserResponseDto } from "./user-response.dto";
 
 @ApiTags("users")
 @ApiCookieAuth()
-@Controller("/api/users")
+@Controller("users")
 export class UserController {
   constructor(
     private readonly listUsers: ListUserService,

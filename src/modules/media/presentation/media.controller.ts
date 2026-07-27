@@ -24,7 +24,7 @@ interface UploadedMulterFile {
 
 @ApiTags("media")
 @ApiCookieAuth()
-@Controller("/api/media")
+@Controller("media")
 export class MediaController {
   constructor(
     private readonly uploadMediaService: UploadMediaService,

@@ -2,7 +2,7 @@
 
 `src/modules/storage/**` — a `StorageAdapter` port with `S3StorageAdapter` and `CloudinaryStorageAdapter` implementations, bound behind a `LazyStorageAdapter` wrapper that defers provider selection/config resolution to first call. No controllers — pure service dependency, consumed by [`media`](media.md) (`MediaModule` imports `StorageModule` and injects `STORAGE_ADAPTER`).
 
-The "lazy" part is load-bearing: `LazyStorageAdapter` reads no config in its constructor, so any e2e suite that boots `AppModule` without ever calling `/api/media/*` (i.e. every existing suite) never needs AWS/Cloudinary credentials to be set.
+The "lazy" part is load-bearing: `LazyStorageAdapter` reads no config in its constructor, so any e2e suite that boots `AppModule` without ever calling `/api/v1/media/*` (i.e. every existing suite) never needs AWS/Cloudinary credentials to be set.
 
 ## Port
 

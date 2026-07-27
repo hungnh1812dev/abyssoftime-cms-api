@@ -82,14 +82,14 @@ Both `Create` and `Revoke` are the **first services in this repo** to read `req.
 
 ## Endpoints
 
-`presentation/access-token.controller.ts`, `@Controller("/api/access-tokens")`, `JwtAuthGuard` + `PermissionsGuard` on every route:
+`presentation/access-token.controller.ts`, `@Controller("/api/v1/access-tokens")`, `JwtAuthGuard` + `PermissionsGuard` on every route:
 
 | Method   | Path                              | Service                    | Required permission  | Notes                                                                 |
 | -------- | ---------------------------------- | --------------------------- | --------------------- | ---------------------------------------------------------------------- |
-| `GET`    | `/api/access-tokens`               | `ListAccessTokensService`   | `api_token:read`      | Response strips `token` entirely (explicit field mapping, not `delete`, since entity fields are `readonly`) |
-| `POST`   | `/api/access-tokens`               | `CreateAccessTokenService`  | `api_token:manager`   | Returns plaintext `token` once                                        |
-| `POST`   | `/api/access-tokens/:id/revoke`    | `RevokeAccessTokenService`  | `api_token:manager`   | Rotates the secret always; returns the new plaintext `token` once; `404` if not found |
-| `DELETE` | `/api/access-tokens/:id` (204)     | `DeleteAccessTokenService`  | `api_token:manager`   | Hard delete; `404` if not found                                       |
+| `GET`    | `/api/v1/access-tokens`               | `ListAccessTokensService`   | `api_token:read`      | Response strips `token` entirely (explicit field mapping, not `delete`, since entity fields are `readonly`) |
+| `POST`   | `/api/v1/access-tokens`               | `CreateAccessTokenService`  | `api_token:manager`   | Returns plaintext `token` once                                        |
+| `POST`   | `/api/v1/access-tokens/:id/revoke`    | `RevokeAccessTokenService`  | `api_token:manager`   | Rotates the secret always; returns the new plaintext `token` once; `404` if not found |
+| `DELETE` | `/api/v1/access-tokens/:id` (204)     | `DeleteAccessTokenService`  | `api_token:manager`   | Hard delete; `404` if not found                                       |
 
 ## ApiTokenGuard (standalone, unwired)
 
@@ -109,7 +109,7 @@ Both `Create` and `Revoke` are the **first services in this repo** to read `req.
 
 ## Permissions catalog additions
 
-`src/bootstrap/seed-default-data.service.ts` — two new slugs added to `DEFAULT_PERMISSIONS` (`api_token:manager`, `api_token:read`), granted to `super_admin` and `admin` respectively in `DEFAULT_ROLES`. Seeding is additive-only (`findBySlug` guard, skip if already present) — **existing dev/prod databases seeded before this change will not retroactively gain these permissions on an already-existing `super_admin`/`admin` role**; that requires a manual `PUT /api/roles/:id` (or a fresh DB) to pick up the new defaults on a pre-existing install.
+`src/bootstrap/seed-default-data.service.ts` — two new slugs added to `DEFAULT_PERMISSIONS` (`api_token:manager`, `api_token:read`), granted to `super_admin` and `admin` respectively in `DEFAULT_ROLES`. Seeding is additive-only (`findBySlug` guard, skip if already present) — **existing dev/prod databases seeded before this change will not retroactively gain these permissions on an already-existing `super_admin`/`admin` role**; that requires a manual `PUT /api/v1/roles/:id` (or a fresh DB) to pick up the new defaults on a pre-existing install.
 
 ## Cross-cutting fix: real `accessTokenCount`
 

@@ -11,7 +11,7 @@ import { validateDocumentIdParam, validateSlugParam } from "./validate-params";
 // No guards anywhere — always resolves the published version only, regardless of draftToPublish
 // mode; draft data is never reachable through these routes.
 @ApiTags("documents-public")
-@Controller("/api/public/documents")
+@Controller("public/documents")
 export class PublicDocumentController {
   constructor(
     private readonly getPublicDocument: GetPublicDocumentService,

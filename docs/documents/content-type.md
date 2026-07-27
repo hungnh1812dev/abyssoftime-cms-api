@@ -12,7 +12,7 @@ Two Go-derived design docs (content-type + component) describe the original Go/G
 4. **Permission slug naming** — the Go doc's `content_types:read` (plural resource) is `content_type:read` here (singular), matching this repo's existing convention (`role:read`, `user:read`, `media:read`, ...).
 5. **Primary key** — same inversion as every other module in this repo (see `media.md`'s equivalent note): `documentId String @id @default(uuid())` is the real key; `id Int @default(autoincrement())` is a plain, unmapped legacy column.
 6. **Column type mapping is richer than the Go doc's** — `field-type-mapping.ts`: `number → DOUBLE PRECISION` (Go doc: `REAL`), `json → JSONB` (Go doc: `TEXT`, i.e. no native JSON support), `media → UUID REFERENCES media_assets(document_id) ON DELETE SET NULL` (Go doc: a bare `VARCHAR`, no real FK constraint).
-7. **No `FindByID`/documentId-keyed lookup route** — the Go doc's `ContentTypeRepository.FindByID` and its REST/gRPC surface are unused; the only read routes are by `slug` (`GET /api/content-types`, `GET /api/content-types/:slug`), matching Confirmed Decision territory that content types are addressed by slug everywhere in this feature, never by their internal `documentId`.
+7. **No `FindByID`/documentId-keyed lookup route** — the Go doc's `ContentTypeRepository.FindByID` and its REST/gRPC surface are unused; the only read routes are by `slug` (`GET /api/v1/content-types`, `GET /api/v1/content-types/:slug`), matching Confirmed Decision territory that content types are addressed by slug everywhere in this feature, never by their internal `documentId`.
 8. **Postgres identifier-length safety is new** — neither Go doc addresses the 63-byte Postgres identifier limit (GORM/MongoDB names were never long enough to matter). This repo's `table-naming.ts` hash-truncates an overlong component table name, and `indexName()` (added post-hoc, see [Known quirks](#known-quirks--deviations-preserved-intentionally) below) does the same for derived index names — a real Postgres constraint the Go source never had to solve.
 
 ## Entity
@@ -141,12 +141,12 @@ The 53-char limit on slugs/field names (not 63) leaves headroom for the `documen
 
 ## Endpoints
 
-`presentation/content-type.controller.ts`, `@Controller("/api/content-types")`, per-route `@UseGuards(JwtAuthGuard, PermissionsGuard)` + `@RequirePermissions("content_type:read")` — **read-only, no write route of any kind**:
+`presentation/content-type.controller.ts`, `@Controller("/api/v1/content-types")`, per-route `@UseGuards(JwtAuthGuard, PermissionsGuard)` + `@RequirePermissions("content_type:read")` — **read-only, no write route of any kind**:
 
 | Method | Path | Service | Notes |
 | --- | --- | --- | --- |
-| `GET` | `/api/content-types` | `ListContentTypeService` | Returns `ContentTypeSummary[]`. |
-| `GET` | `/api/content-types/:slug` | `GetContentTypeService` | Full `ContentTypeEntity`; `400 BadRequestException` for an unsafe slug (caught `UnsafeSqlIdentifierError`, translated at the controller — same pattern `document`'s `validate-params.ts` reuses), `404` if no content type has that slug. |
+| `GET` | `/api/v1/content-types` | `ListContentTypeService` | Returns `ContentTypeSummary[]`. |
+| `GET` | `/api/v1/content-types/:slug` | `GetContentTypeService` | Full `ContentTypeEntity`; `400 BadRequestException` for an unsafe slug (caught `UnsafeSqlIdentifierError`, translated at the controller — same pattern `document`'s `validate-params.ts` reuses), `404` if no content type has that slug. |
 
 ## Module wiring
 
@@ -154,7 +154,7 @@ The 53-char limit on slugs/field names (not 63) leaves headroom for the `documen
 
 ## Permissions catalog additions
 
-`src/bootstrap/seed-default-data.service.ts` — one new slug, `content_type:read`, added to `DEFAULT_PERMISSIONS` and granted to both `super_admin` and `admin` in `DEFAULT_ROLES` (the remaining 6 new slugs this feature cycle adds are `document:*`, documented in `document.md`). Same additive, `findBySlug`-guarded seeding pattern as every prior module — **an existing dev/prod DB's `super_admin`/`admin` role predating this change will not retroactively gain the slug** without a manual `PUT /api/roles/:id` or a fresh DB (see `document.md`'s e2e notes for how the test suite handles this gap).
+`src/bootstrap/seed-default-data.service.ts` — one new slug, `content_type:read`, added to `DEFAULT_PERMISSIONS` and granted to both `super_admin` and `admin` in `DEFAULT_ROLES` (the remaining 6 new slugs this feature cycle adds are `document:*`, documented in `document.md`). Same additive, `findBySlug`-guarded seeding pattern as every prior module — **an existing dev/prod DB's `super_admin`/`admin` role predating this change will not retroactively gain the slug** without a manual `PUT /api/v1/roles/:id` or a fresh DB (see `document.md`'s e2e notes for how the test suite handles this gap).
 
 ## Tests
 

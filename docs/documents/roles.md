@@ -82,14 +82,14 @@ Implementations: `infrastructure/persistence/prisma-role.repository.ts` (`Prisma
 
 ## Endpoints
 
-`presentation/role.controller.ts`, class name **`RolesColtroller`** (typo, preserved), `@Controller("/api/roles")`. All four routes are wired and guarded:
+`presentation/role.controller.ts`, class name **`RolesColtroller`** (typo, preserved), `@Controller("/api/v1/roles")`. All four routes are wired and guarded:
 
 | Method   | Path                   | Service                                                       | Guard                                                       |
 | -------- | ---------------------- | -------------------------------------------------------------- | ------------------------------------------------------------ |
-| `GET`    | `/api/roles`           | `ListRolesService`                                              | `JwtAuthGuard`, `PermissionsGuard` + `@RequirePermissions("role:read")` |
-| `POST`   | `/api/roles`           | `CreateRoleService`                                              | `JwtAuthGuard`, `PermissionsGuard` + `@RequirePermissions("role:manager")` |
-| `PUT`    | `/api/roles/:id`       | `UpdateRoleService`                                              | `JwtAuthGuard`, `PermissionsGuard` + `@RequirePermissions("role:manager")` |
-| `DELETE` | `/api/roles/:id` (204) | `DeleteRoleService` (`dalateRoleService`, typo'd field name)     | `JwtAuthGuard`, `PermissionsGuard` + `@RequirePermissions("role:manager")` |
+| `GET`    | `/api/v1/roles`           | `ListRolesService`                                              | `JwtAuthGuard`, `PermissionsGuard` + `@RequirePermissions("role:read")` |
+| `POST`   | `/api/v1/roles`           | `CreateRoleService`                                              | `JwtAuthGuard`, `PermissionsGuard` + `@RequirePermissions("role:manager")` |
+| `PUT`    | `/api/v1/roles/:id`       | `UpdateRoleService`                                              | `JwtAuthGuard`, `PermissionsGuard` + `@RequirePermissions("role:manager")` |
+| `DELETE` | `/api/v1/roles/:id` (204) | `DeleteRoleService` (`dalateRoleService`, typo'd field name)     | `JwtAuthGuard`, `PermissionsGuard` + `@RequirePermissions("role:manager")` |
 
 `JwtAuthGuard` (`src/common/guards/jwt-auth.guard.ts`) validates the `access_token` httpOnly cookie and populates `req.user` (the shared `AuthenticatedRequest`/`AccessTokenPayload` type from `src/common/types/`). `PermissionsGuard` then checks `req.user.permissions` against the route's `@RequirePermissions` metadata (read-implies-manager). No controller method reads `req.user` directly anymore — the previous inline `AuthenticatedRequest` placeholder type and the `callerRoleSlug` extraction helper were removed entirely, since the services no longer need a caller identity at all.
 

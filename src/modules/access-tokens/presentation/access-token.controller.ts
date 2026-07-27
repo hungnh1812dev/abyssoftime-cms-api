@@ -18,7 +18,7 @@ import { AccessTokenResponseDto, AccessTokenSecretResponseDto } from "./dto/acce
 
 @ApiTags("access-tokens")
 @ApiCookieAuth()
-@Controller("/api/access-tokens")
+@Controller("access-tokens")
 export class AccessTokenController {
   constructor(
     private readonly createAccessTokenService: CreateAccessTokenService,

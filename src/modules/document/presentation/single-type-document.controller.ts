@@ -19,7 +19,7 @@ import { validateSlugParam } from "./validate-params";
 // No DELETE route — single-types are never deleted (at most one entry ever exists).
 @ApiTags("documents-single-type")
 @ApiCookieAuth()
-@Controller("/api/documents/single-type")
+@Controller("documents/single-type")
 export class SingleTypeDocumentController {
   constructor(
     private readonly getSingleType: GetSingleTypeService,

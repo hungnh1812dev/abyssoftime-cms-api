@@ -6,7 +6,7 @@
 
 The Go/GORM/MongoDB-derived design docs (`README.md` + 5 linked sub-docs, plus `component.md`) describe a mature, several-versions-evolved reference implementation. Where they diverge from this repo's scope or conventions:
 
-1. **No `locale` anywhere** — the single biggest deviation. The source docs' `Document.Locale` field, every method's `locale` parameter, `?locale=` query params, and the bulk-create "reject unsupported locale" rule are all dropped entirely. Every record in this repo is locale-less; there is no `/api/locales` route.
+1. **No `locale` anywhere** — the single biggest deviation. The source docs' `Document.Locale` field, every method's `locale` parameter, `?locale=` query params, and the bulk-create "reject unsupported locale" rule are all dropped entirely. Every record in this repo is locale-less; there is no `/api/v1/locales` route.
 2. **No frontend, no gRPC** — this repo is a backend API only. The source docs' `CollectionListPage` URL-state management, `PageSizeSelector`, bulk-action checkboxes, and the entire `proto/cms/v1/document*` gRPC surface don't exist here.
 3. **No MongoDB** — Postgres-only, matching `content-type.md`'s equivalent note. The source docs' Mongo-specific behavior (nested BSON components, `$regex` search, collection-per-content-type) is dropped; every "GORM" branch is this repo's actual (only) implementation.
 4. **DDL ports moved off `DocumentRepository` entirely** — the source's `DocumentRepository` interface includes `EnsureCollection`/`DropCollection`. This repo's `IDocumentRepository` has neither; `ISchemaTableRepository` (owned by `content-type`) is the only thing that ever issues `CREATE`/`ALTER`/`DROP TABLE`. This keeps the dependency arrow one-way (`document → content-type`) instead of the alternative the source's shape implies (document owning schema DDL for tables content-type's sync engine also needs to know about).
@@ -124,7 +124,7 @@ All inject `SchemaResolverService` + `@Inject(DOCUMENT_REPOSITORY)`; every mutat
 
 Three controllers under `presentation/`, DTOs under `presentation/dto/`. Per-route `@UseGuards(JwtAuthGuard, PermissionsGuard)` + `@RequirePermissions(...)` (except the public controller, which has none).
 
-### Single-type (`single-type-document.controller.ts`, `@Controller("/api/documents/single-type")`)
+### Single-type (`single-type-document.controller.ts`, `@Controller("/api/v1/documents/single-type")`)
 
 | Method | Path | Permission | Notes |
 | --- | --- | --- | --- |
@@ -135,7 +135,7 @@ Three controllers under `presentation/`, DTOs under `presentation/dto/`. Per-rou
 
 No `DELETE` route — single-types are never deleted, per the source docs' "Never expose DELETE for single-type documents" boundary.
 
-### Collection-type (`collection-type-document.controller.ts`, `@Controller("/api/documents/collection-type")`)
+### Collection-type (`collection-type-document.controller.ts`, `@Controller("/api/v1/documents/collection-type")`)
 
 | Method | Path | Permission | Notes |
 | --- | --- | --- | --- |
@@ -150,9 +150,9 @@ No `DELETE` route — single-types are never deleted, per the source docs' "Neve
 | `POST` | `:slug/:documentId/unpublish` | `document:unpublish` | `{ status: "draft" }`, 400 in Mode B. |
 | `POST` | `:slug/:documentId/duplicate` | `document:create` | `201`; same no-re-read reasoning as create. |
 
-**Route-ordering footgun (real, guarded against):** the two `/bulk` routes are declared in the controller **before** any `/:documentId` route. NestJS matches routes in declaration order — had `/:documentId` been declared first, a request to `POST /api/documents/collection-type/cv-page/bulk` would have matched `/:documentId` with `documentId = "bulk"` instead, and would have proceeded straight into `SaveDocumentService` with a nonsense ID rather than hitting the bulk handler at all.
+**Route-ordering footgun (real, guarded against):** the two `/bulk` routes are declared in the controller **before** any `/:documentId` route. NestJS matches routes in declaration order — had `/:documentId` been declared first, a request to `POST /api/v1/documents/collection-type/cv-page/bulk` would have matched `/:documentId` with `documentId = "bulk"` instead, and would have proceeded straight into `SaveDocumentService` with a nonsense ID rather than hitting the bulk handler at all.
 
-### Public (`public-document.controller.ts`, `@Controller("/api/public/documents")`) — **no guards, no auth**
+### Public (`public-document.controller.ts`, `@Controller("/api/v1/public/documents")`) — **no guards, no auth**
 
 | Method | Path |
 | --- | --- |
@@ -194,7 +194,7 @@ Unit tests (Jest, mocked repositories/adapters via `Test.createTestingModule` + 
 
 `test/content-engine.e2e-spec.ts` (shared with `content-type`, real Postgres, `bootTestApp` + `JwtTokenService.signAccessToken(...)` against seeded roles, no register/login HTTP round-trip needed since `JwtAuthGuard` only verifies the JWT):
 
-- **Boot sync**: confirms `documents_cv_page`/`documents_en_it_vocab` exist via `to_regclass`, and both seeds are listed by `GET /api/content-types`.
+- **Boot sync**: confirms `documents_cv_page`/`documents_en_it_vocab` exist via `to_regclass`, and both seeds are listed by `GET /api/v1/content-types`.
 - **Mode-A full lifecycle** (`cv-page`): create (`"draft"`) → public read 404 → publish (`200`) → public read 200 → edit route status `"published"` → update fields → edit route status `"modified"` → public read still shows the **old** published data → unpublish → public read 404 again → delete → edit route 404.
 - **3-level component round-trip** (`cv-page`'s `experiences → roles`): two experiences, the first with two roles, published, then re-read — array order preserved at both nesting levels, a `json`-typed nested field (`techStack`) round-trips as a real array, not a string.
 - **Mode-B behavior**: a throwaway `draftToPublish: false` content type, created purely in-memory via a direct `ContentTypeSyncService.sync([...realDefs, modeBDef])` call (no file written to the real `content-types/` directory, so it can never race with any other e2e file's own app boot reading that same shared directory) — create is immediately public with status `"published"`, and both publish and unpublish return `400`.
@@ -202,7 +202,7 @@ Unit tests (Jest, mocked repositories/adapters via `Test.createTestingModule` + 
 - **Bulk create+publish and bulk delete** (`en-it-vocab`): a 3-item bulk create+publish, then a bulk delete of 2 real IDs plus 1 bogus UUID — `deleted` contains exactly the 2 real IDs, `failed` contains exactly the bogus one, confirming partial-success-no-rollback against a real DB rather than mocks.
 - **Auth**: 401 unauthenticated, 403 for an under-permissioned (no-permission) token, 403 for a read-only token attempting a create.
 - Both throwaway content types (and their tables) are torn down in `afterAll` via `syncService.sync(realDefs)` — the same `sync()` the boot process itself uses, so "delete a JSON file and reboot" and "this test's cleanup" are exercised by the identical code path. `afterAll` also deletes every user/document row it created; a `runId` suffix on emails/usernames/throwaway slugs avoids collisions with a prior incomplete run.
-- **A pre-existing dev DB may have `super_admin`/`admin` roles predating this cycle's 7 new permission slugs** (`SeedDefaultDataService` only creates missing roles/permissions, it never patches an already-existing role's `permissions` array) — the suite detects the gap and grants it via a real `PUT /api/roles/:id` call (bootstrapped off `super_admin`'s own pre-existing `role:manager` permission, never off the target role's permissions — `admin` only has `role:read`), the same expected pattern the `media` cycle's Checkpoint 5 documented.
+- **A pre-existing dev DB may have `super_admin`/`admin` roles predating this cycle's 7 new permission slugs** (`SeedDefaultDataService` only creates missing roles/permissions, it never patches an already-existing role's `permissions` array) — the suite detects the gap and grants it via a real `PUT /api/v1/roles/:id` call (bootstrapped off `super_admin`'s own pre-existing `role:manager` permission, never off the target role's permissions — `admin` only has `role:read`), the same expected pattern the `media` cycle's Checkpoint 5 documented.
 - **Getting this e2e suite to run at all required two unrelated bug fixes**, both in already-committed code, neither specific to this module:
   1. `src/config/config.module.ts` computed its env-file search root from `__dirname` assuming the compiled `dist/` layout (3 directory levels up to reach the repo root); under `ts-jest` (running directly against `src/`, only 2 levels up), that landed one directory *above* the actual repo root, so `.env.local`/`.env.test.local` were never found and `bun run test:e2e` could never pass env validation. Fixed by switching to `process.cwd()`, correct in both the compiled and source-run layouts.
   2. `content-type`'s `prisma-schema-table.repository.ts` built index names by naive string concatenation (`` `${tableName}_document_version_idx` ``). `en-it-vocab`'s `phonetics → syllableParts` component table name is 45 bytes — safely under Postgres's 63-byte identifier limit on its own — but appending that index suffix pushed it to 67 bytes, throwing `UnsafeSqlIdentifierError` on every real boot. Fixed with a new `indexName()` helper in `table-naming.ts` (see `content-type.md`'s equivalent note).

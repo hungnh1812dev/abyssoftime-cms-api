@@ -2,7 +2,6 @@ import { MODULE_METADATA } from "@nestjs/common/constants";
 
 import { AppController } from "./app.controller";
 import { AppModule } from "./app.module";
-import { AppService } from "./app.service";
 import { SeedModule } from "./bootstrap/seed.module";
 import { TokenModule } from "./common/token/token.module";
 import { ConfigModule } from "./config/config.module";
@@ -38,8 +37,8 @@ describe("AppModule", () => {
     ]);
   });
 
-  it("registers AppController and AppService", () => {
+  it("registers AppController", () => {
     expect(Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, AppModule)).toEqual([AppController]);
-    expect(Reflect.getMetadata(MODULE_METADATA.PROVIDERS, AppModule)).toEqual([AppService]);
+    expect(Reflect.getMetadata(MODULE_METADATA.PROVIDERS, AppModule)).toBeUndefined();
   });
 });

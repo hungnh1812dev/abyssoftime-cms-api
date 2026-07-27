@@ -17,7 +17,7 @@ import { RoleResponseDto } from "./dto/role-response.dto";
 
 @ApiTags("roles")
 @ApiCookieAuth()
-@Controller("/api/roles")
+@Controller("roles")
 export class RolesColtroller {
   constructor(
     private readonly listRolesService: ListRolesService,
