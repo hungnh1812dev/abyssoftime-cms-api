@@ -54,7 +54,7 @@ describe("UserController", () => {
   });
 
   it("create() delegates to CreateUserService and strips sensitive fields from the response", async () => {
-    const dto: CreateUserDto = { email: "jane@example.com", name: "Jane Doe", username: "janedoe", password: "secret", accountType: true, roleId: "role-1" };
+    const dto: CreateUserDto = { email: "jane@example.com", name: "Jane Doe", username: "janedoe", password: "secret" };
     createUser.execute.mockResolvedValue(user);
 
     const result = await controller.create(dto);

@@ -16,11 +16,9 @@ describe("CreateUserService", () => {
     name: "Jane Doe",
     username: "janedoe",
     password: "secret",
-    accountType: true,
-    roleId: "role-1",
   };
 
-  const createdUser = new UserEntity("user-1", dto.email, dto.name, dto.username, dto.password, dto.accountType, false, dto.roleId, new Date(), new Date());
+  const createdUser = new UserEntity("user-1", dto.email, dto.name, dto.username, dto.password, false, false, null, new Date(), new Date());
 
   beforeEach(async () => {
     repo = {
@@ -56,31 +54,21 @@ describe("CreateUserService", () => {
       name: dto.name,
       username: dto.username,
       password: dto.password,
-      accountType: dto.accountType,
+      accountType: false,
       verified: false,
-      roleId: dto.roleId,
+      roleId: null,
     });
     expect(result).toBe(createdUser);
   });
 
-  it("defaults verified to false when omitted", async () => {
+  it("always fixes accountType/verified/roleId regardless of any extra properties on the dto", async () => {
     repo.findByEmail.mockResolvedValue(null);
     repo.findByUsername.mockResolvedValue(null);
     repo.create.mockResolvedValue(createdUser);
 
-    await service.execute(dto);
+    await service.execute({ ...dto, accountType: true, verified: true, roleId: "role-1" } as CreateUserDto);
 
-    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ verified: false }));
-  });
-
-  it("passes verified through when provided", async () => {
-    repo.findByEmail.mockResolvedValue(null);
-    repo.findByUsername.mockResolvedValue(null);
-    repo.create.mockResolvedValue(createdUser);
-
-    await service.execute({ ...dto, verified: true });
-
-    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ verified: true }));
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ accountType: false, verified: false, roleId: null }));
   });
 
   it("throws ConflictException when the email is already in use", async () => {
