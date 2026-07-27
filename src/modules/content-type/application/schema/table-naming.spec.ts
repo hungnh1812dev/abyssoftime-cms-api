@@ -1,5 +1,5 @@
 import { UnsafeSqlIdentifierError } from "./sql-identifier";
-import { componentTableName, documentTableName } from "./table-naming";
+import { componentTableName, documentTableName, indexName } from "./table-naming";
 
 describe("documentTableName", () => {
   it("derives the document table name from a hyphenated slug", () => {
@@ -35,5 +35,26 @@ describe("componentTableName", () => {
   it("rejects an unsafe slug or path segment", () => {
     expect(() => componentTableName("cv page", ["experience"])).toThrow(UnsafeSqlIdentifierError);
     expect(() => componentTableName("cv-page", ["experience; DROP TABLE"])).toThrow(UnsafeSqlIdentifierError);
+  });
+});
+
+describe("indexName", () => {
+  it("simply concatenates table name and suffix when under the 63-byte limit", () => {
+    expect(indexName("documents_cv_page", "document_id_idx")).toBe("documents_cv_page_document_id_idx");
+  });
+
+  it("hash-truncates when table name + suffix would exceed 63 bytes, staying under the limit and stable across calls", () => {
+    // Real case that surfaced this: a 2-level component table name can be short enough on its
+    // own but still overflow once an index suffix is appended.
+    const tableName = componentTableName("en-it-vocab", ["phonetic", "syllablePart"]);
+    const suffix = "document_version_idx";
+    expect(tableName.length + 1 + suffix.length).toBeGreaterThan(63);
+
+    const first = indexName(tableName, suffix);
+    const second = indexName(tableName, suffix);
+
+    expect(first).toBe(second);
+    expect(first.length).toBeLessThanOrEqual(63);
+    expect(first.endsWith(`_${suffix}`)).toBe(true);
   });
 });

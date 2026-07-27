@@ -32,3 +32,16 @@ export function componentTableName(slug: string, path: string[]): string {
 
   return `${prefix}${pathSegment.slice(0, availableForPath)}${suffix}`;
 }
+
+export function indexName(tableName: string, suffix: string): string {
+  const fullName = `${tableName}_${suffix}`;
+  if (fullName.length <= MAX_POSTGRES_IDENTIFIER_LENGTH) {
+    return fullName;
+  }
+
+  const hash = createHash("sha256").update(fullName).digest("hex").slice(0, HASH_SUFFIX_LENGTH);
+  const hashedSuffix = `_${hash}_${suffix}`;
+  const availableForTableName = MAX_POSTGRES_IDENTIFIER_LENGTH - hashedSuffix.length;
+
+  return `${tableName.slice(0, availableForTableName)}${hashedSuffix}`;
+}
