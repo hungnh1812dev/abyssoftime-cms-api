@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 import { RoleModule } from "@/modules/roles/role.module";
 import { UserModule } from "@/modules/users/user.module";
@@ -12,7 +13,7 @@ import { ResendOtpService } from "./application/services/resend-otp.service";
 import { ResetPasswordService } from "./application/services/reset-password.service";
 import { VerifyOtpService } from "./application/services/verify-otp.service";
 import { EMAIL_SENDER } from "./domain/ports/email-sender.port";
-import { ConsoleEmailSender } from "./infrastructure/email/console-email.sender";
+import { resolveEmailSender } from "./infrastructure/email/resolve-email-sender";
 import { AuthController } from "./presentation/auth.controller";
 
 @Module({
@@ -27,7 +28,7 @@ import { AuthController } from "./presentation/auth.controller";
     RefreshTokenService,
     ForgotPasswordService,
     ResetPasswordService,
-    { provide: EMAIL_SENDER, useClass: ConsoleEmailSender },
+    { provide: EMAIL_SENDER, useFactory: resolveEmailSender, inject: [ConfigService] },
   ],
 })
 export class AuthModule {}

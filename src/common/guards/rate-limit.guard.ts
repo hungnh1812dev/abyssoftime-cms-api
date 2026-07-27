@@ -16,7 +16,9 @@ export class RateLimitGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<{ ip?: string }>();
-    const key = request.ip ?? "unknown";
+    const ip = request.ip ?? "unknown";
+    const route = `${context.getClass().name}.${context.getHandler().name}`;
+    const key = `${ip}:${route}`;
 
     const fillsPerSecond = this.configService.get("RATE_LIMIT_FPS", { infer: true });
     const burst = this.configService.get("RATE_LIMIT_BURST", { infer: true });

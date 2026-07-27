@@ -59,10 +59,11 @@ describe("VerifyOtpService", () => {
       count: jest.fn(),
       hasAnyVerified: jest.fn(),
       findByResetTokenHash: jest.fn(),
+      completeVerification: jest.fn(),
     };
     roles = {
       findAll: jest.fn(),
-      findBySlug: jest.fn(),
+      findBySlug: jest.fn((slug: string) => Promise.resolve(slug === "super_admin" ? superAdminRole : guestRole)),
       findById: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -106,7 +107,7 @@ describe("VerifyOtpService", () => {
     users.findByEmail.mockResolvedValue(buildUser({ otpCodeHash, otpExpiresAt: new Date(Date.now() - 1000) }));
 
     await expect(service.execute(dto)).rejects.toThrow(BadRequestException);
-    expect(users.update).not.toHaveBeenCalled();
+    expect(users.completeVerification).not.toHaveBeenCalled();
   });
 
   it("throws BadRequestException when the OTP does not match", async () => {
@@ -114,44 +115,22 @@ describe("VerifyOtpService", () => {
     users.findByEmail.mockResolvedValue(buildUser({ otpCodeHash }));
 
     await expect(service.execute(dto)).rejects.toThrow(BadRequestException);
-    expect(users.update).not.toHaveBeenCalled();
+    expect(users.completeVerification).not.toHaveBeenCalled();
   });
 
-  it("assigns super_admin to the first user ever to verify and clears the OTP", async () => {
+  it("delegates the first-verifier-vs-guest decision atomically to the repository", async () => {
     const otpCodeHash = await bcrypt.hash(dto.otp, 10);
     const user = buildUser({ otpCodeHash });
     users.findByEmail.mockResolvedValue(user);
-    users.hasAnyVerified.mockResolvedValue(false);
-    roles.findBySlug.mockResolvedValue(superAdminRole);
-    users.update.mockResolvedValue(user);
+    users.completeVerification.mockResolvedValue(user);
 
     await service.execute(dto);
 
     expect(roles.findBySlug).toHaveBeenCalledWith("super_admin");
-    expect(users.update).toHaveBeenCalledWith("user-1", {
-      verified: true,
-      roleId: superAdminRole.documentId,
-      otpCodeHash: null,
-      otpExpiresAt: null,
-    });
-  });
-
-  it("assigns guest to a subsequent verifying user", async () => {
-    const otpCodeHash = await bcrypt.hash(dto.otp, 10);
-    const user = buildUser({ otpCodeHash });
-    users.findByEmail.mockResolvedValue(user);
-    users.hasAnyVerified.mockResolvedValue(true);
-    roles.findBySlug.mockResolvedValue(guestRole);
-    users.update.mockResolvedValue(user);
-
-    await service.execute(dto);
-
     expect(roles.findBySlug).toHaveBeenCalledWith("guest");
-    expect(users.update).toHaveBeenCalledWith("user-1", {
-      verified: true,
-      roleId: guestRole.documentId,
-      otpCodeHash: null,
-      otpExpiresAt: null,
+    expect(users.completeVerification).toHaveBeenCalledWith("user-1", {
+      firstVerifiedRoleId: superAdminRole.documentId,
+      otherwiseRoleId: guestRole.documentId,
     });
   });
 });

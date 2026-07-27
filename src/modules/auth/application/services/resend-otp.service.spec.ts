@@ -31,6 +31,7 @@ describe("ResendOtpService", () => {
       delete: jest.fn(),
       count: jest.fn(),
       hasAnyVerified: jest.fn(),
+      completeVerification: jest.fn(),
       findByResetTokenHash: jest.fn(),
     };
     emailSender = { sendOtpEmail: jest.fn(), sendPasswordResetEmail: jest.fn() };

@@ -1,4 +1,7 @@
-import { IsBoolean, IsEmail, IsNotEmpty, IsString } from "class-validator";
+import { IsBoolean, IsEmail, IsNotEmpty, IsString, Matches, MinLength } from "class-validator";
+
+const USERNAME_PATTERN = /^[a-zA-Z0-9_.-]{3,32}$/;
+const PASSWORD_MIN_LENGTH = 8;
 
 export class RegisterDto {
   @IsEmail()
@@ -8,12 +11,11 @@ export class RegisterDto {
   @IsNotEmpty()
   name!: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @Matches(USERNAME_PATTERN, { message: "username must be 3-32 characters and contain only letters, numbers, underscores, dots, or hyphens" })
   username!: string;
 
   @IsString()
-  @IsNotEmpty()
+  @MinLength(PASSWORD_MIN_LENGTH)
   password!: string;
 
   @IsBoolean()

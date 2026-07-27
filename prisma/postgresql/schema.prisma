@@ -60,12 +60,49 @@ model AccessToken {
     @@map("access_tokens")
 }
 
+model MediaAsset {
+    id           Int      @default(autoincrement())
+    documentId   String   @id @unique @default(uuid()) @map("document_id")
+    fileName     String   @map("file_name")
+    mimeType     String   @map("mime_type")
+    size         Int
+    width        Int
+    height       Int
+    url          String
+    thumbnailUrl String   @map("thumbnail_url")
+    publicId     String   @map("public_id")
+    hash         String
+    createdAt    DateTime @default(now()) @map("created_at")
+    updatedAt    DateTime @updatedAt @map("updated_at")
+
+    // Who uploaded this MediaAsset
+    user         User?    @relation("MediaAssetUploadedBy", fields: [uploadedBy], references: [documentId])
+    uploadedBy   String?  @map("uploaded_by")
+
+    @@map("media_assets")
+}
+
+model ContentType {
+    id             Int      @default(autoincrement())
+    documentId     String   @id @unique @default(uuid()) @map("document_id")
+    slug           String   @unique
+    name           String
+    kind           String
+    draftToPublish Boolean  @map("draft_to_publish")
+    fields         Json
+    listFields     Json     @map("list_fields")
+    createdAt      DateTime @default(now()) @map("created_at")
+    updatedAt      DateTime @updatedAt @map("updated_at")
+
+    @@map("content_types")
+}
+
 model User {
     id          Int         @default(autoincrement())
     documentId  String      @id @unique @default(uuid()) @map("document_id")
     email       String      @unique
     name        String      @map("display_name")
-    username    String
+    username    String      @unique
     password    String      @map("password_hash")
     accountType Boolean     @map("account_type")
     verified    Boolean
@@ -82,6 +119,7 @@ model User {
     updatedRoles        Role[]        @relation("RoleUpdatedBy") @ignore
     updatedPermissions  Permission[]  @relation("PermissionUpdatedBy") @ignore
     updatedAccessTokens AccessToken[] @relation("AccessTokenUpdatedBy") @ignore
+    uploadedMediaAssets MediaAsset[]  @relation("MediaAssetUploadedBy") @ignore
 
     @@index([roleId])
     @@map("users")

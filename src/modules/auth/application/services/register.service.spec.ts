@@ -6,7 +6,7 @@ import { ConflictException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 
 import { UserEntity } from "@/modules/users/domain/entities/user.entity";
-import { type CreateUserData, type IUserRepository, USER_REPOSITORY } from "@/modules/users/domain/repositories/user.repository";
+import { type CreateUserData, type IUserRepository, USER_REPOSITORY, UserAlreadyExistsError } from "@/modules/users/domain/repositories/user.repository";
 
 import { RegisterService } from "./register.service";
 
@@ -36,6 +36,7 @@ describe("RegisterService", () => {
       delete: jest.fn(),
       count: jest.fn(),
       hasAnyVerified: jest.fn(),
+      completeVerification: jest.fn(),
       findByResetTokenHash: jest.fn(),
     };
     emailSender = { sendOtpEmail: jest.fn(), sendPasswordResetEmail: jest.fn() };
@@ -80,6 +81,20 @@ describe("RegisterService", () => {
 
     await expect(service.execute(dto)).rejects.toThrow(ConflictException);
     expect(users.create).not.toHaveBeenCalled();
+  });
+
+  it("throws ConflictException when create() races past the pre-checks and the repository reports a duplicate", async () => {
+    users.create.mockRejectedValue(new UserAlreadyExistsError("email", dto.email));
+
+    await expect(service.execute(dto)).rejects.toThrow(ConflictException);
+    expect(emailSender.sendOtpEmail).not.toHaveBeenCalled();
+  });
+
+  it("rethrows unrelated errors from create() as-is", async () => {
+    const otherError = new Error("connection lost");
+    users.create.mockRejectedValue(otherError);
+
+    await expect(service.execute(dto)).rejects.toThrow(otherError);
   });
 
   it("creates an unverified, roleless user with a hashed password and a hashed OTP, then emails the OTP", async () => {

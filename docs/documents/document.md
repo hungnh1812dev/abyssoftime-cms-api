@@ -1,0 +1,232 @@
+# Document Module
+
+`src/modules/document/**` — the content-entry engine built on top of [`content-type`](content-type.md)'s dynamic schema. Every content entry ("document") is stored as up to two rows in its content type's per-slug Postgres table (`documents_<slug_underscored>`) — a `draft` and a `published` version — reconciled through a draft/publish lifecycle whose branching depends entirely on the owning content type's `draftToPublish` flag (Mode A vs. Mode B, see [Draft/publish policy](#draft-publish-policy) below). Depends on `content-type` (`DocumentModule` imports `ContentTypeModule`, injects `GetContentTypeService` + `CONTENT_TYPE_REPOSITORY`) — never the reverse; this module owns zero DDL (`ensureDocumentTable`/`alterDocumentTable`/etc. all live on content-type's `ISchemaTableRepository`, per SPEC's Open Question #1 decision to keep the module arrow strictly one-way).
+
+## Deviations from the source docs
+
+The Go/GORM/MongoDB-derived design docs (`README.md` + 5 linked sub-docs, plus `component.md`) describe a mature, several-versions-evolved reference implementation. Where they diverge from this repo's scope or conventions:
+
+1. **No `locale` anywhere** — the single biggest deviation. The source docs' `Document.Locale` field, every method's `locale` parameter, `?locale=` query params, and the bulk-create "reject unsupported locale" rule are all dropped entirely. Every record in this repo is locale-less; there is no `/api/locales` route.
+2. **No frontend, no gRPC** — this repo is a backend API only. The source docs' `CollectionListPage` URL-state management, `PageSizeSelector`, bulk-action checkboxes, and the entire `proto/cms/v1/document*` gRPC surface don't exist here.
+3. **No MongoDB** — Postgres-only, matching `content-type.md`'s equivalent note. The source docs' Mongo-specific behavior (nested BSON components, `$regex` search, collection-per-content-type) is dropped; every "GORM" branch is this repo's actual (only) implementation.
+4. **DDL ports moved off `DocumentRepository` entirely** — the source's `DocumentRepository` interface includes `EnsureCollection`/`DropCollection`. This repo's `IDocumentRepository` has neither; `ISchemaTableRepository` (owned by `content-type`) is the only thing that ever issues `CREATE`/`ALTER`/`DROP TABLE`. This keeps the dependency arrow one-way (`document → content-type`) instead of the alternative the source's shape implies (document owning schema DDL for tables content-type's sync engine also needs to know about).
+5. **Repository method shape is version-parameterized, not version-named** — the source's `FindDraftByDocumentID`/`FindPublishedByDocumentID`/`UpsertDraft`/`UpsertPublished` pairs collapse here into single methods taking a `DocumentVersion` parameter (`findByVersion(slug, documentId, version, fields)`, `upsert(slug, doc, fields, tx?)` where `doc.version` carries the version). Same behavior, half the interface surface.
+6. **No `updatedByName` resolution** — SPEC Open Question #4, accepted as dropped for v1. This repo's `updatedBy` is a nullable raw UUID with no `User` join modelled in the dynamic tables (see [Known quirks](#known-quirks--deviations-preserved-intentionally) below); the source docs' `resolveUserDisplayNames` helper and `"Deleted user"` fallback don't exist here.
+7. **No media cascade-delete** — the source's `Delete` use case is documented as "delete draft + published + cascade media"; this repo's `DeleteDocumentService` deletes the document's own draft/published rows and components only. A `media`-typed field's Postgres FK is `UUID REFERENCES media_assets(document_id) ON DELETE SET NULL` (see `content-type.md`'s field-type-mapping table) — deleting a document never cascades into deleting the media assets it referenced, matching how `media` module deletions work independently in the other direction.
+8. **The rest of the source's evolution is *adopted*, not deviated from** — this repo already implements the source's later changelog entries as its baseline, not as changes-in-progress: `orderBy`/`sortDir` widened to any `text`/`number`/`boolean` content field validated per-request against that content type's own schema (v1.16), `?search=` as a partial case-insensitive substring match OR'd across `text`/`richtext` list fields (v1.18), bulk create+publish and bulk delete with their respective all-or-nothing vs. partial-success semantics (v1.13/v1.14). There was no earlier, narrower version of this feature to migrate from in this repo — it was built once, at the target shape.
+9. **The known gap is preserved on purpose** — "bulk create+publish does not reject an item with a missing/empty `data`, it creates a document with empty fields instead" is explicitly called out in the source docs as an accepted, intentional gap (not revisited), and this repo's `BulkCreateAndPublishService` preserves that exact behavior rather than "fixing" it.
+
+## Entities
+
+`domain/entities/document.entity.ts` — `DocumentEntity`:
+
+| Field | Type |
+| --- | --- |
+| `documentId` | `string` |
+| `version` | `"draft" \| "published"` |
+| `fields` | `Record<string, unknown>` |
+| `createdAt` | `Date` |
+| `updatedAt` | `Date` |
+| `publishedAt` | `Date \| null` |
+| `createdBy` | `string \| null` |
+| `updatedBy` | `string \| null` |
+| `publishedBy` | `string \| null` |
+
+`DocumentStatus = "draft" | "modified" | "published"` — always computed (see [`status-resolver.ts`](#draft-publish-policy--status-computation)), never a stored column. No `slug`/internal `id` field on the entity itself — the owning content type's table *is* the slug-scoping, and the internal `BIGSERIAL id` (used only for list-query default ordering) never leaves the persistence layer.
+
+`domain/entities/component.entity.ts` — `ComponentEntity`: `componentId`, `documentId`, `version`, `parentComponentId: string | null`, `fields: Record<string, unknown>`, `children: Record<string, ComponentEntity[]>` (the `children` field is a vestigial shape left unused by the actual recursive I/O — see [Known quirks](#known-quirks--deviations-preserved-intentionally)).
+
+## Repository ports
+
+`domain/repositories/document.repository.ts` — `IDocumentRepository`, DI token `DOCUMENT_REPOSITORY`:
+
+- `findByVersion(slug, documentId, version, fields)` / `findSingle(slug, version, fields)` (single-type — no `documentId`, at most one row) / `findManyByVersion(slug, documentIds, version, fields)` (batch, used for list-status computation).
+- `upsert(slug, doc, fields, tx?)` — `INSERT ... ON CONFLICT (document_id, version) DO UPDATE`.
+- `deleteVersion(slug, documentId, version, tx?)` / `deleteAllVersions(slug, documentId, tx?)`.
+- `listPaginated(slug, version, opts: ListOptions, fields)` → `{ rows, total }`.
+
+`domain/repositories/component.repository.ts` — `IComponentRepository`, DI token `COMPONENT_REPOSITORY`:
+
+- `findByDocument(slug, componentPath, documentId, version, fields)`
+- `upsertAll(slug, componentPath, documentId, version, parentComponentId, components, fields, tx?)`
+- `deleteByDocument(slug, componentPath, documentId, version, tx?)`
+
+Every mutating method on both ports takes an optional `tx?: Prisma.TransactionClient`, threaded through as `tx ?? this.prisma` at the call site — the mechanism every multi-step service (save/publish/unpublish/delete/duplicate, all of which touch both a document row and its component rows) uses to make that pair atomic.
+
+## Support layer
+
+`application/support/schema-resolver.service.ts` — `SchemaResolverService.resolve(slug)`: thin wrapper over `GetContentTypeService.execute(slug)` (content-type's exported service). No caching — every document request re-resolves the live schema from the DB, so a schema edit takes effect on the very next request, not just the next reboot.
+
+### Draft/publish policy & status computation
+
+`application/support/draft-publish.policy.ts`:
+
+- `resolveSaveVersion(contentType)` → `contentType.draftToPublish ? "draft" : "published"` — the single branch point that decides whether *every* write-path service writes a draft (Mode A) or writes the live row directly (Mode B).
+- `assertDraftPublishEnabled(contentType)` → `400 BadRequestException` if `draftToPublish` is `false`. Called by every publish/unpublish service before touching any repository — Mode B content types have no draft/publish concept, so those two routes never make sense for them.
+
+`application/support/status-resolver.ts`:
+
+- `resolveStatus(draftToPublish, draftUpdatedAt, publishedUpdatedAt)` → `"published"` unconditionally in Mode B (`!draftToPublish`); in Mode A: `"draft"` if no published row exists yet, `"modified"` if the draft was updated after the published row, else `"published"`.
+- `resolveBatchStatuses(draftToPublish, draftRows, publishedRows)` — the same logic applied across a whole page of list results in one pass (a `Map` keyed by `documentId`), so `ListDocumentsService` never does a per-row lookup — see [Services](#services--collection-type) below.
+
+### Component I/O
+
+`application/support/component-io.service.ts` — `ComponentIoService`, the recursive extract/hydrate/cascade-delete engine every document-mutating service delegates component handling to:
+
+- `saveComponents(slug, documentId, version, fields, data, tx?)` — for every component field, `upsertAll`s (see below) the incoming array/object, then recurses into any nested component fields, passing the just-inserted row's `componentId` down as the child rows' `parentComponentId`. A non-repeatable component's incoming value (a single object, not an array) is normalized to a 1-item array before insertion, and a missing/absent field normalizes to an empty array (delete-only, nothing re-inserted).
+- `hydrateComponents(slug, documentId, version, fields)` — the mirror read path: fetches every top-level component's rows, then recursively hydrates each nested level, grouping child rows by `parentComponentId` in memory (fetches each component table **exactly once**, regardless of how many sibling parent rows exist — no N+1 across repeated components). A non-repeatable field hydrates to a single object (or `null`), a repeatable one to an array, order preserved (insertion-order `ORDER BY id ASC` at the repository level).
+- `deleteComponents(slug, documentId, version, fields, tx?)` — recurses **children-first**, deepest nesting level deleted before its parent's own table — the same depth-ordering discipline `content-type-sync.service.ts`'s `syncDeletion` uses for dropping tables (see `content-type.md`).
+
+`saveComponents`'s per-field call to `upsertAll` is itself a **full delete-then-insert replace**, not a row-level diff/upsert — every save rewrites every component row for that document+version+parent scope from scratch (see [Known quirks](#known-quirks--deviations-preserved-intentionally)).
+
+### List query parsing
+
+`application/support/list-query.parser.ts` — `parseListQuery(contentType, query)`, called once per collection-list request:
+
+- `start` (default `0`, must be a non-negative integer) / `size` (default `20`, `1`–`100`) / `sortDir` (default `desc`, `asc`|`desc`) — each malformed value → `400 BadRequestException` before any repository call.
+- `orderBy` (default `id`) validated against `sortableColumnsFor(contentType.fields)` (see below) — an invalid column → `400`, never silently ignored or passed through to raw SQL unvalidated.
+- `searchableFieldsFor(contentType)` — restricts `contentType.listFields` to `text`/`richtext`-typed fields only; `number`/`boolean`/`json`/`media`/`component` are never searchable, matching `infrastructure/persistence/sql/where-builder.ts`'s independent, identical `SEARCHABLE`-equivalent filter (defence-in-depth: the same allowlist logic exists at both the query-parsing layer and the raw-SQL-building layer, deliberately not shared, so a bug in one doesn't silently widen what the other trusts).
+
+`infrastructure/persistence/sql/where-builder.ts` — the raw-SQL-safe building blocks `PrismaDocumentRepository.listPaginated` uses:
+
+- `sortableColumnsFor(fields)` → `["id", "document_id", "created_at", "updated_at", "published_at", ...text/number/boolean field names]` — the actual allowlist `buildOrderByClause` checks against (re-validated here, not trusting `list-query.parser.ts`'s earlier check alone).
+- `buildOrderByClause(orderBy, sortDir, allowedColumns)` — throws `InvalidOrderByFieldError` if `orderBy` isn't in `allowedColumns`, otherwise `quoteIdent`s it into `ORDER BY "col" ASC|DESC`.
+- `escapeSearchValue(value)` — escapes `\`, `%`, `_` (in that order) for a safe `ILIKE ... ESCAPE '\'` pattern.
+- `buildSearchWhere(search, searchableColumns, paramIndex)` → `null` for an empty search or no searchable columns, otherwise an OR'd `ILIKE` clause across every searchable column sharing **one** parameterized placeholder (the escaped, wildcard-wrapped search term is bound once, not once per column).
+
+`infrastructure/persistence/sql/row-mapper.ts` — `mapRowToDocument`/`mapRowToComponent` (raw DB row → entity) and `fieldsToRowValues` (entity fields → DB row values), shared by both Prisma repositories: a `json`-typed column is `JSON.parse`d on the way in (Postgres driver may return `JSONB` as a raw string) and `JSON.stringify`d on the way out; a missing field value defaults to `null` in both directions; component-typed fields are always skipped (they're never real columns).
+
+## Services — collection-type
+
+All inject `SchemaResolverService` + `@Inject(DOCUMENT_REPOSITORY)`; every mutating service also injects `ComponentIoService` and `PrismaService` (for `$transaction`).
+
+- **Save** (`save-document.service.ts`) — `resolveSaveVersion` picks draft (Mode A) or published (Mode B); generates a fresh `documentId` if none given; preserves `createdAt`/`createdBy` from an existing row at that version on update; `upsert` + `saveComponents` inside one `$transaction`.
+- **Publish** (`publish-document.service.ts`) — `assertDraftPublishEnabled` first (→ 400 in Mode B); 404 if no draft exists; copies the draft's fields + hydrated components into a fresh published row, preserving the *existing* published row's `createdAt` across a republish (only `updatedAt`/`publishedAt`/`publishedBy` actually change on a republish).
+- **Unpublish** (`unpublish-document.service.ts`) — `assertDraftPublishEnabled` first; 404 if no published row exists; deletes the published row + its components inside a transaction, leaving the draft **untouched**.
+- **Get for edit** (`get-document-for-edit.service.ts`) — reads the save-version row (draft in Mode A, published in Mode B), hydrates its components, and — Mode A only — makes one extra read of the published row purely to compute `status` (skipped entirely in Mode B, where status is always `"published"`).
+- **Get public** (`get-public-document.service.ts`) — **always** reads the `published` version regardless of mode; 404 if none exists. Never touches the draft table, even in Mode A.
+- **Delete** (`delete-document.service.ts`) — fetches draft and published in parallel (`Promise.all`); 404 only if *both* are absent; deletes both versions' components then both document rows, one transaction.
+- **List** (`list-documents.service.ts`) — `listPaginated` at the save version; in Mode A, one extra `findManyByVersion` batch-fetches every *published* counterpart for the page's rows (never per-row — see [status computation](#draft-publish-policy--status-computation)) to compute each row's status; every row's `data` is projected down to `contentType.listFields` only (a listed field absent from the row defaults to `null`), never the full field set.
+- **Duplicate** (`duplicate-document.service.ts`) — reads the source at the save version + hydrates its components; 404 if missing; writes a **fresh** `randomUUID()` `documentId`, `now()` timestamps, and `userId` as both `createdBy`/`updatedBy` (and `publishedBy` if the version being duplicated is `published`) — the source's media-typed field values (raw UUID FKs) are copied through as-is, i.e. the duplicate shares the same underlying media assets rather than deep-copying them.
+
+## Services — bulk (collection-type only)
+
+- **Bulk create + publish** (`bulk-create-publish.service.ts`) — sequential (not parallel) `Save` then, only if the save landed as a `"draft"` version, `Publish` per item, in request order. On any item's failure (`Save` or `Publish`), every **prior** successfully-created item is rolled back via `DeleteDocumentService` — and if the failure happened on `Publish` (not `Save`), the *current* item is rolled back too, not just the ones before it, since its `Save` had already succeeded and left a row behind. No DB transaction spans the whole batch (each item's own save/publish is transactional on its own; the batch-level "rollback" is compensating deletes, not a wrapping transaction) — matches the source doc's explicit "rollback via `Delete`, not a DB transaction" design.
+- **Bulk delete** (`bulk-delete.service.ts`) — loops `DeleteDocumentService.execute` independently per ID; **no rollback** on a partial failure — every ID's outcome (success, or the caught error's message) is collected into its own result entry regardless of any other ID's outcome. An empty ID array returns an empty result array without any repository call.
+
+## Services — single-type
+
+`get-single-type.service.ts` / `save-single-type.service.ts` / `publish-single-type.service.ts` / `unpublish-single-type.service.ts` mirror the collection-type equivalents above exactly, with the same draft/publish-mode branching, minus a `documentId` parameter — every read goes through `findSingle`/every write through the same `upsert` (there is at most one row per version for a single type; `SaveSingleTypeService` reuses the existing singleton's `documentId` if one already exists, generating a fresh one only on the very first save). There is no single-type delete route (see [Endpoints](#endpoints) below) and no single-type duplicate/bulk concept — a single type has exactly zero or one entry, so neither operation is meaningful.
+
+`get-public-single-type.service.ts` / `get-public-document.service.ts` — the public-read pair, both always reading the `published` version only, 404 if absent, regardless of `draftToPublish`.
+
+## Endpoints
+
+Three controllers under `presentation/`, DTOs under `presentation/dto/`. Per-route `@UseGuards(JwtAuthGuard, PermissionsGuard)` + `@RequirePermissions(...)` (except the public controller, which has none).
+
+### Single-type (`single-type-document.controller.ts`, `@Controller("/api/documents/single-type")`)
+
+| Method | Path | Permission | Notes |
+| --- | --- | --- | --- |
+| `GET` | `:slug` | `document:read` | 404 if no document exists yet. |
+| `PUT` | `:slug` | `document:update` | Create-on-first-save; saves then re-reads (via `GetSingleTypeService`) so the response carries the correctly computed status rather than the fresh write's own version. |
+| `POST` | `:slug/publish` | `document:publish` | `{ status: "published" }`, 400 in Mode B. |
+| `POST` | `:slug/unpublish` | `document:unpublish` | `{ status: "draft" }`, 400 in Mode B. |
+
+No `DELETE` route — single-types are never deleted, per the source docs' "Never expose DELETE for single-type documents" boundary.
+
+### Collection-type (`collection-type-document.controller.ts`, `@Controller("/api/documents/collection-type")`)
+
+| Method | Path | Permission | Notes |
+| --- | --- | --- | --- |
+| `GET` | `:slug` | `document:read` | Paginated list; query parsed by `ListQueryDto`. |
+| `POST` | `:slug/bulk` | `document:create` **and** `document:publish` | Declared **before** `:documentId`-shaped routes (see below). `201`, `{ items: [...] }`, every item's response status hardcoded `"published"`. |
+| `DELETE` | `:slug/bulk` | `document:delete` | Declared before `:documentId`-shaped routes. Always `200`, `{ deleted: string[], failed: { documentId, error }[] }`. |
+| `POST` | `:slug` | `document:create` | `201`; status derived straight from the returned entity's `version` (`create`/`duplicate` never need a re-read — a freshly created or duplicated document can never already have an older published counterpart, so the draft-vs-modified branch of `resolveStatus` can never apply). |
+| `GET` | `:slug/:documentId` | `document:read` | 404 if not found. |
+| `PUT` | `:slug/:documentId` | `document:update` | Saves then re-reads (unlike create) — an *update* can legitimately turn `"published"` into `"modified"`. |
+| `DELETE` | `:slug/:documentId` | `document:delete` | `204`. |
+| `POST` | `:slug/:documentId/publish` | `document:publish` | `{ status: "published" }`, 400 in Mode B. |
+| `POST` | `:slug/:documentId/unpublish` | `document:unpublish` | `{ status: "draft" }`, 400 in Mode B. |
+| `POST` | `:slug/:documentId/duplicate` | `document:create` | `201`; same no-re-read reasoning as create. |
+
+**Route-ordering footgun (real, guarded against):** the two `/bulk` routes are declared in the controller **before** any `/:documentId` route. NestJS matches routes in declaration order — had `/:documentId` been declared first, a request to `POST /api/documents/collection-type/cv-page/bulk` would have matched `/:documentId` with `documentId = "bulk"` instead, and would have proceeded straight into `SaveDocumentService` with a nonsense ID rather than hitting the bulk handler at all.
+
+### Public (`public-document.controller.ts`, `@Controller("/api/public/documents")`) — **no guards, no auth**
+
+| Method | Path |
+| --- | --- |
+| `GET` | `collection-type/:slug/:documentId` |
+| `GET` | `single-type/:slug` |
+
+Both always resolve the `published` version only (via `GetPublicDocumentService`/`GetPublicSingleTypeService`), 404 otherwise — draft data is never reachable through these routes regardless of content-type mode.
+
+### Validation (`presentation/validate-params.ts`)
+
+`validateSlugParam(slug)` — reuses content-type's `assertSafeSlug`, translating a caught `UnsafeSqlIdentifierError` into `400 BadRequestException` (never a raw 500). `validateDocumentIdParam(documentId)` — `class-validator`'s `isUUID(documentId, "4")`, `400` if not a v4 UUID. Both run at the very top of every handler that reads the corresponding param, before any service call.
+
+### DTOs (`presentation/dto/`)
+
+- `save-document.dto.ts` — `{ data: Record<string, unknown> }`, `@IsObject()` on `data` only — a shape gate, not field-level validation (per Confirmed Decision 11, real per-field validation happens implicitly at the SQL layer via the schema's own column types, not in a DTO).
+- `bulk-create.dto.ts` — `{ items: SaveDocumentDto[] }`, `@ArrayMinSize(1)` `@ArrayMaxSize(100)`, `@ValidateNested({ each: true })`.
+- `bulk-delete.dto.ts` — `{ documentIds: string[] }`, `@ArrayMinSize(1)` `@ArrayMaxSize(100)`.
+- `list-query.dto.ts` — `start`/`size`/`orderBy`/`sortDir`/`search`, every field `@IsOptional() @IsString()` (deeper validation — numeric ranges, allowlist membership — happens in `list-query.parser.ts`, not here).
+
+## Module wiring
+
+`document.module.ts` — `imports: [ContentTypeModule]`; registers all three controllers; every service listed in [Services](#services--collection-type) above plus `SchemaResolverService`/`ComponentIoService`; binds `DOCUMENT_REPOSITORY → PrismaDocumentRepository` / `COMPONENT_REPOSITORY → PrismaComponentRepository`. Registered in `src/app.module.ts` after `ContentTypeModule`, before `SeedModule`.
+
+## Permissions catalog additions
+
+`src/bootstrap/seed-default-data.service.ts` — 6 new slugs added alongside `content-type`'s `content_type:read` (see `content-type.md`): `document:read`, `document:create`, `document:update`, `document:delete`, `document:publish`, `document:unpublish`. All 6 granted to `super_admin`; only `document:read` granted to `admin` (alongside `content_type:read`). Same additive, `findBySlug`-guarded pattern as every prior cycle.
+
+## Tests
+
+Unit tests (Jest, mocked repositories/adapters via `Test.createTestingModule` + `useValue`, or plain `new` construction) live next to each source file — one spec per service/support file/repository/controller, exhaustively covering both draft/publish modes for every branch:
+
+- **Support**: `draft-publish.policy.spec.ts`, `status-resolver.spec.ts` (incl. the batch variant computing every row's status in one pass), `component-io.service.spec.ts` (3-level nested extract/hydrate, `parentComponentId` linking, no-N+1 fetch count, deepest-first cascade delete, transaction-client passthrough), `list-query.parser.spec.ts` (every default/validation/rejection path), `schema-resolver.service.spec.ts`, `row-mapper.spec.ts`, `where-builder.spec.ts` (ORDER BY allowlist + injection rejection, ILIKE escaping, shared-placeholder search).
+- **Collection services**: `save-document`, `publish-document`, `unpublish-document`, `get-document-for-edit`, `get-public-document`, `delete-document`, `list-documents`, `duplicate-document` — each spec covers both modes' branches (400 in Mode B for publish/unpublish; status draft/modified/published in Mode A; the createdAt-preserved-on-republish case; the parallel-fetch-then-404-only-if-both-absent delete case; list's batch-status computation and field projection).
+- **Bulk services**: `bulk-create-publish.service.spec.ts` (sequential save+publish in order, mode A vs. B; mid-batch Save failure rolls back all prior items; a Publish failure rolls back the current item too; no rollback needed when the very first item fails), `bulk-delete.service.spec.ts` (all-succeed, partial-success-continues, all-fail, empty-slice no-op, non-`Error` rejection falls back to string conversion).
+- **Single-type services**: `get-single-type`, `save-single-type`, `publish-single-type`, `unpublish-single-type`, `get-public-single-type` — mirror the collection-type specs' mode coverage.
+- **Repositories**: `prisma-document.repository.spec.ts` (parameterized `INSERT ... ON CONFLICT`, transaction passthrough, `ANY($2)` batching with no N+1, count+data query pair sharing the search placeholder, `orderBy` allowlist rejection), `prisma-component.repository.spec.ts` (insertion-order `SELECT`, parent-scoped delete-then-insert including a non-null `parentComponentId` scope, empty-array short-circuit, transaction passthrough).
+- **Controllers**: `single-type-document.controller.spec.ts`, `collection-type-document.controller.spec.ts` (every route including both `/bulk` routes and the fixed-status responses for publish/unpublish/create/duplicate), `public-document.controller.spec.ts` — every spec also asserts an invalid slug/documentId throws `BadRequestException` **without touching the service**.
+- **Module**: `document.module.spec.ts` — imports `ContentTypeModule`, registers all three controllers, registers every service plus both repository token bindings.
+
+`test/content-engine.e2e-spec.ts` (shared with `content-type`, real Postgres, `bootTestApp` + `JwtTokenService.signAccessToken(...)` against seeded roles, no register/login HTTP round-trip needed since `JwtAuthGuard` only verifies the JWT):
+
+- **Boot sync**: confirms `documents_cv_page`/`documents_en_it_vocab` exist via `to_regclass`, and both seeds are listed by `GET /api/content-types`.
+- **Mode-A full lifecycle** (`cv-page`): create (`"draft"`) → public read 404 → publish (`200`) → public read 200 → edit route status `"published"` → update fields → edit route status `"modified"` → public read still shows the **old** published data → unpublish → public read 404 again → delete → edit route 404.
+- **3-level component round-trip** (`cv-page`'s `experiences → roles`): two experiences, the first with two roles, published, then re-read — array order preserved at both nesting levels, a `json`-typed nested field (`techStack`) round-trips as a real array, not a string.
+- **Mode-B behavior**: a throwaway `draftToPublish: false` content type, created purely in-memory via a direct `ContentTypeSyncService.sync([...realDefs, modeBDef])` call (no file written to the real `content-types/` directory, so it can never race with any other e2e file's own app boot reading that same shared directory) — create is immediately public with status `"published"`, and both publish and unpublish return `400`.
+- **Schema-edit data preservation**: a second throwaway content type, created the same in-memory way with fields `[title, note]`; a document is saved with both; the definition is then re-synced (same `syncService.sync(...)` call, no reboot) with fields changed to `[title, extra]` — re-reading confirms `title` survived untouched, `note` is gone from the response entirely (column dropped), and a document created *after* the edit can store `extra`.
+- **Bulk create+publish and bulk delete** (`en-it-vocab`): a 3-item bulk create+publish, then a bulk delete of 2 real IDs plus 1 bogus UUID — `deleted` contains exactly the 2 real IDs, `failed` contains exactly the bogus one, confirming partial-success-no-rollback against a real DB rather than mocks.
+- **Auth**: 401 unauthenticated, 403 for an under-permissioned (no-permission) token, 403 for a read-only token attempting a create.
+- Both throwaway content types (and their tables) are torn down in `afterAll` via `syncService.sync(realDefs)` — the same `sync()` the boot process itself uses, so "delete a JSON file and reboot" and "this test's cleanup" are exercised by the identical code path. `afterAll` also deletes every user/document row it created; a `runId` suffix on emails/usernames/throwaway slugs avoids collisions with a prior incomplete run.
+- **A pre-existing dev DB may have `super_admin`/`admin` roles predating this cycle's 7 new permission slugs** (`SeedDefaultDataService` only creates missing roles/permissions, it never patches an already-existing role's `permissions` array) — the suite detects the gap and grants it via a real `PUT /api/roles/:id` call (bootstrapped off `super_admin`'s own pre-existing `role:manager` permission, never off the target role's permissions — `admin` only has `role:read`), the same expected pattern the `media` cycle's Checkpoint 5 documented.
+- **Getting this e2e suite to run at all required two unrelated bug fixes**, both in already-committed code, neither specific to this module:
+  1. `src/config/config.module.ts` computed its env-file search root from `__dirname` assuming the compiled `dist/` layout (3 directory levels up to reach the repo root); under `ts-jest` (running directly against `src/`, only 2 levels up), that landed one directory *above* the actual repo root, so `.env.local`/`.env.test.local` were never found and `bun run test:e2e` could never pass env validation. Fixed by switching to `process.cwd()`, correct in both the compiled and source-run layouts.
+  2. `content-type`'s `prisma-schema-table.repository.ts` built index names by naive string concatenation (`` `${tableName}_document_version_idx` ``). `en-it-vocab`'s `phonetics → syllableParts` component table name is 45 bytes — safely under Postgres's 63-byte identifier limit on its own — but appending that index suffix pushed it to 67 bytes, throwing `UnsafeSqlIdentifierError` on every real boot. Fixed with a new `indexName()` helper in `table-naming.ts` (see `content-type.md`'s equivalent note).
+
+Per project rule, no `coverageThreshold` entries were added for the Prisma repositories (`prisma-document.repository.ts`, `prisma-component.repository.ts`) or the three controllers.
+
+## Known quirks / deviations (preserved intentionally)
+
+- **`ComponentEntity.children` is always `{}`** — the recursive component I/O in `component-io.service.ts` builds nested structures directly as plain object properties on the hydrated result (`item[nestedField.name] = ...`), never through this field. It's part of the entity's declared shape but unused by the actual recursive walk; left as-is rather than removed, since removing it would be an unrelated cleanup outside this feature's scope.
+- **Component saves are full delete-then-insert, not a row-level upsert** — `IComponentRepository.upsertAll` always `DELETE`s every existing row in the given `(documentId, version, parentComponentId)` scope, then bulk-`INSERT`s the incoming array from scratch, even if only one item in a 10-item repeatable component actually changed. Simpler and correct (order is always exactly what was just inserted), at the cost of rewriting unchanged sibling rows on every save.
+- **`GetSingleTypeService`/`GetDocumentForEditService` are near-duplicates** — both resolve schema, read the save-version row, hydrate components, and (Mode A only) make one extra published-row read purely for status computation. Kept as two separate services rather than one parameterized-by-documentId service to mirror the source doc's `GetForEdit`/`GetSingleType` being distinct use cases, even though today's Postgres-backed implementation is nearly line-for-line identical modulo the `documentId` parameter.
+- **`listPaginated`'s count query and data query are two round-trips**, not a single windowed query (`COUNT(*) OVER()`) — simpler to reason about and test independently; acceptable at this repo's scale, revisit only if list-endpoint latency ever becomes a concern under real load.
+- **No caller-identity plumbing** — same known gap as `permissions`/`media`/`roles`: `createdBy`/`updatedBy`/`publishedBy` are `string | null` and get set from a JWT's `sub` claim where the calling controller has one, but nothing validates that the referenced user still exists, and several call sites (bulk services, in particular) pass the same `userId` straight through without re-verification.
+- **The Mode-B seed content types used to prove 400-on-publish/unpublish are e2e-only, throwaway, in-memory definitions** — neither of this repo's two real seeds (`cv-page`, `en-it-vocab`) is `draftToPublish: false`; both are Mode A. Mode B's behavior is proven correct at the unit level (every mode-gated service's spec) and, for the full HTTP+DB path, via the e2e suite's synthetic throwaway content type built with a direct `ContentTypeSyncService.sync(...)` call rather than a JSON file on disk — see [Tests](#tests) above for why (avoiding a cross-process race with other e2e files' own app boots against the same shared `content-types/` directory).
+
+## Post-review hardening
+
+A five-axis code review (`agent-skills:code-reviewer`) over this feature's full diff flagged two Important findings, both fixed:
+
+1. **No enforcement that a content type's `kind` matches the route family used to reach it.** A `collection`-kind slug driven through single-type endpoints would have operated on an arbitrary row (`findSingle` had no `ORDER BY`); a `single`-kind slug driven through collection-type endpoints would have let a client-supplied `documentId` violate the "at most one entry" invariant. Fixed with `assertKind(contentType, expectedKind)` (`draft-publish.policy.ts`, alongside `assertDraftPublishEnabled` — same `BadRequestException`-on-mismatch shape), called immediately after `schemaResolver.resolve(slug)` in all 13 document-mutating/reading services (every collection-type service asserts `"collection"`, every single-type service asserts `"single"`). `BulkCreateAndPublishService`/`BulkDeleteService` needed no direct change — they compose `SaveDocumentService`/`PublishDocumentService`/`DeleteDocumentService`, which already assert on every call.
+2. **Concurrent first-save race on single-type documents.** Two simultaneous first saves to the same single-type slug both read "no existing row," both generated a new `documentId`, and both `upsert`s could succeed (they target different `document_id` values, so the table's existing `UNIQUE (document_id, version)` constraint never caught it) — leaving two permanent rows for a content type meant to have at most one, with no way to detect or delete either through the API (no single-type delete route). Fixed at the DB level, not just in application code: `ensureDocumentTable` (content-type's `ISchemaTableRepository`, see `content-type.md`) now takes a `kind: ContentKind` parameter, and adds a second constraint, `UNIQUE (version)`, when creating a `single`-kind content type's table — the second concurrent `upsert` now fails outright (a real constraint violation) instead of silently succeeding as a duplicate row. `findSingle`'s query also gained `ORDER BY id ASC` as cheap defense-in-depth (deterministic row choice if more than one somehow exists). The constraint only applies to newly created tables (`ensureDocumentTable`'s `CREATE TABLE IF NOT EXISTS` path) — retrofitting it onto an already-existing single-type table via `alterDocumentTable` was intentionally left out of scope, since this system's diff engine doesn't reconcile `kind` changes at all yet (a pre-existing, separate limitation, not introduced by this fix).
+
+A residual, accepted trade-off from fix 2: the losing side of that now-impossible-to-silently-corrupt race gets an unhandled `500` (an uncaught Postgres unique-violation from `upsert`), not a graceful `409 Conflict` or an automatic retry-after-re-read. Given how rare a genuine concurrent first-save collision is in practice (a single-type document is typically edited by one admin at a time), a loud `500` on the losing request was judged sufficient — correctness (no silent duplicate rows) mattered more than a polished error response for this edge case.
+
+## Verified state
+
+`bun run build`, `bunx tsc --noEmit`, `bunx eslint .`, and `bun run test:cov` all pass (116 suites, 646 tests, incl. the post-review hardening fixes above). `bun run test:e2e` is green across all three e2e suites together (`app.e2e-spec.ts`, `media.e2e-spec.ts`, `content-engine.e2e-spec.ts` — 21/21) against a real reachable Postgres, confirming: dynamic table creation on boot with zero hand-written per-content-type code; the full Mode-A draft/publish/edit/unpublish/delete lifecycle; 3-level nested component round-tripping with order preserved; Mode-B's immediate-live-on-create and 400-on-publish/unpublish; a live schema edit (add/remove a field) followed by an in-process re-sync preserving every untouched column's data; bulk create+publish and bulk delete's real partial-success semantics; and the full 401/403 permission surface. A post-run check confirmed the e2e suite's own cleanup left no throwaway content types, tables, or users behind — only the two real seeds remain in `content_types`. (Both real seeds are `collection`-kind, so the new single-type `UNIQUE (version)` constraint doesn't apply to either — it's covered by unit tests only, per [Post-review hardening](#post-review-hardening) above.)
