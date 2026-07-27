@@ -68,12 +68,31 @@ See `tasks/plan.md` for full context, approach, and confirmed decisions.
 
 ## Phase 3 — e2e proof, docs, spec cleanup, review
 
-- [ ] `test/content-engine.e2e-spec.ts` — extend list assertions against the real `cv-page` seed
-      (`position`:text, `isMain`:boolean, both real non-throwaway fields): `$contains` on `position`,
-      `$eq` on `isMain`, a filter combined with `search`, and one `400` case (invalid field or
-      operator) — real HTTP route + real Postgres. If the timestamp-cast risk flagged in
-      `tasks/plan.md` surfaces here, fix `buildFilterWhere`'s timestamp branch with an explicit
-      `CAST($n AS timestamptz)` and re-run
+- [x] `test/content-engine.e2e-spec.ts` — new "list filter params (cv-page)" describe block:
+      `$contains` on `position`, `$eq` on `isMain` combined with `$contains`, a filter combined with
+      `search`, a `$gte` timestamp-column filter (`created_at`), and two `400` cases (unknown field,
+      operator illegal for the field's type) — real HTTP route + real Postgres. The timestamp-cast
+      risk flagged in `tasks/plan.md` did **not** surface — Postgres's implicit text→timestamptz
+      cast held with no explicit `CAST` needed.
+- [x] **Pre-existing bugs found and fixed along the way** (all confirmed via `git show --stat` that
+      the `/api/v1` migration commit never touched test files, and via a temporary debug e2e test
+      reproducing the exact 400 body):
+      1. `bun run test:e2e` was already broken on `develop` (19/21 failing) — `content-engine.e2e-spec.ts`
+         and `media.e2e-spec.ts` still called pre-`/api/v1`-migration routes; `app.e2e-spec.ts` still
+         tested the old removed root `GET /` route instead of the `GET /health` that replaced it. Fixed
+         and committed separately (`ed9baed`, confirmed with user first) before adding new assertions.
+      2. **Real bug in this feature's own design**: `filters[field][$op]=value` requires Express's
+         "extended" (qs-based) query parser to arrive as a nested object; Express 5 defaults to
+         "simple" (no bracket nesting), which class-validator's `whitelist`/`forbidNonWhitelisted`
+         then rejected as an unrecognized flat property (`"property filters[position][$contains]
+         should not exist"`). SPEC.md's assumption that this "works with zero custom parser config"
+         was wrong for this repo's actual Express version. Fixed with `app.set("query parser",
+         "extended")` in `configure-app.ts`, TDD'd with a new `configureApp query parser` describe
+         block in `configure-app.spec.ts` (a throwaway echo controller proving bracket-notation
+         query params round-trip into a real nested object). This is a global, app-wide setting
+         change — verified safe/backward-compatible by re-running the full suite (674 unit tests,
+         22 e2e tests, build, lint) with no other regressions, since "extended" is a superset of
+         "simple" for every existing flat (non-bracketed) query param already in use.
 - [ ] `docs/documents/document.md` — extend the "List query parsing" section with the new `filters`
       mechanism (operators, value classes, 400 cases), mirroring how `search`/`orderBy` are
       documented there

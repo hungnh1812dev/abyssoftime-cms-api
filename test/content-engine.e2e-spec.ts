@@ -365,6 +365,74 @@ describe("Content engine (e2e)", () => {
     });
   });
 
+  describe("list filter params (cv-page)", () => {
+    it("filters via $contains and $eq, combines with search, and rejects invalid filters with 400", async () => {
+      const filterTag = `FilterTag-${runId}`;
+
+      async function createCvPage(position: string, isMain: boolean): Promise<string> {
+        const response = await request(app.getHttpServer())
+          .post("/api/v1/documents/collection-type/cv-page")
+          .set("Cookie", [`access_token=${superAdminToken}`])
+          .send({ data: { position, isMain, company: `${filterTag}-Co`, summary: "<p>Filter test</p>" } })
+          .expect(201);
+        const documentId = (response.body as DocumentResponseBody).data.documentId;
+        pendingCleanupCvPageIds.add(documentId);
+        return documentId;
+      }
+
+      const primaryId = await createCvPage(`${filterTag} Primary`, true);
+      const secondaryId = await createCvPage(`${filterTag} Secondary`, false);
+      await createCvPage(`Unrelated-${runId}`, true);
+
+      const containsResponse = await request(app.getHttpServer())
+        .get("/api/v1/documents/collection-type/cv-page")
+        .query({ filters: { position: { $contains: filterTag } } })
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .expect(200);
+      const containsIds = (containsResponse.body as { items: { documentId: string }[] }).items.map((item) => item.documentId);
+      expect(containsIds.sort()).toEqual([primaryId, secondaryId].sort());
+
+      const combinedResponse = await request(app.getHttpServer())
+        .get("/api/v1/documents/collection-type/cv-page")
+        .query({ filters: { position: { $contains: filterTag }, isMain: { $eq: "true" } } })
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .expect(200);
+      const combinedIds = (combinedResponse.body as { items: { documentId: string }[] }).items.map((item) => item.documentId);
+      expect(combinedIds).toEqual([primaryId]);
+
+      const searchAndFilterResponse = await request(app.getHttpServer())
+        .get("/api/v1/documents/collection-type/cv-page")
+        .query({ search: filterTag, filters: { isMain: { $eq: "false" } } })
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .expect(200);
+      const searchAndFilterIds = (searchAndFilterResponse.body as { items: { documentId: string }[] }).items.map((item) => item.documentId);
+      expect(searchAndFilterIds).toEqual([secondaryId]);
+
+      // $gte against a timestamp system column — confirms the string parameter correctly casts to
+      // timestamptz in a real comparison (the parameterized value is never explicitly cast in
+      // buildFilterWhere; this proves Postgres's implicit text->timestamptz cast holds here).
+      const timestampResponse = await request(app.getHttpServer())
+        .get("/api/v1/documents/collection-type/cv-page")
+        .query({ filters: { position: { $contains: filterTag }, created_at: { $gte: "2020-01-01T00:00:00.000Z" } } })
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .expect(200);
+      const timestampIds = (timestampResponse.body as { items: { documentId: string }[] }).items.map((item) => item.documentId);
+      expect(timestampIds.sort()).toEqual([primaryId, secondaryId].sort());
+
+      await request(app.getHttpServer())
+        .get("/api/v1/documents/collection-type/cv-page")
+        .query({ filters: { unknownField: { $eq: "x" } } })
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .get("/api/v1/documents/collection-type/cv-page")
+        .query({ filters: { isMain: { $gt: "true" } } })
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .expect(400);
+    });
+  });
+
   describe("mode-B behavior (draftToPublish: false)", () => {
     it("is immediately public on create, and publish/unpublish return 400", async () => {
       const createResponse = await request(app.getHttpServer())

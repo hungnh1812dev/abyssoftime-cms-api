@@ -7,6 +7,7 @@ import { PermissionEntity } from "../modules/permissions/domain/entities/permiss
 import { PermissionController } from "../modules/permissions/presentation/permission.controller";
 import request from "supertest";
 
+import { Controller, Get, Query } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { type NestExpressApplication } from "@nestjs/platform-express";
 import { Test } from "@nestjs/testing";
@@ -102,5 +103,41 @@ describe("configureApp", () => {
 
   it("404s on /api/v1/health — the exclude only applies to the unprefixed path", async () => {
     await request(app.getHttpServer()).get("/api/v1/health").expect(404);
+  });
+});
+
+@Controller("query-echo")
+class QueryEchoController {
+  @Get()
+  echo(@Query() query: unknown): unknown {
+    return query;
+  }
+}
+
+describe("configureApp query parser", () => {
+  let app: NestExpressApplication;
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      controllers: [QueryEchoController],
+      providers: [{ provide: ConfigService, useValue: { get: jest.fn((key: string) => (key === "TRUST_PROXY" ? "1" : undefined)) } }],
+    }).compile();
+
+    app = module.createNestApplication<NestExpressApplication>();
+    configureApp(app);
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it("parses bracket-notation query params into nested objects (Express 5 defaults to 'simple', which would keep them as flat string keys)", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/query-echo")
+      .query({ filters: { position: { $contains: "hello" } } })
+      .expect(200);
+
+    expect(response.body).toEqual({ filters: { position: { $contains: "hello" } } });
   });
 });
