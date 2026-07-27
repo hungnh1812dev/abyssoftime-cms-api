@@ -1,124 +1,126 @@
-# Todo — Content-Type-Schema-Driven CMS Document Engine
+# Todo — Swagger/OpenAPI Documentation
 
-See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
+See `tasks/plan.md` for full context, build order, and confirmed decisions.
 
-## Phase 0 — Prisma model + migration + dir scaffold
+## Phase 0 — Dependency + bootstrap wiring
 
-- [x] `prisma/postgresql/schema.prisma` — `ContentType` model (`content_types` table)
-- [x] `bun run prisma:migrate` — `add_content_types`
-- [x] `bun run prisma:generate`
-- [x] **Checkpoint 0:** `bun run build` succeeds
+- [x] `bun add @nestjs/swagger` (`11.4.6`)
+- [x] `src/bootstrap/configure-app.ts` — `DocumentBuilder().setTitle("Abyssoftime CMS
+      API").setDescription(...).setVersion("0.0.1").addCookieAuth("access_token",
+      {...}).addBearerAuth().build()`, `SwaggerModule.createDocument` +
+      `SwaggerModule.setup("api-docs", app, document)`
+- [x] **Checkpoint 0:** `bun run build` succeeds; `bun run start:dev` + `curl localhost:3000/api-docs`
+      confirmed `200` against the real dev DB; `bun run lint` clean (pre-existing unrelated
+      `main.ts` warning only); `configure-app.spec.ts` (6 tests) still green
 
-## Phase 1 — SQL foundations (pure, no DB, highest-risk-first)
+## Phase 1 — `permissions` module
 
-- [x] `field-definition.ts` — `ContentKind`/`FieldType`/`FieldDefinition`/`isComponentField`
-- [x] `sql-identifier.ts` + spec — `assertSafeSlug`/`assertSafeFieldName`/`quoteIdent` (the
-      injection choke-point)
-- [x] `table-naming.ts` + spec — `documentTableName`/`componentTableName` + hash-truncation
-- [x] `field-type-mapping.ts` + spec — `FieldType → Postgres column type`
-- [x] **Checkpoint 1:** schema-helper specs green, build clean
+- [ ] `create-permission.dto.ts` / `update-permission.dto.ts` — `@ApiProperty`/`@ApiPropertyOptional`
+      per field (slug pattern example `"document:read"`, name/description examples)
+- [ ] `permission.controller.ts` — `@ApiTags("permissions")`; per route `@ApiCookieAuth()` (all 4
+      routes are guarded) + `@ApiOperation` + `@ApiResponse` for: `GET` 200; `POST` 201/409; `PUT`
+      200/404; `DELETE` 204/404
+- [ ] **Checkpoint 1:** `bun run build && bun run lint && bun run test:cov` green
 
-## Phase 2 — Content-type domain + loader/validator/differ (pure/fs, no DB)
+## Phase 2 — `roles` module
 
-- [x] `content-type.entity.ts`
-- [x] `content-type.repository.ts` — `IContentTypeRepository` + `ContentTypeNotFoundError`
-- [x] `schema-table.repository.ts` — `ISchemaTableRepository`
-- [x] `schema-validator.ts` + spec
-- [x] `schema-loader.service.ts` + spec
-- [x] `schema-differ.ts` + spec — pure diff plan (add/drop/retype), no `DROP TABLE`
-- [x] **Checkpoint 2:** content-type specs green (excl. persistence), typecheck clean
+- [ ] `create-role.dto.ts` / `update-role.dto.ts` — properties incl. `level` (`0`-`100` range in
+      the property doc), `permissions` array
+- [ ] `role.controller.ts` — `@ApiTags("roles")`; all 4 routes `@ApiCookieAuth()`; `GET` 200;
+      `POST` 201/400(unknown permission slug)/409; `PUT` 200/400/404; `DELETE` 204/400/404/409
+      (still-assigned-to-users)
+- [ ] **Checkpoint 2:** build/lint/test:cov green
 
-## Phase 3 — Content-type persistence (first DB-touching code)
+## Phase 3 — `users` module
 
-- [x] `prisma-content-type.repository.ts` + spec
-- [x] `prisma-schema-table.repository.ts` + spec — raw DDL, identifiers quoted, values
-      parameterized, `information_schema` introspection
-- [x] **Checkpoint 3:** persistence specs green, build clean
+- [ ] `create-user.dto.ts` / `update-user.dto.ts` — note in the property doc that `password` is
+      round-tripped in plaintext by this module (pre-existing gap, not something Swagger should
+      paper over) — no fake-realistic password example, use an obvious placeholder
+      (`"changeme123"`)
+- [ ] `user.controller.ts` — `@ApiTags("users")`; all 4 routes `@ApiCookieAuth()`; response type is
+      `UserResponseDto` (already strips sensitive fields) for `GET`/`POST`/`PUT`; `POST` 201/409;
+      `PUT` 200/403(level-hierarchy)/404/409; `DELETE` 204/403/404
+- [ ] **Checkpoint 3:** build/lint/test:cov green
 
-## Phase 4 — Content-type sync + services + controller + module
+## Phase 4 — `access-tokens` module
 
-- [x] `content-type-sync.service.ts` + spec — `OnApplicationBootstrap`
-- [x] `list-content-type.service.ts` + spec
-- [x] `get-content-type.service.ts` + spec — exported for `document` module
-- [x] `content-type.controller.ts` + spec — `/api/content-types`, read-only
-- [x] `content-type.module.ts` — exports `GetContentTypeService` + `CONTENT_TYPE_REPOSITORY`
-- [x] `app.module.ts` — register `ContentTypeModule`
-- [x] **Checkpoint 4:** build/typecheck/lint/`test content-type` all clean — **commit here**
+- [ ] `create-access-token.dto.ts` / `revoke-access-token.dto.ts` — `expiresIn` enum values as the
+      property's `enum`; never a real token example
+- [ ] `access-token.controller.ts` — `@ApiTags("access-tokens")`; all 4 routes `@ApiCookieAuth()`;
+      `GET` 200 (no `token` field in response — note that in the operation description); `POST`
+      201/400(unknown slug); `POST /:id/revoke` 200/400/404; `DELETE` 204/404
+- [ ] **Checkpoint 4:** build/lint/test:cov green
 
-## Phase 5 — Document domain + SQL helpers + raw DML repos
+## Phase 5 — `auth` module
 
-- [x] `document.entity.ts`, `component.entity.ts`
-- [x] `document.repository.ts`, `component.repository.ts` — ports w/ optional `tx` param
-- [x] `row-mapper.ts` + spec
-- [x] `where-builder.ts` + spec — `ILIKE` search + `ORDER BY` allowlist
-- [x] `prisma-document.repository.ts` + spec — `tx ?? this.prisma`
-- [x] `prisma-component.repository.ts` + spec — `tx ?? this.prisma`
-- [x] **Checkpoint 5:** `document/infrastructure` specs green, build clean
+- [ ] All 6 DTOs (`register`/`login`/`verify-otp`/`resend-otp`/`forgot-password`/`reset-password`)
+      — placeholder examples only (`"user@example.com"`, `"SecurePass123!"`, OTP `"123456"`), never
+      anything resembling a real credential
+- [ ] `auth.controller.ts` — `@ApiTags("auth")`; **no** `@ApiCookieAuth()` anywhere (every route is
+      public per `auth.md`); document that `login`/`refresh` set cookies and `logout` clears them
+      via each operation's description (Swagger has no first-class "sets a cookie" decorator, so
+      this is prose, not a typed annotation); status codes: register 201/409; verify-otp
+      200/400/404/409; resend-otp 200/404/409; has-users 200; login 200/401/403; refresh 200/401;
+      logout 200; forgot-password 200; reset-password 200/400
+- [ ] **Checkpoint 5:** build/lint/test:cov green
 
-## Phase 6 — Document support layer
+## Phase 6 — `media` module
 
-- [x] `schema-resolver.service.ts` + spec
-- [x] `draft-publish.policy.ts` + spec — mode A/B branching
-- [x] `status-resolver.ts` + spec — incl. batch variant (no N+1)
-- [x] `component-io.service.ts` + spec — recursive extract/hydrate/cascade, 3-level seeds
-- [x] `list-query.parser.ts` + spec
-- [x] **Checkpoint 6:** `document/application/support` specs green, typecheck clean
+- [ ] `media.controller.ts` — `@ApiTags("media")`; all 3 routes `@ApiCookieAuth()`; `upload` gets
+      `@ApiConsumes("multipart/form-data")` + `@ApiBody({ schema: { type: "object", properties: {
+      file: { type: "string", format: "binary" } } } })` (no DTO class exists for this route — it's
+      Multer-handled, per `media.md`); `GET` 200; `POST /upload` 201/400(no file)/413/422; `DELETE`
+      204/404
+- [ ] **Checkpoint 6:** build/lint/test:cov green
 
-## Phase 7 — Document collection services
+## Phase 7 — `content-type` module
 
-- [x] `save-document.service.ts` + spec — transactional
-- [x] `publish-document.service.ts` + spec — mode B → 400
-- [x] `unpublish-document.service.ts` + spec — mode B → 400
-- [x] `get-document-for-edit.service.ts` + spec
-- [x] `get-public-document.service.ts` + spec
-- [x] `delete-document.service.ts` + spec — transactional
-- [x] `list-documents.service.ts` + spec
-- [x] `duplicate-document.service.ts` + spec
-- [x] **Checkpoint 7:** collection service specs green
+- [ ] `content-type.controller.ts` — `@ApiTags("content-types")`; both routes `@ApiCookieAuth()`
+      (guarded, read-only); `GET /` 200 (`ContentTypeSummary[]`); `GET /:slug` 200/400(unsafe
+      slug)/404 — note in the class-level description that this module has no write route by
+      design (per `content-type.md`), so Swagger correctly shows only 2 GETs
+- [ ] **Checkpoint 7:** build/lint/test:cov green
 
-## Phase 8 — Bulk + single-type services
+## Phase 8 — `document` module (3 controllers)
 
-- [x] `bulk-create-publish.service.ts` + spec — compensating rollback
-- [x] `bulk-delete.service.ts` + spec — partial success, no rollback
-- [x] `get-single-type.service.ts` + spec
-- [x] `save-single-type.service.ts` + spec — transactional
-- [x] `publish-single-type.service.ts` + spec — mode B → 400
-- [x] `unpublish-single-type.service.ts` + spec — mode B → 400
-- [x] **Checkpoint 8:** all `document/application/services` specs green, build clean
+- [ ] `save-document.dto.ts` / `bulk-create.dto.ts` / `bulk-delete.dto.ts` / `list-query.dto.ts` —
+      properties; note `save-document.dto.ts`'s `data` is intentionally a loose `object` (schema
+      fields are dynamic per content type, see `document.md`) — document that in the property
+      description rather than trying to type it more tightly
+- [ ] `single-type-document.controller.ts` — `@ApiTags("documents-single-type")`; all 4 routes
+      `@ApiCookieAuth()`; `GET` 200/404; `PUT` 200; `POST /publish` 200/400(Mode B); `POST
+      /unpublish` 200/400(Mode B)
+- [ ] `collection-type-document.controller.ts` — `@ApiTags("documents-collection-type")`; all 9
+      routes `@ApiCookieAuth()`; note the `/bulk` route-ordering footgun in the class description
+      (informational only, doesn't change behavior); `GET` 200; `POST /bulk` 201; `DELETE /bulk`
+      200; `POST` 201; `GET /:documentId` 200/404; `PUT /:documentId` 200; `DELETE /:documentId`
+      204; `POST /:documentId/publish` 200/400; `POST /:documentId/unpublish` 200/400; `POST
+      /:documentId/duplicate` 201/404
+- [ ] `public-document.controller.ts` — `@ApiTags("documents-public")`; **no** `@ApiCookieAuth()`
+      (no guards per `document.md`); both routes 200/404
+- [ ] **Checkpoint 8:** build/lint/test:cov green
 
-## Phase 9 — Document presentation + DTOs + module wiring
+## Phase 9 — Manual verification
 
-- [x] `save-document.dto.ts`, `bulk-create.dto.ts`, `bulk-delete.dto.ts`, `list-query.dto.ts`
-- [x] `single-type-document.controller.ts` + spec
-- [x] `collection-type-document.controller.ts` + spec — `/bulk` routes before `/:documentId`
-- [x] `public-document.controller.ts` + spec — no guards
-- [x] `document.module.ts` — imports `ContentTypeModule`
-- [x] `app.module.ts` — register `DocumentModule`
-- [x] **Checkpoint 9:** build/typecheck/lint/`test document` all clean
+- [ ] `bun run start:dev`, browse `/api-docs`, confirm all 10 tags appear with every route listed,
+      cookie-lock icon shown only on the guarded routes/tags, `auth`/`public-document` show no lock
+- [ ] Confirm `bun run test:cov` shows no changed assertions vs. pre-change baseline (decorator-only
+      diff, zero runtime behavior change)
 
-## Phase 10 — Seed permissions + seed JSON
+## Phase 10 — Update spec/docs
 
-- [x] `seed-default-data.service.ts` — add 7 slugs (`content_type:read`, `document:read/create/
-      update/delete/publish/unpublish`); all 7 → `super_admin`; `content_type:read`+`document:read`
-      → `admin`
-- [x] `seed-default-data.service.spec.ts` — update counts/ordered-slug/permissions-array assertions
-- [x] `content-types/cv-page.json` — adopted + `"draftToPublish": true`
-- [x] `content-types/en-it-vocab.json` — adopted + `"draftToPublish": true`
-- [ ] **Checkpoint 10:** build/typecheck/lint/`test:cov` all clean — **commit here**
+- [ ] New `docs/documents/swagger.md` — mirrors this plan's Context section once the feature is
+      actually built (dependency version installed, exact bootstrap file touched, final route/tag
+      list)
+- [ ] `docs/ENTRYPOINT.md` — add the new doc file's index entry
+- [ ] Trim `SPEC.md` back to a one-line pointer at `docs/documents/swagger.md`, per the "Root docs"
+      rule
 
-## Phase 11 — e2e (real Postgres, manual/flagged if unreachable)
+## Phase 11 — Review + cleanup
 
-- [x] `test/content-engine.e2e-spec.ts` — boot sync creates real tables; mode-A full lifecycle;
-      mode-B 400 on publish; 401/403; bulk happy/partial; 3-level component round-trip; schema-edit
-      data preservation
-- [x] **Checkpoint 11:** `bun run test:e2e` green against reachable Postgres (grant the 7 new slugs
-      to pre-existing `super_admin`/`admin` roles via `PUT /api/roles/:id` if needed — same
-      expected gap as the media cycle)
-
-## Phase 12 — Docs
-
-- [x] `docs/documents/content-type.md`
-- [x] `docs/documents/document.md`
-- [x] `docs/ENTRYPOINT.md` — add index lines
-- [x] `SPEC.md` — trim to pointer line
-- [x] **Checkpoint 12:** doc read-through — commit
+- [ ] Five-axis code review (`agent-skills:code-reviewer`)
+- [ ] Apply any Critical/Important findings
+- [ ] Delete this cycle's `SPEC.md` content back down to the "No active spec" pointer form (already
+      done in Phase 10, just confirm) — no `/specs/*.md` file exists in this repo's convention to
+      separately delete (per `docs/rules/workflow.md`'s cleanup step, SPEC.md itself is the artifact
+      that gets trimmed, matching the previous cycle's own closeout)
