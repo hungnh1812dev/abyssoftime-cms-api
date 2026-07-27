@@ -34,6 +34,7 @@ describe("parseListQuery", () => {
       search: undefined,
       listFields: ["wordGroup", "bio", "teamSize"],
       searchableFields: ["wordGroup", "bio"],
+      filters: [],
     });
   });
 
@@ -96,5 +97,23 @@ describe("parseListQuery", () => {
     const contentType = buildContentType([]);
 
     expect(() => parseListQuery(contentType, { sortDir: "up" })).toThrow(BadRequestException);
+  });
+
+  it("defaults filters to an empty array when omitted", () => {
+    const contentType = buildContentType([]);
+
+    expect(parseListQuery(contentType, {}).filters).toEqual([]);
+  });
+
+  it("parses provided filters into the returned options", () => {
+    const contentType = buildContentType([]);
+
+    expect(parseListQuery(contentType, { filters: { wordGroup: { $eq: "hello" } } }).filters).toEqual([{ column: "wordGroup", operator: "$eq", value: "hello" }]);
+  });
+
+  it("propagates a filter validation error from parseFilters", () => {
+    const contentType = buildContentType([]);
+
+    expect(() => parseListQuery(contentType, { filters: { unknownField: { $eq: "x" } } })).toThrow(BadRequestException);
   });
 });

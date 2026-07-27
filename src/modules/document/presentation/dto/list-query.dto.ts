@@ -1,7 +1,8 @@
-import { IsOptional, IsString } from "class-validator";
+import { IsObject, IsOptional, IsString } from "class-validator";
 
 import { ApiPropertyOptional } from "@nestjs/swagger";
 
+import { type FilterQueryParams } from "@/modules/document/application/support/filter-query.parser";
 import { type ListQueryParams } from "@/modules/document/application/support/list-query.parser";
 
 export class ListQueryDto implements ListQueryParams {
@@ -29,4 +30,20 @@ export class ListQueryDto implements ListQueryParams {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({
+    type: "object",
+    additionalProperties: true,
+    example: { title: { $contains: "engineer" }, age: { $gte: "18" } },
+    description:
+      "Per-field filters, keyed by field/system-column name: `filters[field][$op]=value`. One operator per field. " +
+      "Supported operators by field type — text: `$eq` `$ne` `$contains`; number/timestamp system columns " +
+      "(`created_at`/`updated_at`/`published_at`): `$eq` `$ne` `$gt` `$gte` `$lt` `$lte`; boolean/`id`/`document_id`: " +
+      '`$eq` `$ne`. Boolean values must be the literal string `"true"`/`"false"`. Fields not in the sortable ' +
+      "allowlist (richtext/media/json/component) are not filterable. Combines with `search` and with every other " +
+      "filtered field as an AND.",
+  })
+  @IsOptional()
+  @IsObject()
+  filters?: FilterQueryParams;
 }

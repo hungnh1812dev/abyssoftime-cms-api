@@ -5,6 +5,8 @@ import { BadRequestException } from "@nestjs/common";
 
 import { sortableColumnsFor } from "@/modules/document/infrastructure/persistence/sql/where-builder";
 
+import { FilterQueryParams, parseFilters } from "./filter-query.parser";
+
 const DEFAULT_START = 0;
 const DEFAULT_SIZE = 20;
 const MAX_SIZE = 100;
@@ -18,6 +20,7 @@ export interface ListQueryParams {
   orderBy?: string;
   sortDir?: string;
   search?: string;
+  filters?: FilterQueryParams;
 }
 
 export function parseListQuery(contentType: ContentTypeEntity, query: ListQueryParams): ListOptions {
@@ -29,6 +32,7 @@ export function parseListQuery(contentType: ContentTypeEntity, query: ListQueryP
     search: query.search,
     listFields: contentType.listFields,
     searchableFields: searchableFieldsFor(contentType),
+    filters: parseFilters(contentType, query.filters),
   };
 }
 
