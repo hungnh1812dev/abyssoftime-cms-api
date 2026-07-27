@@ -57,12 +57,12 @@ See `tasks/plan.md` for full context, dependency graph, and confirmed decisions.
 
 ## Phase 6 — Document support layer
 
-- [ ] `schema-resolver.service.ts` + spec
-- [ ] `draft-publish.policy.ts` + spec — mode A/B branching
-- [ ] `status-resolver.ts` + spec — incl. batch variant (no N+1)
-- [ ] `component-io.service.ts` + spec — recursive extract/hydrate/cascade, 3-level seeds
-- [ ] `list-query.parser.ts` + spec
-- [ ] **Checkpoint 6:** `document/application/support` specs green, typecheck clean
+- [x] `schema-resolver.service.ts` + spec
+- [x] `draft-publish.policy.ts` + spec — mode A/B branching
+- [x] `status-resolver.ts` + spec — incl. batch variant (no N+1)
+- [x] `component-io.service.ts` + spec — recursive extract/hydrate/cascade, 3-level seeds
+- [x] `list-query.parser.ts` + spec
+- [x] **Checkpoint 6:** `document/application/support` specs green, typecheck clean
 
 ## Phase 7 — Document collection services
 
