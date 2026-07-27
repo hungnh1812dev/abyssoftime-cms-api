@@ -39,7 +39,7 @@ All 10 controllers, all 19 request DTOs, full response-shape coverage:
 | `content-type` | `content-types` | `content-type.controller.ts` |
 | `document` | `documents-single-type` / `documents-collection-type` / `documents-public` | 3 controllers |
 
-Live-verified: 36 paths, 48 operations (up from 35/47 after the `users` module's `PATCH /api/users/:id/role` route was added — see [users.md](./users.md)), both `cookie`/`bearer` security schemes registered in `components.securitySchemes`.
+Live-verified: 36 paths, 47 operations (`POST /api/users` was later removed — see [users.md](./users.md#removed-post-apiusers)), both `cookie`/`bearer` security schemes registered in `components.securitySchemes`.
 
 ## Response-shape DTOs (documentation-only, zero behavior change)
 
