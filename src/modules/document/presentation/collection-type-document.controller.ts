@@ -10,6 +10,7 @@ import { UnpublishDocumentService } from "../application/services/unpublish-docu
 import { DocumentEntity, DocumentStatus } from "../domain/entities/document.entity";
 
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
+import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
@@ -19,6 +20,7 @@ import { type AuthenticatedRequest } from "@/common/types/authenticated-request"
 import { type DocumentResponse, toDocumentResponse } from "./document-response.mapper";
 import { BulkCreateDto } from "./dto/bulk-create.dto";
 import { BulkDeleteDto } from "./dto/bulk-delete.dto";
+import { BulkCreateResponseDto, BulkDeleteResponseDto, DocumentResponseDto, ListDocumentsResponseDto, PublishStatusResponseDto } from "./dto/document-response.dto";
 import { ListQueryDto } from "./dto/list-query.dto";
 import { SaveDocumentDto } from "./dto/save-document.dto";
 import { validateDocumentIdParam, validateSlugParam } from "./validate-params";
@@ -32,6 +34,8 @@ interface BulkDeleteResponse {
   failed: { documentId: string; error?: string }[];
 }
 
+@ApiTags("documents-collection-type")
+@ApiCookieAuth()
 @Controller("/api/documents/collection-type")
 export class CollectionTypeDocumentController {
   constructor(
@@ -49,6 +53,8 @@ export class CollectionTypeDocumentController {
   @Get(":slug")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("document:read")
+  @ApiOperation({ summary: "List documents, paginated/sorted/searched" })
+  @ApiResponse({ status: 200, type: ListDocumentsResponseDto })
   async list(@Param("slug") slug: string, @Query() query: ListQueryDto): Promise<ListDocumentsResult> {
     validateSlugParam(slug);
 
@@ -60,6 +66,8 @@ export class CollectionTypeDocumentController {
   @Post(":slug/bulk")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("document:create", "document:publish")
+  @ApiOperation({ summary: "Bulk create + publish, sequentially in order; any item's failure rolls back all prior successes" })
+  @ApiResponse({ status: 201, type: BulkCreateResponseDto })
   async bulkCreate(@Param("slug") slug: string, @Body() dto: BulkCreateDto, @Req() req: AuthenticatedRequest): Promise<BulkCreateResponse> {
     validateSlugParam(slug);
 
@@ -74,6 +82,8 @@ export class CollectionTypeDocumentController {
   @Delete(":slug/bulk")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("document:delete")
+  @ApiOperation({ summary: "Bulk delete — each ID's outcome is independent, no rollback on partial failure" })
+  @ApiResponse({ status: 200, type: BulkDeleteResponseDto })
   async bulkDelete(@Param("slug") slug: string, @Body() dto: BulkDeleteDto): Promise<BulkDeleteResponse> {
     validateSlugParam(slug);
 
@@ -87,6 +97,8 @@ export class CollectionTypeDocumentController {
   @Post(":slug")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("document:create")
+  @ApiOperation({ summary: "Create a document" })
+  @ApiResponse({ status: 201, type: DocumentResponseDto })
   async create(@Param("slug") slug: string, @Body() dto: SaveDocumentDto, @Req() req: AuthenticatedRequest): Promise<DocumentResponse> {
     validateSlugParam(slug);
 
@@ -97,6 +109,9 @@ export class CollectionTypeDocumentController {
   @Get(":slug/:documentId")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("document:read")
+  @ApiOperation({ summary: "Get a document by ID (draft in Mode A, published in Mode B)" })
+  @ApiResponse({ status: 200, type: DocumentResponseDto })
+  @ApiResponse({ status: 404, description: "Document not found" })
   async get(@Param("slug") slug: string, @Param("documentId") documentId: string): Promise<DocumentResponse> {
     validateSlugParam(slug);
     validateDocumentIdParam(documentId);
@@ -108,6 +123,8 @@ export class CollectionTypeDocumentController {
   @Put(":slug/:documentId")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("document:update")
+  @ApiOperation({ summary: "Update a document" })
+  @ApiResponse({ status: 200, type: DocumentResponseDto })
   async update(@Param("slug") slug: string, @Param("documentId") documentId: string, @Body() dto: SaveDocumentDto, @Req() req: AuthenticatedRequest): Promise<DocumentResponse> {
     validateSlugParam(slug);
     validateDocumentIdParam(documentId);
@@ -121,6 +138,9 @@ export class CollectionTypeDocumentController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("document:delete")
+  @ApiOperation({ summary: "Delete a document (both draft and published versions, plus their components)" })
+  @ApiResponse({ status: 204, description: "Deleted" })
+  @ApiResponse({ status: 404, description: "Document not found" })
   async delete(@Param("slug") slug: string, @Param("documentId") documentId: string): Promise<void> {
     validateSlugParam(slug);
     validateDocumentIdParam(documentId);
@@ -132,6 +152,9 @@ export class CollectionTypeDocumentController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("document:publish")
+  @ApiOperation({ summary: "Publish the draft (Mode A only)" })
+  @ApiResponse({ status: 200, type: PublishStatusResponseDto })
+  @ApiResponse({ status: 400, description: "Content type has draftToPublish disabled (Mode B)" })
   async publish(@Param("slug") slug: string, @Param("documentId") documentId: string, @Req() req: AuthenticatedRequest): Promise<{ status: "published" }> {
     validateSlugParam(slug);
     validateDocumentIdParam(documentId);
@@ -144,6 +167,9 @@ export class CollectionTypeDocumentController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("document:unpublish")
+  @ApiOperation({ summary: "Unpublish (Mode A only) — draft is left untouched" })
+  @ApiResponse({ status: 200, type: PublishStatusResponseDto })
+  @ApiResponse({ status: 400, description: "Content type has draftToPublish disabled (Mode B)" })
   async unpublish(@Param("slug") slug: string, @Param("documentId") documentId: string): Promise<{ status: "draft" }> {
     validateSlugParam(slug);
     validateDocumentIdParam(documentId);
@@ -155,6 +181,9 @@ export class CollectionTypeDocumentController {
   @Post(":slug/:documentId/duplicate")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("document:create")
+  @ApiOperation({ summary: "Duplicate a document as a brand-new document (shares the same underlying media assets)" })
+  @ApiResponse({ status: 201, type: DocumentResponseDto })
+  @ApiResponse({ status: 404, description: "Source document not found" })
   async duplicate(@Param("slug") slug: string, @Param("documentId") documentId: string, @Req() req: AuthenticatedRequest): Promise<DocumentResponse> {
     validateSlugParam(slug);
     validateDocumentIdParam(documentId);
