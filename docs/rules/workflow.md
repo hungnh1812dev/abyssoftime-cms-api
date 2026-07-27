@@ -53,6 +53,10 @@ For any new feature/page/module:
 
 - All changed `.js`, `.ts`, `.tsx` files must be run through Prettier before testing or committing.
 
+## Linting
+
+- Always lint via `bun run lint` — never invoke `eslint` directly (e.g. `bunx eslint .`, `bunx eslint <glob>`). The project's own script is already correctly scoped and finishes in ~5-10s; ad-hoc `eslint .` invocations re-run type-aware checking across the whole repo and can take 10+ minutes, pegging a CPU core the whole time.
+
 ## Naming convention
 
 - Use clear, unambiguous names.
