@@ -7,19 +7,21 @@ import { renderWithProviders } from "@/test-utils";
 import type { ContentType } from "@/types/cms";
 
 const contentType: ContentType = {
-  ID: "ct-1",
-  Name: "Blog Posts",
-  Slug: "blog-posts",
-  Kind: "collection",
-  Fields: [
+  documentId: "ct-1",
+  name: "Blog Posts",
+  slug: "blog-posts",
+  kind: "collection",
+  draftToPublish: true,
+  fields: [
     { name: "title", type: "text" },
     { name: "slug", type: "text" },
     { name: "body", type: "richtext" },
     { name: "featured", type: "boolean" },
     { name: "banner", type: "component" },
   ],
-  CreatedAt: "",
-  UpdatedAt: "",
+  listFields: [],
+  createdAt: "",
+  updatedAt: "",
 };
 
 function renderDialog(props: Partial<React.ComponentProps<typeof ColumnChooserDialog>> = {}) {

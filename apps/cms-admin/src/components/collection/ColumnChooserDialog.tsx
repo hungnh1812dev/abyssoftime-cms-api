@@ -7,7 +7,7 @@ import { type ContentType } from "@/types/cms";
 const SYSTEM_DISPLAY_FIELDS = [
   { key: "createdAt", label: "Created At" },
   { key: "updatedAt", label: "Updated At" },
-  { key: "updatedByName", label: "Updated By" },
+  { key: "updatedBy", label: "Updated By" },
 ] as const;
 
 interface ColumnChooserDialogProps {
@@ -20,7 +20,7 @@ interface ColumnChooserDialogProps {
 }
 
 function defaultSelection(contentType: ContentType): Set<string> {
-  const fields = (contentType.Fields ?? []).filter((field) => field.type !== "component");
+  const fields = (contentType.fields ?? []).filter((field) => field.type !== "component");
   const contentDefaults = fields.slice(0, 3).map((field) => field.name);
   const systemDefaults = SYSTEM_DISPLAY_FIELDS.map((field) => field.key);
   return new Set([...contentDefaults, ...systemDefaults]);
@@ -41,7 +41,7 @@ export function ColumnChooserDialog({ open, onOpenChange, contentType, currentLi
 function ColumnChooserContent({ contentType, currentListFields, onOpenChange, onSave, isSaving }: Omit<ColumnChooserDialogProps, "open">) {
   const [selected, setSelected] = useState<Set<string>>(() => initialSelection(contentType, currentListFields));
 
-  const contentFields = (contentType.Fields ?? []).filter((field) => field.type !== "component");
+  const contentFields = (contentType.fields ?? []).filter((field) => field.type !== "component");
 
   function handleToggle(key: string) {
     setSelected((prev) => {

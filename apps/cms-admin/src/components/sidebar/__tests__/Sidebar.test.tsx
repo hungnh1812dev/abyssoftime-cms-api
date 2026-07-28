@@ -9,8 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/hooks/useContentTypes", () => ({
   useContentTypes: () => ({
     data: [
-      { ID: "1", Name: "Homepage", Slug: "homepage", Kind: "single" },
-      { ID: "2", Name: "Articles", Slug: "articles", Kind: "collection" },
+      { name: "Homepage", slug: "homepage", kind: "single", draftToPublish: true },
+      { name: "Articles", slug: "articles", kind: "collection", draftToPublish: true },
     ],
   }),
 }));

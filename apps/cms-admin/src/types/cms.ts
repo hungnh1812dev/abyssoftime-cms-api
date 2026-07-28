@@ -1,25 +1,26 @@
 export interface FieldDefinition {
   name: string;
-  type: string;
-  ext?: string[];
+  type: "text" | "richtext" | "number" | "boolean" | "media" | "json" | "component";
   width?: "100%" | "50%" | "1/3";
-  repeatable?: boolean;
   header?: boolean;
+  component?: string;
+  repeatable?: boolean;
   fields?: FieldDefinition[];
 }
 
 export interface ContentTypeSummary {
-  ID: string;
-  Name: string;
-  Slug: string;
-  Kind: "single" | "collection";
+  slug: string;
+  name: string;
+  kind: "single" | "collection";
+  draftToPublish: boolean;
 }
 
 export interface ContentType extends ContentTypeSummary {
-  Fields?: FieldDefinition[];
-  listFields?: string[];
-  CreatedAt: string;
-  UpdatedAt: string;
+  documentId: string;
+  fields: FieldDefinition[];
+  listFields: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PaginatedResponse<T> {
@@ -27,17 +28,48 @@ export interface PaginatedResponse<T> {
   total: number;
   start: number;
   size: number;
-  listFields?: string[];
 }
 
 export type EntryStatus = "draft" | "modified" | "published";
 
-export interface Document {
-  data: Record<string, unknown>;
-  status: EntryStatus;
+export interface DocumentUpdatedBy {
+  documentId: string;
+  name: string;
 }
 
-export const SYSTEM_FIELDS = ["id", "documentId", "locale", "createdAt", "updatedAt", "createdBy", "updatedBy", "updatedByName"] as const;
+export interface Document {
+  data: {
+    documentId: string;
+    status: EntryStatus;
+    createdAt: string;
+    updatedAt: string;
+    publishedAt?: string | null;
+    updatedBy: DocumentUpdatedBy | null;
+    [key: string]: unknown;
+  };
+}
+
+// Shape of one row from GET /documents/collection-type/:slug (list) —
+// confirmed against the live API to differ from the single-document fetch
+// shape above: system columns are siblings of `data`, not nested inside it,
+// and `data` holds only the content-type's configured `listFields` content
+// columns (never system columns, regardless of listFields config).
+export interface ListedDocumentItem {
+  documentId: string;
+  status: EntryStatus;
+  createdAt: string;
+  updatedAt: string;
+  publishedAt?: string | null;
+  updatedBy: DocumentUpdatedBy | null;
+  data: Record<string, unknown>;
+}
+
+// System columns that can appear inside a document's `data` (always on a
+// full document fetch; only when configured into a content type's
+// `listFields` on a collection-list row) — stripped before `data` is fed
+// into a react-hook-form instance, so the form only ever sees user-editable
+// schema fields.
+export const SYSTEM_FIELDS = ["documentId", "status", "createdAt", "updatedAt", "publishedAt", "updatedBy"] as const;
 
 export function stripSystemFields(data: Record<string, unknown>): Record<string, unknown> {
   const content: Record<string, unknown> = {};
@@ -49,6 +81,9 @@ export function stripSystemFields(data: Record<string, unknown>): Record<string,
   return content;
 }
 
+// Locale support is hidden in the UI (this backend has no locale/i18n
+// module), but the type is kept so the orphaned locale files
+// (InternationalizePage, LocaleSelector, useLocales*) still typecheck.
 export interface Locale {
   code: string;
   name: string;
@@ -58,15 +93,17 @@ export interface Locale {
 }
 
 export interface MediaAsset {
-  ID: string;
   documentId: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  width: number;
+  height: number;
   url: string;
   thumbnailUrl: string;
   publicId: string;
-  fileName: string;
-  fileExt: string;
   hash: string;
-  width: number;
-  height: number;
+  uploadedBy: string | null;
   createdAt: string;
+  updatedAt: string;
 }

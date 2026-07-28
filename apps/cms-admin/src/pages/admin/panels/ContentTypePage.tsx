@@ -21,9 +21,9 @@ export function ContentTypePage() {
     return <p className="text-muted-foreground">Content type not found.</p>;
   }
 
-  if (contentType.Kind === "single") {
-    return <ContentTypePanel key={contentType.Slug} contentType={contentType} />;
+  if (contentType.kind === "single") {
+    return <ContentTypePanel key={contentType.slug} contentType={contentType} />;
   }
 
-  return <CollectionListPage key={contentType.Slug} contentType={contentType} />;
+  return <CollectionListPage key={contentType.slug} contentType={contentType} />;
 }
