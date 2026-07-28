@@ -1,5 +1,5 @@
 import { quoteIdent } from "@/modules/content-type/application/schema/sql-identifier";
-import { FieldDefinition, FieldType } from "@/modules/content-type/domain/entities/field-definition";
+import { FieldDefinition, LISTABLE_FIELD_TYPES } from "@/modules/content-type/domain/entities/field-definition";
 import { FilterOperator, ParsedFilter } from "@/modules/document/domain/entities/filter";
 
 export class InvalidOrderByFieldError extends Error {
@@ -71,8 +71,7 @@ export function buildFilterWhere(filters: ParsedFilter[], paramIndex: number): {
 }
 
 const SYSTEM_SORTABLE_COLUMNS = ["id", "document_id", "created_at", "updated_at", "published_at"];
-const SORTABLE_FIELD_TYPES: ReadonlySet<FieldType> = new Set(["text", "number", "boolean"]);
 
 export function sortableColumnsFor(fields: FieldDefinition[]): string[] {
-  return [...SYSTEM_SORTABLE_COLUMNS, ...fields.filter((field) => SORTABLE_FIELD_TYPES.has(field.type)).map((field) => field.name)];
+  return [...SYSTEM_SORTABLE_COLUMNS, ...fields.filter((field) => LISTABLE_FIELD_TYPES.has(field.type)).map((field) => field.name)];
 }

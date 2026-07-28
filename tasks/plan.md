@@ -1,101 +1,161 @@
-# Plan: `GET /api/v1/auth/me`
+# Plan: Configure-Columns backend support — `PATCH .../list-fields` + `updatedBy`
 
-See `SPEC.md` for the active spec pointer and `docs/documents/auth-me-techstack.md` for the decision
-rationale tables. This plan implements the endpoint FE requested in `get-auth-me.md`.
+See `SPEC.md` for the active spec pointer. This plan implements both FE requests
+(`patch-content-type-list-fields.md`, `add-updated-by-field.md`) as one combined build cycle.
 
 ## Context
 
-The CMS-Admin frontend has no way to resolve the session cookie into "who is logged in and what can they
-do" — login/refresh/logout only return `{ message }`, and cookies are `httpOnly`. The FE's current workaround
-(`GET /users` + `GET /roles`, matched by email in memory) breaks on cold reload and requires permissions the
-caller may not hold just to identify themselves.
+Two FE feature requests block the CMS-Admin's "Configure columns" UI, currently disabled. Investigation done
+in the spec phase (direct file reads, no exploration needed):
 
-Two design decisions were confirmed with the user in the spec phase:
-1. **Fresh DB reads** for `role.permissions`/`level`/`slug`, not the JWT payload — the payload can't supply
-   `role.documentId`/`role.name` anyway, so a DB role lookup is mandatory regardless.
-2. **Deleted-user-mid-session → 401**, not 404 — matches the FE's existing "401 → redirect to /login"
-   contract; this is the first route to look up the caller's own user row by `sub`.
+- `ContentType.listFields` is a real DB column, but `ContentTypeSyncService.syncOne()` overwrites it from the
+  JSON schema on **every app boot** — a naive PATCH would be silently reverted on next deploy.
+- `DocumentEntity.updatedBy` (raw user id) is **already populated on every save** and already read off the
+  row — this feature is "resolve id → name and expose it," not new tracking.
+- `content-type` module must not import from `document` module (one-way arrow, `docs/documents/content-type.md`)
+  — the orderBy field-kind allowlist (`SORTABLE_FIELD_TYPES`, `where-builder.ts:74`) currently lives on the
+  wrong side of that boundary for Feature A to reuse in place; it needs relocating.
+- `IUserRepository` has no batch lookup (`findById` only) — needed to avoid N+1 on the list endpoint.
+- `projectFields()` (`list-documents.service.ts:62-68`) only reads `DocumentEntity.fields` — system columns
+  (`updatedAt`, and the new `updatedBy`) named in `listFields` render as `null` today. Confirmed with the
+  user: fix this as part of this work (`SPEC.md` Decision A-5).
 
-**Correction found during planning:** `SPEC.md`'s decision #3 said `IRoleRepository.findById` *throws*
-`RoleNotFoundError` for a missing role. Checked `prisma-role.repository.ts:23-26` — it does not; `findById`
-returns `null` (cast through `null as unknown as RoleEntity`, an existing type-signature inaccuracy already
-present in this codebase). The real precedent, from `UpdateUserRoleService`
-(`update-user-role.service.ts:25-28`), is an explicit `if (!newRole) throw new NotFoundException(...)` check.
-This plan follows that precedent; Task 1 fixes `SPEC.md` to match.
+## Dependency graph
+
+```
+Task 1 (relocate allowlist)  ──┬──▶ Task 4 (PATCH endpoint)  ──┐
+                                └──▶ Task 7 (projectFields fix) │
+Task 2 (findByIds)  ──▶ Task 5 (detail updatedBy)  ──▶ Task 6 (list updatedBy)  ──┼──▶ Task 7
+Task 3 (override column + repo merge)  ───────────────▶ Task 4 ───────────────────┘
+```
+
+Tasks 1, 2, 3 have no dependencies on each other. Task 7 is the integration point and comes last.
 
 ## Key files
 
-- `src/modules/auth/presentation/dto/me-response.dto.ts` (new) — `MeResponseDto`, mirrors
-  `UserResponseDto`'s fields + nested `role: RoleResponseDto | null`
-- `src/modules/auth/application/services/get-me.service.ts` (new) — `GetMeService`, injects
-  `USER_REPOSITORY`/`ROLE_REPOSITORY` (both already exported since `AuthModule` imports `UserModule` +
-  `RoleModule`)
-- `src/modules/auth/presentation/auth.controller.ts` — add `GET auth/me`, `JwtAuthGuard` only (no
-  `PermissionsGuard`), `@ApiCookieAuth()` on this method only (every other route here is public by design)
-- `src/modules/auth/auth.module.ts` — register `GetMeService` as a provider
-- `docs/documents/auth.md`, `docs/cms-admin-integration.md` — document the shipped endpoint, remove the
-  "no GET /auth/me" known gap
+- `src/modules/content-type/application/sync/content-type-sync.service.ts` — must stay untouched by Task 3/4.
+- `src/modules/content-type/infrastructure/persistence/prisma-content-type.repository.ts` — the single
+  override-merge point (Task 3).
+- `src/modules/document/infrastructure/persistence/sql/where-builder.ts` — allowlist relocation source (Task 1).
+- `src/modules/document/application/services/list-documents.service.ts` — touched by both Task 6 and Task 7.
+- `src/modules/document/presentation/document-response.mapper.ts` — stays pure/sync (Task 5).
+- `src/bootstrap/seed-default-data.service.ts` — permission/role seed (Task 4).
 
-## Confirmed decisions (from the Spec + Plan phases, restated)
+## Confirmed decisions (from the Spec phase, restated)
 
-1. Role/permissions returned fresh from `RoleRepository`, not `req.user`'s JWT payload.
-2. `findById(sub)` returning no user → `401 UnauthorizedException` ("Invalid session").
-3. `user.roleId === null` → `role: null`, no role lookup performed.
-4. `roles.findById(user.roleId)` returning `null` (orphaned `roleId`) → `404 NotFoundException`, matching
-   `UpdateUserRoleService`'s existing handling of the same nullable `findById` contract.
-5. No `PermissionsGuard` on this route — matches the existing precedent at `UserController.update`
-   (`PUT /users/:id`).
+1. `listFieldsOverride` is a **separate** DB column from the sync-owned `listFields` — merged at read time in
+   `PrismaContentTypeRepository.toEntity()`. `ContentTypeSyncService` never reads/writes it.
+2. New permission `content_type:manager`, granted to `super_admin` only (matches the existing `*:manager`
+   pattern — every other manager permission is super_admin-only today).
+3. `updatedBy` response shape: nested `{ documentId, name }`, not a flat string.
+4. `updatedBy` scope: authenticated CMS-Admin routes only (`CollectionTypeDocumentController`,
+   `SingleTypeDocumentController`); `PublicDocumentController` is not touched.
+5. `projectFields` is extended to source system columns (incl. resolved `updatedBy`) for `listFields` entries
+   — required for the FE's own `"updatedAt"` example, and for `updatedBy`, to actually render.
+6. `listFields` must be non-empty — `400` on `[]`.
 
 ## Tasks
 
-### Phase 1 — Spec correction + response DTO
-- [x] Fix `SPEC.md` decision #3 (and `docs/documents/auth-me-techstack.md` if it repeats the same claim):
-      `findById` returns `null`, not a thrown `RoleNotFoundError`; handling is an explicit null check
-- [x] `src/modules/auth/presentation/dto/me-response.dto.ts` (new) — `MeResponseDto` with
-      `documentId`/`email`/`name`/`username`/`accountType`/`verified`/`roleId`/`createdAt`/`updatedAt` +
-      `role: RoleResponseDto | null`; `static fromEntities(user, role)` following `UserResponseDto.fromEntity`
-- [x] **Checkpoint 1:** `bun run build` succeeds (no dedicated spec file needed for a pure DTO — matches
-      `RoleResponseDto`'s own precedent)
+### Phase 1 — Foundational relocations (no user-facing behavior yet)
 
-### Phase 2 — Service + controller (vertical slice)
-- [x] `src/modules/auth/application/services/get-me.service.ts` (new) — `GetMeService.execute(sub)`:
-      `findById(sub)` → 401 if missing; `roleId === null` → `role: null`; else `roles.findById(roleId)` → 404
-      if missing; return `{ user, role }`
-- [x] `get-me.service.spec.ts` (new) — mocked `IUserRepository`/`IRoleRepository` (same shape as
-      `list-user.service.spec.ts`): happy path, `roleId: null` path, missing-user → 401, missing-role → 404
-- [x] `auth.controller.ts` — add `GET auth/me` (`@UseGuards(JwtAuthGuard)`, `@ApiCookieAuth()` on this method
-      only, calls `GetMeService.execute(req.user.sub)`, maps via `MeResponseDto.fromEntities`)
-- [x] `auth.controller.spec.ts` — new test asserting the route calls `GetMeService` with `req.user.sub` and
-      returns the mapped DTO, same style as this file's other tests
-- [x] `auth.module.ts` — register `GetMeService` as a provider
-- [x] **Checkpoint 2:** `bun run lint && bunx jest src/modules/auth && bun run build` all green. Manual check
-      against `bun run start:dev`: login → cookies set → `GET /api/v1/auth/me` → 200 expected shape; no
-      cookie → 401. Automatically-verifiable parts (lint/test/build) → commit here; manual check can trail.
+- [x] **Task 1:** Relocate `SORTABLE_FIELD_TYPES` (`where-builder.ts:74`) into
+      `content-type/domain/entities/field-definition.ts` as `LISTABLE_FIELD_TYPES` (same values). Add new
+      `LISTABLE_SYSTEM_COLUMNS: readonly string[]` = `["documentId", "status", "createdAt", "updatedAt", "publishedAt", "updatedBy"]`
+      (response-DTO-facing, distinct from orderBy's SQL-facing `SYSTEM_SORTABLE_COLUMNS`, which is untouched).
+      Update `where-builder.ts` to import `LISTABLE_FIELD_TYPES` instead of defining its own copy.
+      - Verify: `where-builder.spec.ts`'s existing `sortableColumnsFor` tests pass unmodified (pure refactor).
+        New coverage for the relocated/added constants in `field-definition.spec.ts`.
+- [ ] **Task 2:** Add `findByIds(ids: string[]): Promise<UserEntity[]>` to `IUserRepository` +
+      `PrismaUserRepository` (`prisma.user.findMany({ where: { documentId: { in: ids } } })`). Empty input →
+      `[]`, no query.
+      - Verify: empty-input short-circuit, partial matches, no assumed result ordering.
+- [ ] **Task 3:** `prisma/postgresql/schema.prisma` — add `listFieldsOverride Json? @map("list_fields_override")`
+      to `ContentType`. New migration (`ALTER TABLE "content_types" ADD COLUMN "list_fields_override" JSONB;`).
+      `content-type.repository.ts` — add `updateListFields(slug, listFields): Promise<ContentTypeEntity>` to
+      `IContentTypeRepository` (narrow method, not routed through `update()`). `prisma-content-type.repository.ts`
+      — implement it (same `P2025` handling as `update()`/`delete()`); update `toEntity()` to merge
+      `listFieldsOverride ?? listFields`.
+      - Verify: `content-type-sync.service.spec.ts` passes with **zero edits** to `content-type-sync.service.ts`
+        itself — proves the override column is invisible to sync logic by construction.
+- [ ] **Checkpoint 1:** `bun run build && bun run lint && bunx jest src/modules/content-type src/modules/document/infrastructure/persistence/sql src/modules/users/infrastructure/persistence/prisma-user.repository.spec.ts`
+      all green.
 
-### Phase 3 — Docs
-- [x] `docs/documents/auth.md` — add the new endpoint to its existing route table/section
-- [x] `docs/cms-admin-integration.md` — remove "no GET /auth/me" from known gaps; add to per-module endpoint
-      reference
-- [x] **Checkpoint 3:** doc read-through, no stale "no /auth/me" mentions — commit
+### Phase 2 — Feature A: `PATCH content-types/:slug/list-fields`
 
-### Phase 4 — Five-axis review + close-out
-- [x] Five-axis review (correctness / readability / architecture / security / performance) — APPROVE, no
-      Critical/Important findings (see commit for the full report)
-- [x] Address findings — fixed the one actionable Suggestion: `MeResponseDto.fromEntities` now explicitly
-      maps `RoleEntity` → `RoleResponseDto` field-by-field instead of assigning the raw entity through a
-      structural-typing coincidence. The other three findings were pre-existing/out-of-scope
-      (`IRoleRepository.findById`'s non-nullable return type lie predates this feature) or doc-wording-only
-      — left as-is.
-- [x] `SPEC.md` — trim back to a one-line pointer (workflow.md step 7 cleanup)
-- [x] **Checkpoint 4 (final):** all automated checks green after any fixes; `SPEC.md` reduced to pointer —
-      commit
+- [ ] **Task 4:** `UpdateListFieldsDto` (`{ listFields: string[] }`, `@IsArray() @ArrayNotEmpty() @IsString({ each: true })`).
+      `UpdateListFieldsService` — 404 on unknown slug; validate every entry is in `LISTABLE_SYSTEM_COLUMNS` or
+      matches a `fields` entry with an eligible `LISTABLE_FIELD_TYPES` kind, else `400`; calls
+      `contentTypes.updateListFields(...)`. `content-type.controller.ts` — new
+      `@Patch(":slug/list-fields")`, `JwtAuthGuard` + `PermissionsGuard` + `@RequirePermissions("content_type:manager")`,
+      returns `200 ContentTypeResponseDto`. Register the service in `content-type.module.ts`.
+      `seed-default-data.service.ts` — add `content_type:manager` permission, grant to `super_admin` only.
+      - Verify: valid PATCH → 200, persists across restart (override column); unknown field/disallowed
+        kind/empty array → 400; unknown slug → 404; non-super_admin caller → 403.
+- [ ] **Checkpoint 1 (Feature A core):** `bun run build && bun run lint && bunx jest src/modules/content-type src/bootstrap/seed-default-data.service.spec.ts`
+      green. Manual: `bun run start:dev`, PATCH a real content type, restart, confirm `GET` still reflects
+      the override. **Commit here** (automated checks pass; this is a full vertical slice of Feature A).
+
+### Phase 3 — Feature B: `updatedBy` on document responses
+
+- [ ] **Task 5:** `document.module.ts` — import `UserModule`. `document-response.mapper.ts` —
+      `toDocumentResponse(document, status, updatedBy)` takes the already-resolved value, stays pure/sync.
+      `document-response.dto.ts` — new `UpdatedByResponseDto { documentId; name }`; add
+      `updatedBy?: UpdatedByResponseDto | null` to `DocumentDataResponseDto`. Both document controllers —
+      inject `USER_REPOSITORY`, resolve via `findById` immediately before each `toDocumentResponse(...)` call
+      (5 sites in collection-type, 2 in single-type); `null`/dangling id → `updatedBy: null`, never throws.
+      `PublicDocumentController` is **not** touched.
+      - Verify: every authenticated detail route returns resolved or `null` `updatedBy`;
+        `public-document.controller.spec.ts` unmodified and still passing.
+- [ ] **Task 6:** `document-response.dto.ts` — add `updatedBy?: UpdatedByResponseDto | null` to
+      `ListedDocumentItemResponseDto`. `list-documents.service.ts` — after fetching `rows`, one
+      `USER_REPOSITORY.findByIds(...)` call for the page's unique non-null `updatedBy` ids, build a
+      `documentId → {documentId,name}` map, attach to each item.
+      - Verify: exactly one `findByIds` call per `execute()` regardless of page size/duplicates; `null`/dangling
+        ids → `updatedBy: null`.
+- [ ] **Checkpoint 2 (Feature B core):** `bun run build && bun run lint && bunx jest src/modules/document src/modules/users`
+      green. **Commit here.**
+
+### Phase 4 — Integration: system columns in `projectFields`
+
+- [ ] **Task 7:** `list-documents.service.ts` — `projectFields` (or its replacement): for each `listFields`
+      entry, if the name is in `LISTABLE_SYSTEM_COLUMNS`, source it from the row's already-resolved values
+      (`documentId`, `status` from the existing `statuses` map, `createdAt`/`updatedAt`/`publishedAt` off
+      `row`, `updatedBy` from Task 6's resolved map) instead of `row.fields`; otherwise keep the existing
+      `row.fields[name] ?? null` behavior.
+      - Verify: `listFields: ["title", "updatedAt", "updatedBy"]` → `data.updatedAt` is the real timestamp,
+        `data.updatedBy` is the resolved object — neither is `null`. `title` unaffected.
+- [ ] **Checkpoint 3 (final, full integration):** `bun run build && bun run lint && bun test` (full suite)
+      green. Manual walkthrough: `bun run start:dev` → PATCH `listFields` to include `"updatedAt"`/`"updatedBy"`
+      → restart → GET content type (override survived) → hit collection-list route → confirm both render real
+      values, not `null`. **Commit here.**
+
+### Phase 5 — Docs
+
+- [ ] `SPEC.md` — trim back to a one-line pointer (this repo's established convention).
+- [ ] `docs/documents/content-type.md` — new PATCH route, `listFieldsOverride`, `content_type:manager`
+      permission; correct the "read-only by design" framing (schema is read-only; `listFields` is now
+      admin-mutable).
+- [ ] `docs/documents/document.md` — `updatedBy` on responses.
+- [ ] `docs/documents/users.md` — `findByIds`.
+- [ ] `docs/cms-admin-integration.md` — both new/changed contracts.
+- [ ] New `docs/documents/content-type-list-fields-techstack.md` — override-column-vs-alternatives comparison
+      table (workflow.md's "Decision rationale" rule).
+- [ ] **Checkpoint 4:** doc read-through, no stale "read-only"/"no updatedBy" mentions — commit.
+
+### Phase 6 — Five-axis review + close-out
+
+- [ ] Five-axis review (correctness / readability / architecture / security / performance).
+- [ ] Address findings.
+- [ ] **Checkpoint 5 (final):** all checks green after any fixes — commit.
 
 ## Verification (end-to-end)
 
-1. `bun run lint && bun run build && bunx jest src/modules/auth` — all green.
-2. `GET /api/v1/auth/me` with a valid `access_token` cookie → 200, shape matches `get-auth-me.md`'s example,
-   `role` resolved fresh from DB.
-3. No/invalid/expired cookie → 401 (unchanged `JwtAuthGuard` behavior).
-4. Deleted user, still-valid token → 401.
-5. `roleId: null` → `role: null`, 200.
-6. No permission slug required to call this route.
+1. `bun run build && bun run lint && bun test` (full suite) — all green, no regressions in
+   `where-builder.spec.ts`, `content-type-sync.service.spec.ts`, `list-documents.service.spec.ts`,
+   `public-document.controller.spec.ts`, etc.
+2. `PATCH content-types/:slug/list-fields` persists across a restart; only `super_admin` can call it; bad
+   input → 400; unknown slug → 404.
+3. `updatedBy: { documentId, name } | null` on every authenticated collection-type/single-type route;
+   `PublicDocumentController` responses unchanged.
+4. `listFields` containing `"updatedAt"`/`"updatedBy"` renders real values in list `data`, not `null`.
+5. Exactly one batch user lookup per list page, not one per row.
