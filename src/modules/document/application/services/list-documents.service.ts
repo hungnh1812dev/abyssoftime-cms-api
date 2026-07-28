@@ -7,12 +7,20 @@ import { resolveBatchStatuses } from "../support/status-resolver";
 
 import { Inject, Injectable } from "@nestjs/common";
 
+import { type IUserRepository, USER_REPOSITORY } from "@/modules/users/domain/repositories/user.repository";
+
+export interface ResolvedUpdatedBy {
+  documentId: string;
+  name: string;
+}
+
 export interface ListedDocumentItem {
   documentId: string;
   data: Record<string, unknown>;
   status: DocumentStatus;
   createdAt: Date;
   updatedAt: Date;
+  updatedBy: ResolvedUpdatedBy | null;
 }
 
 export interface ListDocumentsResult {
@@ -27,6 +35,7 @@ export class ListDocumentsService {
   constructor(
     private readonly schemaResolver: SchemaResolverService,
     @Inject(DOCUMENT_REPOSITORY) private readonly documents: IDocumentRepository,
+    @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
   ) {}
 
   async execute(slug: string, query: ListQueryParams): Promise<ListDocumentsResult> {
@@ -47,12 +56,17 @@ export class ListDocumentsService {
       : [];
     const statuses = resolveBatchStatuses(contentType.draftToPublish, rows, publishedRows);
 
+    const updatedByIds = [...new Set(rows.map((row) => row.updatedBy).filter((id): id is string => id !== null))];
+    const updatedByUsers = await this.users.findByIds(updatedByIds);
+    const updatedByMap = new Map(updatedByUsers.map((user) => [user.documentId, { documentId: user.documentId, name: user.name }]));
+
     const items: ListedDocumentItem[] = rows.map((row) => ({
       documentId: row.documentId,
       data: projectFields(row.fields, options.listFields),
       status: statuses.get(row.documentId) ?? "draft",
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      updatedBy: row.updatedBy ? (updatedByMap.get(row.updatedBy) ?? null) : null,
     }));
 
     return { items, total, start: options.start, size: options.size };

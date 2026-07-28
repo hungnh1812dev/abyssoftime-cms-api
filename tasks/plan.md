@@ -106,13 +106,13 @@ Tasks 1, 2, 3 have no dependencies on each other. Task 7 is the integration poin
       `PublicDocumentController` is **not** touched.
       - Verify: every authenticated detail route returns resolved or `null` `updatedBy`;
         `public-document.controller.spec.ts` unmodified and still passing.
-- [ ] **Task 6:** `document-response.dto.ts` — add `updatedBy?: UpdatedByResponseDto | null` to
+- [x] **Task 6:** `document-response.dto.ts` — add `updatedBy?: UpdatedByResponseDto | null` to
       `ListedDocumentItemResponseDto`. `list-documents.service.ts` — after fetching `rows`, one
       `USER_REPOSITORY.findByIds(...)` call for the page's unique non-null `updatedBy` ids, build a
       `documentId → {documentId,name}` map, attach to each item.
       - Verify: exactly one `findByIds` call per `execute()` regardless of page size/duplicates; `null`/dangling
         ids → `updatedBy: null`.
-- [ ] **Checkpoint 2 (Feature B core):** `bun run build && bun run lint && bunx jest src/modules/document src/modules/users`
+- [x] **Checkpoint 2 (Feature B core):** `bun run build && bun run lint && bunx jest src/modules/document src/modules/users`
       green. **Commit here.**
 
 ### Phase 4 — Integration: system columns in `projectFields`

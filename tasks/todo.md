@@ -14,8 +14,8 @@ See `tasks/plan.md` for full context and rationale.
 
 ## Phase 3 — Feature B: `updatedBy`
 - [x] Task 5 — detail responses: `UserModule` import, mapper param, DTO field, both controllers resolve via `findById`, public controller untouched
-- [ ] Task 6 — list responses: DTO field, batched `findByIds` resolution in `ListDocumentsService`
-- [ ] **Checkpoint 2 (Feature B core):** build/lint/test green — commit
+- [x] Task 6 — list responses: DTO field, batched `findByIds` resolution in `ListDocumentsService`
+- [x] **Checkpoint 2 (Feature B core):** build/lint/test green — commit
 
 ## Phase 4 — Integration
 - [ ] Task 7 — `projectFields` sources system columns (incl. resolved `updatedBy`) instead of only `row.fields`
