@@ -46,7 +46,21 @@ export class MeResponseDto {
     dto.roleId = user.roleId;
     dto.createdAt = user.createdAt;
     dto.updatedAt = user.updatedAt;
-    dto.role = role;
+    dto.role = role ? MeResponseDto.mapRole(role) : null;
+    return dto;
+  }
+
+  private static mapRole(role: RoleEntity): RoleResponseDto {
+    const dto = new RoleResponseDto();
+    dto.documentId = role.documentId;
+    dto.name = role.name;
+    dto.slug = role.slug;
+    dto.permissions = role.permissions;
+    dto.level = role.level;
+    dto.isDefault = role.isDefault;
+    dto.createdAt = role.createdAt;
+    dto.updatedAt = role.updatedAt;
+    dto.updatedBy = role.updatedBy;
     return dto;
   }
 }

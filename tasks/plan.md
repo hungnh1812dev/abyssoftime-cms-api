@@ -79,10 +79,15 @@ This plan follows that precedent; Task 1 fixes `SPEC.md` to match.
 - [x] **Checkpoint 3:** doc read-through, no stale "no /auth/me" mentions — commit
 
 ### Phase 4 — Five-axis review + close-out
-- [ ] Five-axis review (correctness / readability / architecture / security / performance)
-- [ ] Address findings
-- [ ] `SPEC.md` — trim back to a one-line pointer (workflow.md step 7 cleanup)
-- [ ] **Checkpoint 4 (final):** all automated checks green after any fixes; `SPEC.md` reduced to pointer —
+- [x] Five-axis review (correctness / readability / architecture / security / performance) — APPROVE, no
+      Critical/Important findings (see commit for the full report)
+- [x] Address findings — fixed the one actionable Suggestion: `MeResponseDto.fromEntities` now explicitly
+      maps `RoleEntity` → `RoleResponseDto` field-by-field instead of assigning the raw entity through a
+      structural-typing coincidence. The other three findings were pre-existing/out-of-scope
+      (`IRoleRepository.findById`'s non-nullable return type lie predates this feature) or doc-wording-only
+      — left as-is.
+- [x] `SPEC.md` — trim back to a one-line pointer (workflow.md step 7 cleanup)
+- [x] **Checkpoint 4 (final):** all automated checks green after any fixes; `SPEC.md` reduced to pointer —
       commit
 
 ## Verification (end-to-end)
