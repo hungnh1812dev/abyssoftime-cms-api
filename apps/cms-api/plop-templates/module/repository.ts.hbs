@@ -1,0 +1,21 @@
+import { {{pascalCase name}}Entity } from "../entities/{{kebabCase name}}.entity";
+
+export interface Create{{pascalCase name}}Data {
+  name: string;
+  updatedBy: string;
+}
+
+export interface Update{{pascalCase name}}Data {
+  name?: string;
+  updatedBy: string;
+}
+
+export interface I{{pascalCase name}}Repository {
+  findAll(): Promise<{{pascalCase name}}Entity[]>;
+  findById(documentId: string): Promise<{{pascalCase name}}Entity | null>;
+  create(data: Create{{pascalCase name}}Data): Promise<{{pascalCase name}}Entity>;
+  update(documentId: string, data: Update{{pascalCase name}}Data): Promise<{{pascalCase name}}Entity>;
+  delete(documentId: string): Promise<void>;
+}
+
+export const {{constantCase name}}_REPOSITORY = Symbol("{{constantCase name}}_REPOSITORY");

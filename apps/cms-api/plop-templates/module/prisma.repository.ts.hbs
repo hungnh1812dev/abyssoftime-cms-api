@@ -1,0 +1,45 @@
+import { {{pascalCase name}}Entity } from "../../domain/entities/{{kebabCase name}}.entity";
+import { Create{{pascalCase name}}Data, I{{pascalCase name}}Repository, Update{{pascalCase name}}Data } from "../../domain/repositories/{{kebabCase name}}.repository";
+
+import { Injectable } from "@nestjs/common";
+
+import { PrismaService } from "@/prisma/application/prisma.service";
+
+@Injectable()
+export class Prisma{{pascalCase name}}Repository implements I{{pascalCase name}}Repository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findAll(): Promise<{{pascalCase name}}Entity[]> {
+    const {{pluralCamel name}} = await this.prisma.{{camelCase name}}.findMany();
+    return {{pluralCamel name}}.map(({{camelCase name}}) => this.toEntity({{camelCase name}}));
+  }
+
+  async findById(documentId: string): Promise<{{pascalCase name}}Entity | null> {
+    const {{camelCase name}} = await this.prisma.{{camelCase name}}.findUnique({ where: { documentId } });
+    return {{camelCase name}} ? this.toEntity({{camelCase name}}) : null;
+  }
+
+  async create(data: Create{{pascalCase name}}Data): Promise<{{pascalCase name}}Entity> {
+    const {{camelCase name}} = await this.prisma.{{camelCase name}}.create({
+      data: { name: data.name, updatedBy: data.updatedBy },
+    });
+    return this.toEntity({{camelCase name}});
+  }
+
+  async update(documentId: string, data: Update{{pascalCase name}}Data): Promise<{{pascalCase name}}Entity> {
+    const {{camelCase name}} = await this.prisma.{{camelCase name}}.update({
+      where: { documentId },
+      data: { name: data.name, updatedBy: data.updatedBy },
+    });
+
+    return this.toEntity({{camelCase name}});
+  }
+
+  async delete(documentId: string): Promise<void> {
+    await this.prisma.{{camelCase name}}.delete({ where: { documentId } });
+  }
+
+  private toEntity({{camelCase name}}: { documentId: string; name: string; createdAt: Date; updatedAt: Date; updatedBy: string }): {{pascalCase name}}Entity {
+    return new {{pascalCase name}}Entity({{camelCase name}}.documentId, {{camelCase name}}.name, {{camelCase name}}.createdAt, {{camelCase name}}.updatedAt, {{camelCase name}}.updatedBy);
+  }
+}
