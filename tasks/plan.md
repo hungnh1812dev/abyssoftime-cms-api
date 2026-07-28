@@ -117,14 +117,14 @@ Tasks 1, 2, 3 have no dependencies on each other. Task 7 is the integration poin
 
 ### Phase 4 — Integration: system columns in `projectFields`
 
-- [ ] **Task 7:** `list-documents.service.ts` — `projectFields` (or its replacement): for each `listFields`
+- [x] **Task 7:** `list-documents.service.ts` — `projectFields` (or its replacement): for each `listFields`
       entry, if the name is in `LISTABLE_SYSTEM_COLUMNS`, source it from the row's already-resolved values
       (`documentId`, `status` from the existing `statuses` map, `createdAt`/`updatedAt`/`publishedAt` off
       `row`, `updatedBy` from Task 6's resolved map) instead of `row.fields`; otherwise keep the existing
       `row.fields[name] ?? null` behavior.
       - Verify: `listFields: ["title", "updatedAt", "updatedBy"]` → `data.updatedAt` is the real timestamp,
         `data.updatedBy` is the resolved object — neither is `null`. `title` unaffected.
-- [ ] **Checkpoint 3 (final, full integration):** `bun run build && bun run lint && bun test` (full suite)
+- [x] **Checkpoint 3 (final, full integration):** `bun run build && bun run lint && bun test` (full suite)
       green. Manual walkthrough: `bun run start:dev` → PATCH `listFields` to include `"updatedAt"`/`"updatedBy"`
       → restart → GET content type (override survived) → hit collection-list route → confirm both render real
       values, not `null`. **Commit here.**

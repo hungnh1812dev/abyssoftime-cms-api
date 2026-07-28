@@ -163,4 +163,41 @@ describe("ListDocumentsService", () => {
       expect(result.items[0].updatedBy).toBeNull();
     });
   });
+
+  describe("system columns in data (listFields)", () => {
+    it("sources system-column listFields entries from resolved row values, not row.fields", async () => {
+      const contentType = new ContentTypeEntity(
+        "ct-1",
+        "en-it-vocab",
+        "EN-IT Vocab",
+        "collection",
+        false,
+        FIELDS,
+        ["wordGroup", "documentId", "status", "createdAt", "updatedAt", "publishedAt", "updatedBy"],
+        new Date(),
+        new Date(),
+      );
+      const { schemaResolver, documents, users } = buildDeps(contentType);
+      const createdAt = new Date("2026-01-01");
+      const updatedAt = new Date("2026-01-02");
+      const publishedAt = new Date("2026-01-03");
+      const row = new DocumentEntity("doc-1", "published", { wordGroup: "Networking" }, createdAt, updatedAt, publishedAt, null, "user-1", null);
+      documents.listPaginated.mockResolvedValue({ rows: [row], total: 1 });
+      const user = new UserEntity("user-1", "jane@example.com", "Jane Doe", "janedoe", "hash", true, true, null, new Date(), new Date());
+      users.findByIds.mockResolvedValue([user]);
+
+      const service = new ListDocumentsService(schemaResolver, documents, users);
+      const result = await service.execute("en-it-vocab", {});
+
+      expect(result.items[0].data).toEqual({
+        wordGroup: "Networking",
+        documentId: "doc-1",
+        status: "published",
+        createdAt,
+        updatedAt,
+        publishedAt,
+        updatedBy: { documentId: "user-1", name: "Jane Doe" },
+      });
+    });
+  });
 });

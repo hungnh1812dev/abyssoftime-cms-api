@@ -1,4 +1,4 @@
-import { DocumentStatus } from "../../domain/entities/document.entity";
+import { DocumentEntity, DocumentStatus } from "../../domain/entities/document.entity";
 import { DOCUMENT_REPOSITORY, type IDocumentRepository } from "../../domain/repositories/document.repository";
 import { assertKind, resolveSaveVersion } from "../support/draft-publish.policy";
 import { ListQueryParams, parseListQuery } from "../support/list-query.parser";
@@ -7,6 +7,7 @@ import { resolveBatchStatuses } from "../support/status-resolver";
 
 import { Inject, Injectable } from "@nestjs/common";
 
+import { LISTABLE_SYSTEM_COLUMNS } from "@/modules/content-type/domain/entities/field-definition";
 import { type IUserRepository, USER_REPOSITORY } from "@/modules/users/domain/repositories/user.repository";
 
 export interface ResolvedUpdatedBy {
@@ -60,23 +61,47 @@ export class ListDocumentsService {
     const updatedByUsers = await this.users.findByIds(updatedByIds);
     const updatedByMap = new Map(updatedByUsers.map((user) => [user.documentId, { documentId: user.documentId, name: user.name }]));
 
-    const items: ListedDocumentItem[] = rows.map((row) => ({
-      documentId: row.documentId,
-      data: projectFields(row.fields, options.listFields),
-      status: statuses.get(row.documentId) ?? "draft",
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      updatedBy: row.updatedBy ? (updatedByMap.get(row.updatedBy) ?? null) : null,
-    }));
+    const items: ListedDocumentItem[] = rows.map((row) => {
+      const status = statuses.get(row.documentId) ?? "draft";
+      const updatedBy = row.updatedBy ? (updatedByMap.get(row.updatedBy) ?? null) : null;
+      return {
+        documentId: row.documentId,
+        data: projectFields(row, status, updatedBy, options.listFields),
+        status,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        updatedBy,
+      };
+    });
 
     return { items, total, start: options.start, size: options.size };
   }
 }
 
-function projectFields(fields: Record<string, unknown>, listFields: string[]): Record<string, unknown> {
+function projectFields(row: DocumentEntity, status: DocumentStatus, updatedBy: ResolvedUpdatedBy | null, listFields: string[]): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const name of listFields) {
-    result[name] = fields[name] ?? null;
+    result[name] = LISTABLE_SYSTEM_COLUMNS.includes(name) ? systemColumnValue(name, row, status, updatedBy) : (row.fields[name] ?? null);
   }
   return result;
+}
+
+function systemColumnValue(name: string, row: DocumentEntity, status: DocumentStatus, updatedBy: ResolvedUpdatedBy | null): unknown {
+  switch (name) {
+    case "documentId":
+      return row.documentId;
+    case "status":
+      return status;
+    case "createdAt":
+      return row.createdAt;
+    case "updatedAt":
+      return row.updatedAt;
+    case "publishedAt":
+      return row.publishedAt;
+    case "updatedBy":
+      return updatedBy;
+    /* istanbul ignore next -- unreachable: name is already filtered to LISTABLE_SYSTEM_COLUMNS */
+    default:
+      return null;
+  }
 }
