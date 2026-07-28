@@ -1,15 +1,16 @@
-import { useState } from 'react';
-import { useRoleList, useCreateRole, useUpdateRole, useDeleteRole, type RoleItem } from '@/hooks/useRoles';
-import { usePermissions, type PermissionItem } from '@/hooks/usePermissions';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { useState } from "react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { type PermissionItem, usePermissions } from "@/hooks/usePermissions";
+import { type RoleItem, useCreateRole, useDeleteRole, useRoleList, useUpdateRole } from "@/hooks/useRoles";
 
 function resourceOf(slug: string): string {
-  return slug.split(':')[0] ?? slug;
+  return slug.split(":")[0] ?? slug;
 }
 
 function groupByResource(permissions: PermissionItem[]): Array<[string, PermissionItem[]]> {
@@ -79,7 +80,7 @@ function PermissionTree({ permissions, selected, onChange }: PermissionTreeProps
                 checked={groupAllChecked}
                 indeterminate={!groupAllChecked && groupSomeChecked}
                 onChange={() => toggleGroup(groupSlugs)}
-                label={resource.replace(/_/g, ' ')}
+                label={resource.replace(/_/g, " ")}
               />
               <div className="mt-2 ml-5 space-y-1 border-l pl-3">
                 {perms.map((p) => (
@@ -107,8 +108,8 @@ interface RoleDialogProps {
 
 function RoleDialog({ open, onOpenChange, role, permissions }: RoleDialogProps) {
   const isEdit = role !== null;
-  const [name, setName] = useState(role?.name ?? '');
-  const [slug, setSlug] = useState(role?.slug ?? '');
+  const [name, setName] = useState(role?.name ?? "");
+  const [slug, setSlug] = useState(role?.slug ?? "");
   const [level, setLevel] = useState(role?.level ?? 50);
   const [selected, setSelected] = useState<string[]>(role?.permissions ?? []);
   const createRole = useCreateRole();
@@ -138,7 +139,7 @@ function RoleDialog({ open, onOpenChange, role, permissions }: RoleDialogProps) 
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? `Edit Role: ${role.name}` : 'Create Role'}</DialogTitle>
+          <DialogTitle>{isEdit ? `Edit Role: ${role.name}` : "Create Role"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
@@ -165,7 +166,7 @@ function RoleDialog({ open, onOpenChange, role, permissions }: RoleDialogProps) 
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving || !name || (!isEdit && !slug)}>
-            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Role'}
+            {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Role"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -185,13 +186,13 @@ function PermissionSubTree({ slugs, permissions }: { slugs: string[]; permission
   return (
     <div>
       <button type="button" onClick={() => setExpanded((value) => !value)} className="text-xs underline">
-        {expanded ? 'Hide' : 'Show'} {slugs.length} permission{slugs.length !== 1 ? 's' : ''}
+        {expanded ? "Hide" : "Show"} {slugs.length} permission{slugs.length !== 1 ? "s" : ""}
       </button>
       {expanded && (
         <div className="mt-2 space-y-1">
           {groups.map(([resource, perms]) => (
             <div key={resource} className="flex flex-wrap items-center gap-1">
-              <span className="text-muted-foreground text-xs font-medium capitalize">{resource.replace(/_/g, ' ')}:</span>
+              <span className="text-muted-foreground text-xs font-medium capitalize">{resource.replace(/_/g, " ")}:</span>
               {perms.map((p) => (
                 <Badge key={p.slug} variant="secondary" className="text-xs">
                   {p.name}
@@ -287,7 +288,7 @@ export function RolesPage() {
         </Table>
       )}
 
-      <RoleDialog key={editingRole?.documentId ?? 'create'} open={dialogOpen} onOpenChange={setDialogOpen} role={editingRole} permissions={permissions ?? []} />
+      <RoleDialog key={editingRole?.documentId ?? "create"} open={dialogOpen} onOpenChange={setDialogOpen} role={editingRole} permissions={permissions ?? []} />
     </div>
   );
 }

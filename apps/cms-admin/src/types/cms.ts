@@ -2,7 +2,7 @@ export interface FieldDefinition {
   name: string;
   type: string;
   ext?: string[];
-  width?: '100%' | '50%' | '1/3';
+  width?: "100%" | "50%" | "1/3";
   repeatable?: boolean;
   header?: boolean;
   fields?: FieldDefinition[];
@@ -12,7 +12,7 @@ export interface ContentTypeSummary {
   ID: string;
   Name: string;
   Slug: string;
-  Kind: 'single' | 'collection';
+  Kind: "single" | "collection";
 }
 
 export interface ContentType extends ContentTypeSummary {
@@ -30,14 +30,14 @@ export interface PaginatedResponse<T> {
   listFields?: string[];
 }
 
-export type EntryStatus = 'draft' | 'modified' | 'published';
+export type EntryStatus = "draft" | "modified" | "published";
 
 export interface Document {
   data: Record<string, unknown>;
   status: EntryStatus;
 }
 
-export const SYSTEM_FIELDS = ['id', 'documentId', 'locale', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'updatedByName'] as const;
+export const SYSTEM_FIELDS = ["id", "documentId", "locale", "createdAt", "updatedAt", "createdBy", "updatedBy", "updatedByName"] as const;
 
 export function stripSystemFields(data: Record<string, unknown>): Record<string, unknown> {
   const content: Record<string, unknown> = {};

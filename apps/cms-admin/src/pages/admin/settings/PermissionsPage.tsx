@@ -1,15 +1,16 @@
-import { useState } from 'react';
-import { usePermissions, useCreatePermission, useUpdatePermission, useDeletePermission, type PermissionItem } from '@/hooks/usePermissions';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { type PermissionItem, useCreatePermission, useDeletePermission, usePermissions, useUpdatePermission } from "@/hooks/usePermissions";
 
 const SLUG_PATTERN = /^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/;
 
 function extractErrorMessage(error: unknown): string | undefined {
-  if (typeof error === 'object' && error !== null && 'response' in error) {
+  if (typeof error === "object" && error !== null && "response" in error) {
     const response = (error as { response?: { data?: { error?: string } } }).response;
     return response?.data?.error;
   }
@@ -24,13 +25,13 @@ interface PermissionDialogProps {
 
 function PermissionDialog({ open, onOpenChange, permission }: PermissionDialogProps) {
   const isEdit = permission !== null;
-  const [slug, setSlug] = useState(permission?.slug ?? '');
-  const [name, setName] = useState(permission?.name ?? '');
-  const [description, setDescription] = useState(permission?.description ?? '');
+  const [slug, setSlug] = useState(permission?.slug ?? "");
+  const [name, setName] = useState(permission?.name ?? "");
+  const [description, setDescription] = useState(permission?.description ?? "");
   const createPermission = useCreatePermission();
   const updatePermission = useUpdatePermission();
 
-  const slugValid = slug === '' || SLUG_PATTERN.test(slug);
+  const slugValid = slug === "" || SLUG_PATTERN.test(slug);
   const saving = createPermission.isPending || updatePermission.isPending;
 
   function handleSave() {
@@ -46,7 +47,7 @@ function PermissionDialog({ open, onOpenChange, permission }: PermissionDialogPr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? `Edit Permission: ${permission.slug}` : 'Create Permission'}</DialogTitle>
+          <DialogTitle>{isEdit ? `Edit Permission: ${permission.slug}` : "Create Permission"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1">
@@ -64,8 +65,8 @@ function PermissionDialog({ open, onOpenChange, permission }: PermissionDialogPr
           </div>
           {!isEdit && (
             <p className="text-muted-foreground text-xs">
-              Creating a permission here does not grant any new capability by itself — a developer must add a matching check in the backend code before this
-              permission has any effect.
+              Creating a permission here does not grant any new capability by itself — a developer must add a matching check in the backend code before this permission has any
+              effect.
             </p>
           )}
         </div>
@@ -74,7 +75,7 @@ function PermissionDialog({ open, onOpenChange, permission }: PermissionDialogPr
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving || !name || (!isEdit && (!slug || !slugValid))}>
-            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Permission'}
+            {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Permission"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -100,10 +101,10 @@ export function PermissionsPage() {
   }
 
   function handleDelete(permission: PermissionItem) {
-    setDeleteErrors((prev) => ({ ...prev, [permission.slug]: '' }));
+    setDeleteErrors((prev) => ({ ...prev, [permission.slug]: "" }));
     deletePermission.mutate(permission.documentId, {
       onError: (error: unknown) => {
-        const message = extractErrorMessage(error) ?? 'Failed to delete permission';
+        const message = extractErrorMessage(error) ?? "Failed to delete permission";
         setDeleteErrors((prev) => ({ ...prev, [permission.slug]: message }));
       },
     });
@@ -169,7 +170,7 @@ export function PermissionsPage() {
         </Table>
       )}
 
-      <PermissionDialog key={editingPermission?.documentId ?? 'create'} open={dialogOpen} onOpenChange={setDialogOpen} permission={editingPermission} />
+      <PermissionDialog key={editingPermission?.documentId ?? "create"} open={dialogOpen} onOpenChange={setDialogOpen} permission={editingPermission} />
     </div>
   );
 }

@@ -1,28 +1,22 @@
-import { useState } from 'react';
-import { Controller, type Control } from 'react-hook-form';
-import { MediaLibrary } from '@/components/media/MediaLibrary';
-import type { MediaAsset } from '@/types/cms';
+import { useState } from "react";
+import { type Control, Controller } from "react-hook-form";
+
+import { MediaLibrary } from "@/components/media/MediaLibrary";
+import type { MediaAsset } from "@/types/cms";
 
 interface MediaInputProps {
   name?: string;
   control?: Control;
   ext?: string[];
-  'aria-label'?: string;
+  "aria-label"?: string;
 }
 
 function isMediaAssetObject(value: unknown): value is MediaAsset {
-  return typeof value === 'object' && value !== null && 'url' in value;
+  return typeof value === "object" && value !== null && "url" in value;
 }
 
-export function MediaInput({ name, control, ext, 'aria-label': ariaLabel }: MediaInputProps) {
-  return (
-    <Controller
-      name={name ?? ''}
-      control={control}
-      defaultValue={null}
-      render={({ field }) => <MediaInputInner field={field} ariaLabel={ariaLabel ?? name} ext={ext} />}
-    />
-  );
+export function MediaInput({ name, control, ext, "aria-label": ariaLabel }: MediaInputProps) {
+  return <Controller name={name ?? ""} control={control} defaultValue={null} render={({ field }) => <MediaInputInner field={field} ariaLabel={ariaLabel ?? name} ext={ext} />} />;
 }
 
 interface MediaInputInnerProps {
@@ -35,7 +29,7 @@ function MediaInputInner({ field, ariaLabel, ext }: MediaInputInnerProps) {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
   const asset = isMediaAssetObject(field.value) ? field.value : null;
-  const displayUrl = asset ? (asset.thumbnailUrl || asset.url) : null;
+  const displayUrl = asset ? asset.thumbnailUrl || asset.url : null;
   const displayName = asset?.fileName ?? null;
 
   function handleSelect(selected: MediaAsset) {
@@ -57,11 +51,11 @@ function MediaInputInner({ field, ariaLabel, ext }: MediaInputInnerProps) {
         className="border-input hover:border-ring relative cursor-pointer overflow-hidden rounded-md border transition-colors"
         onClick={() => setIsLibraryOpen(true)}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') setIsLibraryOpen(true);
+          if (event.key === "Enter" || event.key === " ") setIsLibraryOpen(true);
         }}>
         {displayUrl ? (
           <>
-            <img src={displayUrl} alt={displayName ?? 'media preview'} className="h-auto max-h-40 w-full object-contain" />
+            <img src={displayUrl} alt={displayName ?? "media preview"} className="h-auto max-h-40 w-full object-contain" />
             {displayName && <span className="text-muted-foreground block truncate border-t px-2 py-1 text-center text-[11px]">{displayName}</span>}
             <button
               type="button"

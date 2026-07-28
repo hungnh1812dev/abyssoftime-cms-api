@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useAcceptInvite } from '@/hooks/useInvites';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { Link, useNavigate, useParams } from "react-router-dom";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAcceptInvite } from "@/hooks/useInvites";
 
 interface AcceptFields {
   displayName: string;
@@ -25,7 +26,7 @@ export function InviteAcceptPage() {
     formState: { errors },
   } = useForm<AcceptFields>();
 
-  const password = useWatch({ control, name: 'password' });
+  const password = useWatch({ control, name: "password" });
 
   function onSubmit(data: AcceptFields) {
     if (!token) return;
@@ -33,8 +34,8 @@ export function InviteAcceptPage() {
     acceptInvite.mutate(
       { token, password: data.password, displayName: data.displayName },
       {
-        onSuccess: () => navigate('/login'),
-        onError: () => setErrorMsg('This invite link is invalid or has expired.'),
+        onSuccess: () => navigate("/login"),
+        onError: () => setErrorMsg("This invite link is invalid or has expired."),
       },
     );
   }
@@ -61,9 +62,9 @@ export function InviteAcceptPage() {
               type="text"
               autoComplete="name"
               aria-invalid={!!errors.displayName}
-              {...register('displayName', {
-                required: 'Display name is required',
-                maxLength: { value: 100, message: 'Display name must be at most 100 characters' },
+              {...register("displayName", {
+                required: "Display name is required",
+                maxLength: { value: 100, message: "Display name must be at most 100 characters" },
               })}
             />
             {errors.displayName && <p className="text-destructive text-xs">{errors.displayName.message}</p>}
@@ -76,9 +77,9 @@ export function InviteAcceptPage() {
               type="password"
               autoComplete="new-password"
               aria-invalid={!!errors.password}
-              {...register('password', {
-                required: 'Password is required',
-                minLength: { value: 8, message: 'Password must be at least 8 characters' },
+              {...register("password", {
+                required: "Password is required",
+                minLength: { value: 8, message: "Password must be at least 8 characters" },
               })}
             />
             {errors.password && <p className="text-destructive text-xs">{errors.password.message}</p>}
@@ -91,21 +92,21 @@ export function InviteAcceptPage() {
               type="password"
               autoComplete="new-password"
               aria-invalid={!!errors.confirmPassword}
-              {...register('confirmPassword', {
-                required: 'Please confirm your password',
-                validate: (value) => value === password || 'Passwords do not match',
+              {...register("confirmPassword", {
+                required: "Please confirm your password",
+                validate: (value) => value === password || "Passwords do not match",
               })}
             />
             {errors.confirmPassword && <p className="text-destructive text-xs">{errors.confirmPassword.message}</p>}
           </div>
 
           <Button type="submit" className="w-full" disabled={acceptInvite.isPending}>
-            {acceptInvite.isPending ? 'Creating account…' : 'Create Account'}
+            {acceptInvite.isPending ? "Creating account…" : "Create Account"}
           </Button>
         </form>
 
         <p className="text-muted-foreground text-center text-sm">
-          Already have an account?{' '}
+          Already have an account?{" "}
           <Link to="/login" className="text-primary underline-offset-4 hover:underline">
             Sign in
           </Link>

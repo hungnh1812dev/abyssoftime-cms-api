@@ -1,7 +1,9 @@
-import { useState, useEffect, type ReactNode } from 'react';
-import { ChevronRight, type LucideIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useSidebar } from './SidebarContext';
+import { ChevronRight, type LucideIcon } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
+
+import { cn } from "@/lib/utils";
+
+import { useSidebar } from "./SidebarContext";
 
 interface SidebarGroupProps {
   icon: LucideIcon;
@@ -18,7 +20,7 @@ export function SidebarGroup({ icon: Icon, label, storageKey, defaultOpen = true
   const [open, setOpen] = useState(() => {
     try {
       const stored = localStorage.getItem(fullKey);
-      return stored !== null ? stored === 'true' : defaultOpen;
+      return stored !== null ? stored === "true" : defaultOpen;
     } catch {
       return defaultOpen;
     }
@@ -40,12 +42,12 @@ export function SidebarGroup({ icon: Icon, label, storageKey, defaultOpen = true
         type="button"
         onClick={handleToggle}
         className={cn(
-          'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors',
-          collapsed && 'justify-center px-0',
+          "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
+          collapsed && "justify-center px-0",
         )}>
         <Icon className="size-4 shrink-0" />
-        <span className={cn('flex-1 truncate text-left', collapsed && 'sr-only')}>{label}</span>
-        <ChevronRight className={cn('size-3.5 shrink-0 transition-transform duration-200', open && 'rotate-90', collapsed && 'hidden')} />
+        <span className={cn("flex-1 truncate text-left", collapsed && "sr-only")}>{label}</span>
+        <ChevronRight className={cn("size-3.5 shrink-0 transition-transform duration-200", open && "rotate-90", collapsed && "hidden")} />
       </button>
       {open && !collapsed && <div className="space-y-0.5 pl-2">{children}</div>}
     </div>

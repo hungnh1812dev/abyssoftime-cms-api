@@ -1,50 +1,51 @@
-import { useState } from 'react';
-import { useAccessTokenList, useCreateAccessToken, useDeleteAccessToken } from '@/hooks/useAccessTokens';
-import { useContentTypes } from '@/hooks/useContentTypes';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useState } from "react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useAccessTokenList, useCreateAccessToken, useDeleteAccessToken } from "@/hooks/useAccessTokens";
+import { useContentTypes } from "@/hooks/useContentTypes";
 
 const EXPIRY_OPTIONS = [
-  { label: '7 days', value: '168h' },
-  { label: '30 days', value: '720h' },
-  { label: '90 days', value: '2160h' },
-  { label: '1 year', value: '8760h' },
-  { label: 'No expiration', value: '' },
+  { label: "7 days", value: "168h" },
+  { label: "30 days", value: "720h" },
+  { label: "90 days", value: "2160h" },
+  { label: "1 year", value: "8760h" },
+  { label: "No expiration", value: "" },
 ] as const;
 
 const DOCUMENT_ACTIONS = [
-  { scope: 'document:read', label: 'Read' },
-  { scope: 'document:create', label: 'Create' },
-  { scope: 'document:update', label: 'Update' },
-  { scope: 'document:delete', label: 'Delete' },
-  { scope: 'document:publish', label: 'Publish' },
-  { scope: 'document:unpublish', label: 'Unpublish' },
+  { scope: "document:read", label: "Read" },
+  { scope: "document:create", label: "Create" },
+  { scope: "document:update", label: "Update" },
+  { scope: "document:delete", label: "Delete" },
+  { scope: "document:publish", label: "Publish" },
+  { scope: "document:unpublish", label: "Unpublish" },
 ] as const;
 
 function formatScope(scope: string): string {
-  if (scope === 'document:read') return 'Read Documents';
-  if (scope.startsWith('document:read:')) return scope.replace('document:read:', '');
-  if (scope === 'document:create') return 'Create Documents';
-  if (scope === 'document:update') return 'Update Documents';
-  if (scope === 'document:delete') return 'Delete Documents';
-  if (scope === 'document:publish') return 'Publish Documents';
-  if (scope === 'document:unpublish') return 'Unpublish Documents';
-  if (scope === 'media:read') return 'Media';
-  if (scope === 'content_types:read') return 'Content Types';
+  if (scope === "document:read") return "Read Documents";
+  if (scope.startsWith("document:read:")) return scope.replace("document:read:", "");
+  if (scope === "document:create") return "Create Documents";
+  if (scope === "document:update") return "Update Documents";
+  if (scope === "document:delete") return "Delete Documents";
+  if (scope === "document:publish") return "Publish Documents";
+  if (scope === "document:unpublish") return "Unpublish Documents";
+  if (scope === "media:read") return "Media";
+  if (scope === "content_types:read") return "Content Types";
   return scope;
 }
 
 export function AccessTokensPage() {
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [tokenName, setTokenName] = useState('');
+  const [tokenName, setTokenName] = useState("");
   const [selectedScopes, setSelectedScopes] = useState<string[]>([]);
-  const [expiresIn, setExpiresIn] = useState('');
+  const [expiresIn, setExpiresIn] = useState("");
   const [createdToken, setCreatedToken] = useState<string | null>(null);
 
   const { data, isLoading } = useAccessTokenList(page);
@@ -58,19 +59,19 @@ export function AccessTokensPage() {
   const hasPrev = page > 1;
   const ctList = contentTypes ?? [];
 
-  const hasReadAll = selectedScopes.includes('document:read');
+  const hasReadAll = selectedScopes.includes("document:read");
 
   function toggleScope(scope: string) {
     setSelectedScopes((previousScopes) => {
-      if (scope === 'document:read') {
-        if (previousScopes.includes('document:read')) {
-          return previousScopes.filter((item) => item !== 'document:read');
+      if (scope === "document:read") {
+        if (previousScopes.includes("document:read")) {
+          return previousScopes.filter((item) => item !== "document:read");
         }
-        return [...previousScopes.filter((item) => !item.startsWith('document:read')), 'document:read'];
+        return [...previousScopes.filter((item) => !item.startsWith("document:read")), "document:read"];
       }
 
-      if (scope.startsWith('document:read:')) {
-        const without = previousScopes.filter((item) => item !== scope && item !== 'document:read');
+      if (scope.startsWith("document:read:")) {
+        const without = previousScopes.filter((item) => item !== scope && item !== "document:read");
         if (previousScopes.includes(scope)) {
           return without;
         }
@@ -88,9 +89,9 @@ export function AccessTokensPage() {
       {
         onSuccess: (response) => {
           setCreatedToken(response.token);
-          setTokenName('');
+          setTokenName("");
           setSelectedScopes([]);
-          setExpiresIn('');
+          setExpiresIn("");
         },
       },
     );
@@ -120,7 +121,7 @@ export function AccessTokensPage() {
           <DialogTrigger render={<Button size="sm" />}>Create new token</DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{createdToken ? 'Token Created' : 'Create Access Token'}</DialogTitle>
+              <DialogTitle>{createdToken ? "Token Created" : "Create Access Token"}</DialogTitle>
             </DialogHeader>
             {createdToken ? (
               <div className="space-y-3">
@@ -145,7 +146,7 @@ export function AccessTokensPage() {
                     <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Documents</div>
                     <div className="space-y-2 rounded-md border p-3">
                       <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-                        <input type="checkbox" checked={hasReadAll} onChange={() => toggleScope('document:read')} className="rounded" />
+                        <input type="checkbox" checked={hasReadAll} onChange={() => toggleScope("document:read")} className="rounded" />
                         Read
                       </label>
                       {!hasReadAll && ctList.length > 0 && (
@@ -162,7 +163,7 @@ export function AccessTokensPage() {
                           })}
                         </div>
                       )}
-                      {DOCUMENT_ACTIONS.filter((action) => action.scope !== 'document:read').map((action) => (
+                      {DOCUMENT_ACTIONS.filter((action) => action.scope !== "document:read").map((action) => (
                         <label key={action.scope} className="flex cursor-pointer items-center gap-2 text-sm font-medium">
                           <input type="checkbox" checked={selectedScopes.includes(action.scope)} onChange={() => toggleScope(action.scope)} className="rounded" />
                           {action.label}
@@ -175,11 +176,11 @@ export function AccessTokensPage() {
                     <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Other</div>
                     <div className="space-y-2 rounded-md border p-3">
                       <label className="flex cursor-pointer items-center gap-2 text-sm">
-                        <input type="checkbox" checked={selectedScopes.includes('media:read')} onChange={() => toggleScope('media:read')} className="rounded" />
+                        <input type="checkbox" checked={selectedScopes.includes("media:read")} onChange={() => toggleScope("media:read")} className="rounded" />
                         Media assets
                       </label>
                       <label className="flex cursor-pointer items-center gap-2 text-sm">
-                        <input type="checkbox" checked={selectedScopes.includes('content_types:read')} onChange={() => toggleScope('content_types:read')} className="rounded" />
+                        <input type="checkbox" checked={selectedScopes.includes("content_types:read")} onChange={() => toggleScope("content_types:read")} className="rounded" />
                         Content type definitions
                       </label>
                     </div>
@@ -187,13 +188,13 @@ export function AccessTokensPage() {
                 </div>
                 <div className="space-y-1">
                   <Label>Expiration</Label>
-                  <Select value={expiresIn} onValueChange={(value: string | null) => setExpiresIn(value ?? '')}>
+                  <Select value={expiresIn} onValueChange={(value: string | null) => setExpiresIn(value ?? "")}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select expiration" />
                     </SelectTrigger>
                     <SelectContent>
                       {EXPIRY_OPTIONS.map((option) => (
-                        <SelectItem key={option.value || 'none'} value={option.value || 'none'}>
+                        <SelectItem key={option.value || "none"} value={option.value || "none"}>
                           {option.label}
                         </SelectItem>
                       ))}
@@ -201,7 +202,7 @@ export function AccessTokensPage() {
                   </Select>
                 </div>
                 <Button className="w-full" onClick={handleCreate} disabled={createToken.isPending || !tokenName || selectedScopes.length === 0}>
-                  {createToken.isPending ? 'Creating…' : 'Create Token'}
+                  {createToken.isPending ? "Creating…" : "Create Token"}
                 </Button>
               </div>
             )}
@@ -239,8 +240,8 @@ export function AccessTokensPage() {
                     ))}
                   </div>
                 </TableCell>
-                <TableCell className="text-muted-foreground text-sm">{token.expiresAt ? new Date(token.expiresAt).toLocaleDateString() : 'Never'}</TableCell>
-                <TableCell className="text-muted-foreground text-sm">{token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleDateString() : 'Never'}</TableCell>
+                <TableCell className="text-muted-foreground text-sm">{token.expiresAt ? new Date(token.expiresAt).toLocaleDateString() : "Never"}</TableCell>
+                <TableCell className="text-muted-foreground text-sm">{token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleDateString() : "Never"}</TableCell>
                 <TableCell className="text-right">
                   <Button
                     variant="destructive"
@@ -261,7 +262,7 @@ export function AccessTokensPage() {
 
       <div className="flex items-center justify-between">
         <span className="text-muted-foreground text-sm">
-          {total} token{total !== 1 ? 's' : ''}
+          {total} token{total !== 1 ? "s" : ""}
         </span>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage - 1)} disabled={!hasPrev}>

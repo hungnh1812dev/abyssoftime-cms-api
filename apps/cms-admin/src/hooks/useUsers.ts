@@ -1,7 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AxiosError } from 'axios';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AxiosError } from "axios";
+import { toast } from "sonner";
+
+import { api } from "@/lib/api";
 
 export interface UserItem {
   id: string;
@@ -18,8 +19,8 @@ interface UserListResponse {
 }
 
 const KEYS = {
-  list: (page: number) => ['users', 'list', page] as const,
-  all: ['users'] as const,
+  list: (page: number) => ["users", "list", page] as const,
+  all: ["users"] as const,
 };
 
 export function useUserList(page: number) {
@@ -37,7 +38,7 @@ export function useUpdateUserRole() {
       queryClient.invalidateQueries({ queryKey: KEYS.all });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to update role';
+      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to update role";
       toast.error(message);
     },
   });
@@ -51,7 +52,7 @@ export function useDeleteUser() {
       queryClient.invalidateQueries({ queryKey: KEYS.all });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to delete user';
+      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to delete user";
       toast.error(message);
     },
   });

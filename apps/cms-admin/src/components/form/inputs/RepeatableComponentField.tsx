@@ -1,14 +1,15 @@
-import { useState } from 'react';
-import { useFieldArray, useFormContext } from 'react-hook-form';
-import { ArrowUp, ArrowDown, Trash2, Plus, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import type { FieldDefinition } from '@/types/cms';
+import { ArrowDown, ArrowUp, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { useFieldArray, useFormContext } from "react-hook-form";
+
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import type { FieldDefinition } from "@/types/cms";
 
 const depthStyles = [
-  { border: 'border-indigo-300 dark:border-indigo-700', bg: 'bg-indigo-50/50 dark:bg-indigo-950/20', legend: 'text-indigo-700 dark:text-indigo-300' },
-  { border: 'border-violet-300 dark:border-violet-700', bg: 'bg-violet-50/50 dark:bg-violet-950/20', legend: 'text-violet-700 dark:text-violet-300' },
-  { border: 'border-amber-300 dark:border-amber-700', bg: 'bg-amber-50/50 dark:bg-amber-950/20', legend: 'text-amber-700 dark:text-amber-300' },
+  { border: "border-indigo-300 dark:border-indigo-700", bg: "bg-indigo-50/50 dark:bg-indigo-950/20", legend: "text-indigo-700 dark:text-indigo-300" },
+  { border: "border-violet-300 dark:border-violet-700", bg: "bg-violet-50/50 dark:bg-violet-950/20", legend: "text-violet-700 dark:text-violet-300" },
+  { border: "border-amber-300 dark:border-amber-700", bg: "bg-amber-50/50 dark:bg-amber-950/20", legend: "text-amber-700 dark:text-amber-300" },
 ] as const;
 
 function getDepthStyle(depth: number) {
@@ -16,21 +17,21 @@ function getDepthStyle(depth: number) {
 }
 
 function findFirstTextFieldName(fields: FieldDefinition[]): string | undefined {
-  return fields.find((fld) => fld.type === 'text')?.name;
+  return fields.find((fld) => fld.type === "text")?.name;
 }
 
 function resolveHeaderFieldName(fields: FieldDefinition[]): string | undefined {
   const flagged = fields.filter((fld) => fld.header);
   const latest = flagged[flagged.length - 1];
-  if (latest && latest.type === 'text') return latest.name;
+  if (latest && latest.type === "text") return latest.name;
   return findFirstTextFieldName(fields);
 }
 
 function formatHintText(value: unknown): string {
-  if (typeof value !== 'string') return '';
+  if (typeof value !== "string") return "";
   const trimmed = value.trim();
-  if (!trimmed) return '';
-  return trimmed.length > 60 ? trimmed.slice(0, 60) + '...' : trimmed;
+  if (!trimmed) return "";
+  return trimmed.length > 60 ? trimmed.slice(0, 60) + "..." : trimmed;
 }
 
 interface RepeatableEntryProps {
@@ -54,17 +55,17 @@ function RepeatableEntry({ entryId: _entryId, entryIndex, totalEntries, parentNa
   const hintText = formatHintText(rawValue);
 
   return (
-    <div className={cn('bg-background relative rounded-md border', expanded ? 'p-4' : 'p-2')}>
-      <div className={cn('flex items-center justify-between', expanded && 'mb-3')}>
-        <button
-          type="button"
-          className="flex items-center gap-1"
-          onClick={() => setExpanded((prev) => !prev)}
-          aria-expanded={expanded}
-        >
-          <ChevronRight className={cn('size-3.5 shrink-0 transition-transform duration-200', expanded && 'rotate-90')} />
+    <div className={cn("bg-background relative rounded-md border", expanded ? "p-4" : "p-2")}>
+      <div className={cn("flex items-center justify-between", expanded && "mb-3")}>
+        <button type="button" className="flex items-center gap-1" onClick={() => setExpanded((prev) => !prev)} aria-expanded={expanded}>
+          <ChevronRight className={cn("size-3.5 shrink-0 transition-transform duration-200", expanded && "rotate-90")} />
           <span className="text-muted-foreground text-xs font-medium">#{entryIndex + 1}</span>
-          {hintText && <span className="text-muted-foreground ml-1 truncate text-xs font-normal">{'— '}{hintText}</span>}
+          {hintText && (
+            <span className="text-muted-foreground ml-1 truncate text-xs font-normal">
+              {"— "}
+              {hintText}
+            </span>
+          )}
         </button>
         <div className="flex items-center gap-1">
           <Button
@@ -74,8 +75,7 @@ function RepeatableEntry({ entryId: _entryId, entryIndex, totalEntries, parentNa
             className="h-7 w-7"
             disabled={entryIndex === 0}
             onClick={() => onSwap(entryIndex, entryIndex - 1)}
-            aria-label={`Move item ${entryIndex + 1} up`}
-          >
+            aria-label={`Move item ${entryIndex + 1} up`}>
             <ArrowUp className="h-3.5 w-3.5" />
           </Button>
           <Button
@@ -85,8 +85,7 @@ function RepeatableEntry({ entryId: _entryId, entryIndex, totalEntries, parentNa
             className="h-7 w-7"
             disabled={entryIndex === totalEntries - 1}
             onClick={() => onSwap(entryIndex, entryIndex + 1)}
-            aria-label={`Move item ${entryIndex + 1} down`}
-          >
+            aria-label={`Move item ${entryIndex + 1} down`}>
             <ArrowDown className="h-3.5 w-3.5" />
           </Button>
           <Button
@@ -95,8 +94,7 @@ function RepeatableEntry({ entryId: _entryId, entryIndex, totalEntries, parentNa
             size="icon"
             className="h-7 w-7 text-destructive hover:text-destructive"
             onClick={() => onRemove(entryIndex)}
-            aria-label={`Remove item ${entryIndex + 1}`}
-          >
+            aria-label={`Remove item ${entryIndex + 1}`}>
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>

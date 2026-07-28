@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
-import { StickyActionBar } from '@/pages/admin/layout/StickyActionBar';
-import type { BreadcrumbItem } from '@/hooks/useBreadcrumbs';
+import type { ReactNode } from "react";
+
+import type { BreadcrumbItem } from "@/hooks/useBreadcrumbs";
+import { StickyActionBar } from "@/pages/admin/layout/StickyActionBar";
 
 interface Props {
   title: string;

@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
-import type { BreadcrumbItem } from '@/hooks/useBreadcrumbs';
+import { ChevronRight } from "lucide-react";
+import { Link } from "react-router-dom";
+
+import type { BreadcrumbItem } from "@/hooks/useBreadcrumbs";
 
 interface BreadcrumbProps {
   items: BreadcrumbItem[];
@@ -20,7 +21,7 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
                   {item.label}
                 </Link>
               ) : (
-                <span className={isLast ? 'text-foreground font-medium' : 'text-muted-foreground'}>{item.label}</span>
+                <span className={isLast ? "text-foreground font-medium" : "text-muted-foreground"}>{item.label}</span>
               )}
             </li>
           );

@@ -1,17 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { FormProvider } from '../../FormProvider';
-import { FormField } from '../../FormField';
+import { FormField } from "../../FormField";
+import { FormProvider } from "../../FormProvider";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // CodeMirror cannot run in jsdom — mock it with a controlled textarea
-vi.mock('@uiw/react-codemirror', () => ({
+vi.mock("@uiw/react-codemirror", () => ({
   default: ({ value, onChange }: { value: string; onChange: (val: string) => void }) => (
     <textarea data-testid="codemirror-mock" value={value} onChange={(e) => onChange(e.target.value)} />
   ),
 }));
-vi.mock('@codemirror/lang-json', () => ({ json: () => [] }));
+vi.mock("@codemirror/lang-json", () => ({ json: () => [] }));
 
 function createClient() {
   return new QueryClient({
@@ -24,14 +24,14 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 }
 
 // Import after mocks are registered
-const { JsonInput } = await import('../JsonInput');
+const { JsonInput } = await import("../JsonInput");
 
-describe('JsonInput', () => {
+describe("JsonInput", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders the CodeMirror editor', () => {
+  it("renders the CodeMirror editor", () => {
     const mutationFn = vi.fn().mockResolvedValue(undefined);
     render(
       <Wrapper>
@@ -42,10 +42,10 @@ describe('JsonInput', () => {
         </FormProvider>
       </Wrapper>,
     );
-    expect(screen.getByTestId('codemirror-mock')).toBeInTheDocument();
+    expect(screen.getByTestId("codemirror-mock")).toBeInTheDocument();
   });
 
-  it('wraps the editor in a min-h-[15em] container', () => {
+  it("wraps the editor in a min-h-[15em] container", () => {
     render(
       <Wrapper>
         <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)}>
@@ -55,11 +55,11 @@ describe('JsonInput', () => {
         </FormProvider>
       </Wrapper>,
     );
-    const wrapper = screen.getByTestId('json-editor-wrapper');
-    expect(wrapper).toHaveClass('min-h-[15em]');
+    const wrapper = screen.getByTestId("json-editor-wrapper");
+    expect(wrapper).toHaveClass("min-h-[15em]");
   });
 
-  it('parses valid JSON and submits as an object (not a string)', async () => {
+  it("parses valid JSON and submits as an object (not a string)", async () => {
     const user = userEvent.setup();
     const mutationFn = vi.fn().mockResolvedValue(undefined);
     render(
@@ -73,16 +73,16 @@ describe('JsonInput', () => {
       </Wrapper>,
     );
     // Use fireEvent.change to avoid userEvent brace-escaping for JSON
-    fireEvent.change(screen.getByTestId('codemirror-mock'), {
+    fireEvent.change(screen.getByTestId("codemirror-mock"), {
       target: { value: '{"key":"val"}' },
     });
-    await user.click(screen.getByRole('button', { name: /submit/i }));
+    await user.click(screen.getByRole("button", { name: /submit/i }));
     await waitFor(() => {
-      expect(mutationFn.mock.calls[0][0]).toEqual({ metadata: { key: 'val' } });
+      expect(mutationFn.mock.calls[0][0]).toEqual({ metadata: { key: "val" } });
     });
   });
 
-  it('shows an inline error for invalid JSON', async () => {
+  it("shows an inline error for invalid JSON", async () => {
     render(
       <Wrapper>
         <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)}>
@@ -92,13 +92,13 @@ describe('JsonInput', () => {
         </FormProvider>
       </Wrapper>,
     );
-    fireEvent.change(screen.getByTestId('codemirror-mock'), {
-      target: { value: '{bad json}' },
+    fireEvent.change(screen.getByTestId("codemirror-mock"), {
+      target: { value: "{bad json}" },
     });
-    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
   });
 
-  it('blocks form submission when JSON is invalid', async () => {
+  it("blocks form submission when JSON is invalid", async () => {
     const user = userEvent.setup();
     const mutationFn = vi.fn().mockResolvedValue(undefined);
     render(
@@ -111,10 +111,10 @@ describe('JsonInput', () => {
         </FormProvider>
       </Wrapper>,
     );
-    fireEvent.change(screen.getByTestId('codemirror-mock'), {
-      target: { value: '{bad json}' },
+    fireEvent.change(screen.getByTestId("codemirror-mock"), {
+      target: { value: "{bad json}" },
     });
-    await user.click(screen.getByRole('button', { name: /submit/i }));
+    await user.click(screen.getByRole("button", { name: /submit/i }));
     await waitFor(() => {
       expect(mutationFn).not.toHaveBeenCalled();
     });

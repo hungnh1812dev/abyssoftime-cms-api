@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
-import { StickyActionBar } from '@/pages/admin/layout/StickyActionBar';
+import type { ReactNode } from "react";
+
+import { StickyActionBar } from "@/pages/admin/layout/StickyActionBar";
 
 export interface ContentTypeLayoutProps {
   title: string;

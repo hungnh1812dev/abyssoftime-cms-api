@@ -1,30 +1,31 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { CheckboxInput } from '@/components/form/inputs/CheckboxInput';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { useCollectionDocuments, useDeleteCollectionDocument, useDuplicateCollectionDocument, useBulkDeleteCollectionDocuments } from '@/hooks/useCollectionDocuments';
-import { useUpdateListFields } from '@/hooks/useContentTypes';
-import { useLocales } from '@/hooks/useLocales';
-import { getRegistration, type CollectionColumnDef } from '@/content-type-registry';
-import { ColumnChooserDialog } from '@/components/collection/ColumnChooserDialog';
-import { PageSizeSelector } from '@/components/collection/PageSizeSelector';
-import { PAGE_SIZE_OPTIONS } from '@/lib/pageSize';
-import { LocaleSelector } from '@/components/locale/LocaleSelector';
-import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { type ContentType, type Document, type FieldDefinition, type Locale } from '@/types/cms';
-import { Pencil, Trash2, Copy, ArrowUpDown, ArrowUp, ArrowDown, Settings2 } from 'lucide-react';
-import { Breadcrumb } from '@/components/ui/breadcrumb';
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowDown, ArrowUp, ArrowUpDown, Copy, Pencil, Settings2, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+
+import { ColumnChooserDialog } from "@/components/collection/ColumnChooserDialog";
+import { PageSizeSelector } from "@/components/collection/PageSizeSelector";
+import { CheckboxInput } from "@/components/form/inputs/CheckboxInput";
+import { LocaleSelector } from "@/components/locale/LocaleSelector";
+import { Badge } from "@/components/ui/badge";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { type CollectionColumnDef, getRegistration } from "@/content-type-registry";
+import { useBulkDeleteCollectionDocuments, useCollectionDocuments, useDeleteCollectionDocument, useDuplicateCollectionDocument } from "@/hooks/useCollectionDocuments";
+import { useUpdateListFields } from "@/hooks/useContentTypes";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useLocales } from "@/hooks/useLocales";
+import { PAGE_SIZE_OPTIONS } from "@/lib/pageSize";
+import { type ContentType, type Document, type FieldDefinition, type Locale } from "@/types/cms";
 
 interface Props {
   contentType: ContentType;
 }
 
-const SYSTEM_FIELD_KEYS = new Set(['createdAt', 'updatedAt', 'updatedByName']);
+const SYSTEM_FIELD_KEYS = new Set(["createdAt", "updatedAt", "updatedByName"]);
 
 function deriveColumns(contentType: ContentType): CollectionColumnDef[] {
   const registration = getRegistration(contentType.Slug);
@@ -39,17 +40,17 @@ function deriveColumns(contentType: ContentType): CollectionColumnDef[] {
     listFieldNames.length > 0
       ? listFieldNames
       : fields
-          .filter((field) => field.type !== 'component')
+          .filter((field) => field.type !== "component")
           .slice(0, 3)
           .map((field) => field.name);
 
   return names.map((name) => {
     const field = fieldMap.get(name);
-    const fieldType = field?.type ?? 'text';
-    let colType: CollectionColumnDef['type'] = 'text';
-    if (fieldType === 'boolean') colType = 'boolean';
-    else if (fieldType === 'number') colType = 'number';
-    else if (fieldType === 'media') colType = 'image';
+    const fieldType = field?.type ?? "text";
+    let colType: CollectionColumnDef["type"] = "text";
+    if (fieldType === "boolean") colType = "boolean";
+    else if (fieldType === "number") colType = "number";
+    else if (fieldType === "media") colType = "image";
     return { key: name, label: name, type: colType };
   });
 }
@@ -59,46 +60,46 @@ function deriveSystemVisibility(listFields: string[]): { showCreatedAt: boolean;
     return { showCreatedAt: true, showUpdatedAt: true, showUpdatedBy: true };
   }
   return {
-    showCreatedAt: listFields.includes('createdAt'),
-    showUpdatedAt: listFields.includes('updatedAt'),
-    showUpdatedBy: listFields.includes('updatedByName'),
+    showCreatedAt: listFields.includes("createdAt"),
+    showUpdatedAt: listFields.includes("updatedAt"),
+    showUpdatedBy: listFields.includes("updatedByName"),
   };
 }
 
 function cellValue(doc: Document, col: CollectionColumnDef): React.ReactNode {
   const raw = doc.data[col.key];
   switch (col.type) {
-    case 'boolean':
-      return raw ? '✓' : '—';
-    case 'number':
-      return String(raw ?? '');
-    case 'image':
-      return <img src={String(raw ?? '')} alt={col.label} className="h-8 w-8 rounded object-cover" />;
+    case "boolean":
+      return raw ? "✓" : "—";
+    case "number":
+      return String(raw ?? "");
+    case "image":
+      return <img src={String(raw ?? "")} alt={col.label} className="h-8 w-8 rounded object-cover" />;
     default:
-      return String(raw ?? '');
+      return String(raw ?? "");
   }
 }
 
 function formatDate(value: unknown): string {
-  if (!value) return '—';
+  if (!value) return "—";
   const date = new Date(String(value));
-  if (isNaN(date.getTime())) return '—';
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
+  if (isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   }).format(date);
 }
 
 type SortField = string;
-type SortDir = 'asc' | 'desc';
+type SortDir = "asc" | "desc";
 
 function getSortableFieldNames(contentType: ContentType): Set<string> {
-  const names = new Set<string>(['id', 'createdAt', 'updatedAt']);
+  const names = new Set<string>(["id", "createdAt", "updatedAt"]);
   for (const field of contentType.Fields ?? []) {
-    if (field.type === 'text' || field.type === 'number' || field.type === 'boolean') {
+    if (field.type === "text" || field.type === "number" || field.type === "boolean") {
       names.add(field.name);
     }
   }
@@ -108,22 +109,22 @@ function getSortableFieldNames(contentType: ContentType): Set<string> {
 const DEFAULT_PAGE_SIZE: number = PAGE_SIZE_OPTIONS[0];
 
 function parseListState(params: URLSearchParams, locales: Locale[], sortableFields: Set<string>) {
-  const rawOrderBy = params.get('orderBy') ?? '';
-  const orderBy: SortField = sortableFields.has(rawOrderBy) ? rawOrderBy : 'id';
+  const rawOrderBy = params.get("orderBy") ?? "";
+  const orderBy: SortField = sortableFields.has(rawOrderBy) ? rawOrderBy : "id";
 
-  const sortDir: SortDir = params.get('sortDir') === 'asc' ? 'asc' : 'desc';
+  const sortDir: SortDir = params.get("sortDir") === "asc" ? "asc" : "desc";
 
-  const rawPage = Number(params.get('page'));
+  const rawPage = Number(params.get("page"));
   const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
 
-  const rawLocale = params.get('locale');
+  const rawLocale = params.get("locale");
   const knownLocale = locales.find((loc) => loc.code === rawLocale);
-  const locale = knownLocale?.code ?? locales.find((loc) => loc.isDefault)?.code ?? locales[0]?.code ?? '';
+  const locale = knownLocale?.code ?? locales.find((loc) => loc.isDefault)?.code ?? locales[0]?.code ?? "";
 
-  const rawPageSize = Number(params.get('pageSize'));
+  const rawPageSize = Number(params.get("pageSize"));
   const pageSize = (PAGE_SIZE_OPTIONS as readonly number[]).includes(rawPageSize) ? rawPageSize : DEFAULT_PAGE_SIZE;
 
-  const search = params.get('search') ?? '';
+  const search = params.get("search") ?? "";
 
   return { orderBy, sortDir, page, locale, pageSize, search };
 }
@@ -132,12 +133,12 @@ type ListState = ReturnType<typeof parseListState>;
 
 function toCanonicalParams(state: ListState, defaultLocaleCode: string): URLSearchParams {
   const params = new URLSearchParams();
-  if (state.orderBy !== 'id') params.set('orderBy', state.orderBy);
-  if (state.sortDir !== 'desc') params.set('sortDir', state.sortDir);
-  if (state.page !== 1) params.set('page', String(state.page));
-  if (state.locale !== defaultLocaleCode) params.set('locale', state.locale);
-  if (state.pageSize !== DEFAULT_PAGE_SIZE) params.set('pageSize', String(state.pageSize));
-  if (state.search !== '') params.set('search', state.search);
+  if (state.orderBy !== "id") params.set("orderBy", state.orderBy);
+  if (state.sortDir !== "desc") params.set("sortDir", state.sortDir);
+  if (state.page !== 1) params.set("page", String(state.page));
+  if (state.locale !== defaultLocaleCode) params.set("locale", state.locale);
+  if (state.pageSize !== DEFAULT_PAGE_SIZE) params.set("pageSize", String(state.pageSize));
+  if (state.search !== "") params.set("search", state.search);
   return params;
 }
 
@@ -157,19 +158,19 @@ function SortableHeader({
   onSort: (field: SortField) => void;
 }) {
   const isActive = activeField === field;
-  const Icon = isActive ? (activeDir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
+  const Icon = isActive ? (activeDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
   return (
     <button type="button" className="hover:text-foreground flex items-center gap-1 font-medium" onClick={() => onSort(field)}>
       {label}
-      <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`} />
+      <Icon className={`h-3.5 w-3.5 ${isActive ? "text-foreground" : "text-muted-foreground"}`} />
     </button>
   );
 }
 
-const statusVariant: Record<string, 'draft' | 'published' | 'modified'> = {
-  draft: 'draft',
-  published: 'published',
-  modified: 'modified',
+const statusVariant: Record<string, "draft" | "published" | "modified"> = {
+  draft: "draft",
+  published: "published",
+  modified: "modified",
 };
 
 export function CollectionListPage({ contentType }: Props) {
@@ -182,7 +183,7 @@ export function CollectionListPage({ contentType }: Props) {
   const sortableFields = getSortableFieldNames(contentType);
   const { orderBy, sortDir, page: currentPage, locale: activeLocale, pageSize, search: activeSearch } = parseListState(searchParams, locales, sortableFields);
   const start = (currentPage - 1) * pageSize;
-  const defaultLocaleCode = locales.find((loc) => loc.isDefault)?.code ?? locales[0]?.code ?? '';
+  const defaultLocaleCode = locales.find((loc) => loc.isDefault)?.code ?? locales[0]?.code ?? "";
 
   function updateListState(patch: Partial<ListState>) {
     const next = { orderBy, sortDir, page: currentPage, locale: activeLocale, pageSize, search: activeSearch, ...patch };
@@ -229,7 +230,7 @@ export function CollectionListPage({ contentType }: Props) {
 
   const hasRegistryOverride = Boolean(getRegistration(contentType.Slug)?.columns);
   const columns = deriveColumns(contentType);
-  const hasSearchableColumn = columns.some((column) => column.type === 'text');
+  const hasSearchableColumn = columns.some((column) => column.type === "text");
   const systemVis = deriveSystemVisibility(contentType.listFields ?? []);
   const docs = page?.items ?? [];
   const total = page?.total ?? 0;
@@ -271,10 +272,7 @@ export function CollectionListPage({ contentType }: Props) {
   }
 
   function confirmBulkDelete() {
-    bulkDeleteDocs(
-      { contentTypeSlug: contentType.Slug, documentIds: Array.from(selectedIds) },
-      { onSuccess: () => setSelectedIds(new Set()) },
-    );
+    bulkDeleteDocs({ contentTypeSlug: contentType.Slug, documentIds: Array.from(selectedIds) }, { onSuccess: () => setSelectedIds(new Set()) });
     setBulkDeleteConfirmOpen(false);
   }
 
@@ -295,7 +293,7 @@ export function CollectionListPage({ contentType }: Props) {
   }
 
   function handleSort(sortField: SortField) {
-    const nextDir: SortDir = orderBy === sortField ? (sortDir === 'desc' ? 'asc' : 'desc') : 'desc';
+    const nextDir: SortDir = orderBy === sortField ? (sortDir === "desc" ? "asc" : "desc") : "desc";
     updateListState({ orderBy: sortField, sortDir: nextDir, page: 1 });
     setSelectedIds(new Set());
   }
@@ -310,7 +308,7 @@ export function CollectionListPage({ contentType }: Props) {
       {
         onSuccess: () => {
           setColumnChooserOpen(false);
-          queryClient.invalidateQueries({ queryKey: ['documents', 'collection-type', contentType.Slug] });
+          queryClient.invalidateQueries({ queryKey: ["documents", "collection-type", contentType.Slug] });
         },
       },
     );
@@ -327,24 +325,12 @@ export function CollectionListPage({ contentType }: Props) {
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-0.5">
-          <Breadcrumb
-            items={[
-              { label: 'Home', to: '/admin' },
-              { label: 'Content Manager' },
-            ]}
-          />
+          <Breadcrumb items={[{ label: "Home", to: "/admin" }, { label: "Content Manager" }]} />
           <h1 className="text-xl font-semibold">{contentType.Name}</h1>
         </div>
         <div className="flex items-center gap-2">
           {hasSearchableColumn && (
-            <Input
-              type="text"
-              placeholder="Search…"
-              aria-label="Search"
-              className="h-7 w-48"
-              value={searchDraft}
-              onChange={(event) => setSearchDraft(event.target.value)}
-            />
+            <Input type="text" placeholder="Search…" aria-label="Search" className="h-7 w-48" value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} />
           )}
           <LocaleSelector
             value={activeLocale}
@@ -390,11 +376,11 @@ export function CollectionListPage({ contentType }: Props) {
         }}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle>{bulkDeleteConfirmOpen ? `Delete ${selectedIds.size} entries` : 'Delete entry'}</DialogTitle>
+            <DialogTitle>{bulkDeleteConfirmOpen ? `Delete ${selectedIds.size} entries` : "Delete entry"}</DialogTitle>
             <DialogDescription>
               {bulkDeleteConfirmOpen
                 ? `Are you sure you want to delete ${selectedIds.size} selected entries? This action cannot be undone.`
-                : 'Are you sure you want to delete this entry? This action cannot be undone.'}
+                : "Are you sure you want to delete this entry? This action cannot be undone."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -467,15 +453,15 @@ export function CollectionListPage({ contentType }: Props) {
                         onCheckedChange={(checked) => toggleSelectRow(doc.data.documentId as string, checked === true)}
                       />
                     </TableCell>
-                    <TableCell className="font-mono text-sm">{String(doc.data.id ?? '')}</TableCell>
+                    <TableCell className="font-mono text-sm">{String(doc.data.id ?? "")}</TableCell>
                     {columns.map((column) => (
                       <TableCell key={column.key}>{cellValue(doc, column)}</TableCell>
                     ))}
                     {systemVis.showCreatedAt && <TableCell className="text-muted-foreground text-sm">{formatDate(doc.data.createdAt)}</TableCell>}
                     {systemVis.showUpdatedAt && <TableCell className="text-muted-foreground text-sm">{formatDate(doc.data.updatedAt)}</TableCell>}
-                    {systemVis.showUpdatedBy && <TableCell className="text-muted-foreground text-sm">{String(doc.data.updatedByName ?? '')}</TableCell>}
+                    {systemVis.showUpdatedBy && <TableCell className="text-muted-foreground text-sm">{String(doc.data.updatedByName ?? "")}</TableCell>}
                     <TableCell>
-                      <Badge variant={statusVariant[doc.status] ?? 'draft'}>{doc.status}</Badge>
+                      <Badge variant={statusVariant[doc.status] ?? "draft"}>{doc.status}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">

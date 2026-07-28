@@ -1,12 +1,13 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useNavigate, Navigate, Link } from 'react-router-dom';
-import { api } from '@/lib/api';
-import { useAuth } from '@/context/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api";
 
 interface LoginFields {
   email: string;
@@ -24,8 +25,8 @@ export function LoginPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const { data: setupData, isLoading: setupLoading } = useQuery({
-    queryKey: ['auth-setup'],
-    queryFn: () => api.get<{ adminExists: boolean }>('/auth/setup').then((response) => response.data),
+    queryKey: ["auth-setup"],
+    queryFn: () => api.get<{ adminExists: boolean }>("/auth/setup").then((response) => response.data),
     staleTime: 30_000,
   });
 
@@ -36,13 +37,13 @@ export function LoginPage() {
   } = useForm<LoginFields>();
 
   const mutation = useMutation({
-    mutationFn: (data: LoginFields) => api.post<LoginResponse>('/auth/login', data).then((response) => response.data),
+    mutationFn: (data: LoginFields) => api.post<LoginResponse>("/auth/login", data).then((response) => response.data),
     onSuccess: (data) => {
       login(data.accessToken);
-      navigate('/admin');
+      navigate("/admin");
     },
     onError: () => {
-      setErrorMsg('Invalid email or password.');
+      setErrorMsg("Invalid email or password.");
     },
   });
 
@@ -80,9 +81,9 @@ export function LoginPage() {
               type="email"
               autoComplete="email"
               aria-invalid={!!errors.email}
-              {...register('email', {
-                required: 'Email is required',
-                pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email address' },
+              {...register("email", {
+                required: "Email is required",
+                pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Enter a valid email address" },
               })}
             />
             {errors.email && <p className="text-destructive text-xs">{errors.email.message}</p>}
@@ -95,28 +96,28 @@ export function LoginPage() {
               type="password"
               autoComplete="current-password"
               aria-invalid={!!errors.password}
-              {...register('password', {
-                required: 'Password is required',
-                minLength: { value: 8, message: 'Password must be at least 8 characters' },
+              {...register("password", {
+                required: "Password is required",
+                minLength: { value: 8, message: "Password must be at least 8 characters" },
               })}
             />
             {errors.password && <p className="text-destructive text-xs">{errors.password.message}</p>}
           </div>
 
           <div className="flex items-center gap-2">
-            <input id="rememberMe" type="checkbox" className="border-border h-4 w-4 rounded" {...register('rememberMe')} />
+            <input id="rememberMe" type="checkbox" className="border-border h-4 w-4 rounded" {...register("rememberMe")} />
             <Label htmlFor="rememberMe" className="cursor-pointer text-sm font-normal">
               Stay logged in
             </Label>
           </div>
 
           <Button type="submit" className="w-full" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Signing in…' : 'Sign in'}
+            {mutation.isPending ? "Signing in…" : "Sign in"}
           </Button>
         </form>
 
         <p className="text-muted-foreground text-center text-sm">
-          Don&apos;t have an account?{' '}
+          Don&apos;t have an account?{" "}
           <Link to="/register" className="text-primary underline-offset-4 hover:underline">
             Create account
           </Link>

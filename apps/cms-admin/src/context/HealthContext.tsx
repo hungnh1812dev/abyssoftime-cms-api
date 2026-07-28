@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ConnectionOverlay } from '@/components/ConnectionOverlay';
+import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
+
+import { ConnectionOverlay } from "@/components/ConnectionOverlay";
 
 const PING_INTERVAL_HEALTHY = 14 * 60 * 1000;
 const PING_INTERVAL_UNHEALTHY = 10 * 1000;
@@ -29,7 +30,7 @@ export function HealthProvider({ children }: { children: ReactNode }) {
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), PING_TIMEOUT);
-    const baseUrl = import.meta.env.VITE_API_URL || '';
+    const baseUrl = import.meta.env.VITE_API_URL || "";
 
     fetch(`${baseUrl}/health`, { signal: controller.signal })
       .then((response) => {
@@ -69,16 +70,16 @@ export function HealthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     function handleVisibilityChange() {
-      if (document.visibilityState === 'hidden') {
+      if (document.visibilityState === "hidden") {
         clearTimer();
       } else {
         pingRef.current();
       }
     }
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
@@ -93,6 +94,6 @@ export function HealthProvider({ children }: { children: ReactNode }) {
 // eslint-disable-next-line react-refresh/only-export-components
 export function useHealthStatus(): HealthContextValue {
   const context = useContext(HealthContext);
-  if (!context) throw new Error('useHealthStatus must be used inside HealthProvider');
+  if (!context) throw new Error("useHealthStatus must be used inside HealthProvider");
   return context;
 }

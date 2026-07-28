@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Controller, type Control } from 'react-hook-form';
-import CodeMirror from '@uiw/react-codemirror';
-import { json } from '@codemirror/lang-json';
+import { json } from "@codemirror/lang-json";
+import CodeMirror from "@uiw/react-codemirror";
+import { useState } from "react";
+import { type Control, Controller } from "react-hook-form";
 
 interface JsonInputProps {
   name?: string;
@@ -9,7 +9,7 @@ interface JsonInputProps {
 }
 
 function serialize(value: unknown): string {
-  if (value == null) return '';
+  if (value == null) return "";
   return JSON.stringify(value, null, 2);
 }
 
@@ -41,7 +41,7 @@ function InnerJsonInput({ field }: { field: { value: unknown; onChange: (value: 
           onChange={(val) => {
             setRawValue(val);
             setEditCount((count) => count + 1);
-            if (val.trim() === '') {
+            if (val.trim() === "") {
               setSyntaxError(null);
               field.onChange(null);
               return;
@@ -51,7 +51,7 @@ function InnerJsonInput({ field }: { field: { value: unknown; onChange: (value: 
               setSyntaxError(null);
               field.onChange(parsed);
             } catch {
-              setSyntaxError('Invalid JSON');
+              setSyntaxError("Invalid JSON");
               field.onChange(undefined);
             }
           }}
@@ -65,11 +65,11 @@ function InnerJsonInput({ field }: { field: { value: unknown; onChange: (value: 
 export function JsonInput({ name, control }: JsonInputProps) {
   return (
     <Controller
-      name={name ?? ''}
+      name={name ?? ""}
       control={control}
       defaultValue={null}
       rules={{
-        validate: (value) => value !== undefined || 'Invalid JSON',
+        validate: (value) => value !== undefined || "Invalid JSON",
       }}
       render={({ field }) => <InnerJsonInput field={field} />}
     />

@@ -1,7 +1,7 @@
-import { Controller, type Control } from 'react-hook-form';
-import { CKEditor } from '@ckeditor/ckeditor5-react';
-import { ClassicEditor, Essentials, Paragraph, Bold, Italic, Heading, Link, List, BlockQuote, Indent, MediaEmbed, Table, TableToolbar } from 'ckeditor5';
-import 'ckeditor5/ckeditor5.css';
+import { CKEditor } from "@ckeditor/ckeditor5-react";
+import { BlockQuote, Bold, ClassicEditor, Essentials, Heading, Indent, Italic, Link, List, MediaEmbed, Paragraph, Table, TableToolbar } from "ckeditor5";
+import "ckeditor5/ckeditor5.css";
+import { type Control, Controller } from "react-hook-form";
 
 interface RichTextInputProps {
   name?: string;
@@ -10,34 +10,34 @@ interface RichTextInputProps {
 }
 
 const DEFAULT_TOOLBAR = [
-  'heading',
-  '|',
-  'bold',
-  'italic',
-  'link',
-  '|',
-  'bulletedList',
-  'numberedList',
-  '|',
-  'outdent',
-  'indent',
-  '|',
-  'blockQuote',
-  'insertTable',
-  'mediaEmbed',
-  '|',
-  'undo',
-  'redo',
+  "heading",
+  "|",
+  "bold",
+  "italic",
+  "link",
+  "|",
+  "bulletedList",
+  "numberedList",
+  "|",
+  "outdent",
+  "indent",
+  "|",
+  "blockQuote",
+  "insertTable",
+  "mediaEmbed",
+  "|",
+  "undo",
+  "redo",
 ];
 
 const PLUGINS = [Essentials, Paragraph, Bold, Italic, Heading, Link, List, BlockQuote, Indent, MediaEmbed, Table, TableToolbar];
 
-const minHeightStyle = '.ck-editor__editable_inline { min-height: 12em; }';
+const minHeightStyle = ".ck-editor__editable_inline { min-height: 12em; }";
 
 export function RichTextInput({ name, control, toolbar }: RichTextInputProps) {
   return (
     <Controller
-      name={name ?? ''}
+      name={name ?? ""}
       control={control}
       defaultValue=""
       render={({ field }) => (
@@ -45,9 +45,9 @@ export function RichTextInput({ name, control, toolbar }: RichTextInputProps) {
           <style>{minHeightStyle}</style>
           <CKEditor
             editor={ClassicEditor}
-            data={(field.value as string) ?? ''}
+            data={(field.value as string) ?? ""}
             config={{
-              licenseKey: 'GPL',
+              licenseKey: "GPL",
               plugins: PLUGINS,
               toolbar: toolbar ?? DEFAULT_TOOLBAR,
             }}

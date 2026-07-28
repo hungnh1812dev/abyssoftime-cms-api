@@ -1,14 +1,14 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { FormProvider } from '../FormProvider';
-import { FormField } from '../FormField';
-import { useCmsFormState } from '../FormStateContext';
+import { FormField } from "../FormField";
+import { FormProvider } from "../FormProvider";
+import { useCmsFormState } from "../FormStateContext";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 
-vi.mock('sonner', () => ({
+vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
@@ -25,8 +25,8 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   return <QueryClientProvider client={createClient()}>{children}</QueryClientProvider>;
 }
 
-describe('FormProvider + FormField', () => {
-  it('serializes dot-notation field names into nested JSON on submit', async () => {
+describe("FormProvider + FormField", () => {
+  it("serializes dot-notation field names into nested JSON on submit", async () => {
     const user = userEvent.setup();
     const mutationFn = vi.fn().mockResolvedValue(undefined);
 
@@ -41,16 +41,16 @@ describe('FormProvider + FormField', () => {
       </Wrapper>,
     );
 
-    await user.type(screen.getByLabelText('nested-input'), 'hello');
-    await user.click(screen.getByRole('button', { name: /submit/i }));
+    await user.type(screen.getByLabelText("nested-input"), "hello");
+    await user.click(screen.getByRole("button", { name: /submit/i }));
 
     await waitFor(() => {
       expect(mutationFn).toHaveBeenCalledTimes(1);
-      expect(mutationFn.mock.calls[0][0]).toEqual({ a: { b: 'hello' } });
+      expect(mutationFn.mock.calls[0][0]).toEqual({ a: { b: "hello" } });
     });
   });
 
-  it('renders FormField child with register props injected', async () => {
+  it("renders FormField child with register props injected", async () => {
     const mutationFn = vi.fn().mockResolvedValue(undefined);
 
     render(
@@ -64,23 +64,23 @@ describe('FormProvider + FormField', () => {
       </Wrapper>,
     );
 
-    expect(screen.getByLabelText('title-input')).toBeInTheDocument();
+    expect(screen.getByLabelText("title-input")).toBeInTheDocument();
   });
 
-  it('does not use React.Children.map in FormProvider or FormField source', () => {
+  it("does not use React.Children.map in FormProvider or FormField source", () => {
     const dir = import.meta.dirname;
-    const formProviderSrc = readFileSync(resolve(dir, '../FormProvider.tsx'), 'utf-8');
-    const formFieldSrc = readFileSync(resolve(dir, '../FormField.tsx'), 'utf-8');
-    expect(formProviderSrc).not.toContain('Children.map');
-    expect(formFieldSrc).not.toContain('Children.map');
+    const formProviderSrc = readFileSync(resolve(dir, "../FormProvider.tsx"), "utf-8");
+    const formFieldSrc = readFileSync(resolve(dir, "../FormField.tsx"), "utf-8");
+    expect(formProviderSrc).not.toContain("Children.map");
+    expect(formFieldSrc).not.toContain("Children.map");
   });
 
-  it('exposes loading, submitting and isDirty state via context', async () => {
+  it("exposes loading, submitting and isDirty state via context", async () => {
     const mutationFn = vi.fn().mockResolvedValue(undefined);
 
     function StateConsumer() {
       const { loading, submitting, isDirty } = useCmsFormState();
-      return <span data-testid="state">{loading ? 'loading' : submitting ? 'submitting' : isDirty ? 'dirty' : 'idle'}</span>;
+      return <span data-testid="state">{loading ? "loading" : submitting ? "submitting" : isDirty ? "dirty" : "idle"}</span>;
     }
 
     render(
@@ -92,16 +92,16 @@ describe('FormProvider + FormField', () => {
       </Wrapper>,
     );
 
-    expect(screen.getByTestId('state')).toHaveTextContent('idle');
+    expect(screen.getByTestId("state")).toHaveTextContent("idle");
   });
 
-  it('isDirty is false on initial load and true after editing a field', async () => {
+  it("isDirty is false on initial load and true after editing a field", async () => {
     const user = userEvent.setup();
     const mutationFn = vi.fn().mockResolvedValue(undefined);
 
     function DirtyConsumer() {
       const { isDirty } = useCmsFormState();
-      return <span data-testid="dirty">{isDirty ? 'dirty' : 'clean'}</span>;
+      return <span data-testid="dirty">{isDirty ? "dirty" : "clean"}</span>;
     }
 
     render(
@@ -115,19 +115,19 @@ describe('FormProvider + FormField', () => {
       </Wrapper>,
     );
 
-    expect(screen.getByTestId('dirty')).toHaveTextContent('clean');
-    await user.type(screen.getByLabelText('title'), 'x');
-    expect(screen.getByTestId('dirty')).toHaveTextContent('dirty');
+    expect(screen.getByTestId("dirty")).toHaveTextContent("clean");
+    await user.type(screen.getByLabelText("title"), "x");
+    expect(screen.getByTestId("dirty")).toHaveTextContent("dirty");
   });
 
-  it('fires success toast and resets form to clean after successful save', async () => {
-    const { toast } = await import('sonner');
+  it("fires success toast and resets form to clean after successful save", async () => {
+    const { toast } = await import("sonner");
     const user = userEvent.setup();
-    const mutationFn = vi.fn().mockResolvedValue({ title: 'saved-value' });
+    const mutationFn = vi.fn().mockResolvedValue({ title: "saved-value" });
 
     function DirtyConsumer() {
       const { isDirty } = useCmsFormState();
-      return <span data-testid="dirty">{isDirty ? 'dirty' : 'clean'}</span>;
+      return <span data-testid="dirty">{isDirty ? "dirty" : "clean"}</span>;
     }
 
     render(
@@ -142,20 +142,20 @@ describe('FormProvider + FormField', () => {
       </Wrapper>,
     );
 
-    await user.type(screen.getByLabelText('title'), 'hello');
-    expect(screen.getByTestId('dirty')).toHaveTextContent('dirty');
+    await user.type(screen.getByLabelText("title"), "hello");
+    expect(screen.getByTestId("dirty")).toHaveTextContent("dirty");
 
-    await user.click(screen.getByRole('button', { name: /save/i }));
+    await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('Saved');
-      expect(screen.getByTestId('dirty')).toHaveTextContent('clean');
+      expect(toast.success).toHaveBeenCalledWith("Saved");
+      expect(screen.getByTestId("dirty")).toHaveTextContent("clean");
     });
   });
 
-  it('calls onDirtyChange with false on mount, true after editing, and false after save-and-reset', async () => {
+  it("calls onDirtyChange with false on mount, true after editing, and false after save-and-reset", async () => {
     const user = userEvent.setup();
-    const mutationFn = vi.fn().mockResolvedValue({ title: 'saved-value' });
+    const mutationFn = vi.fn().mockResolvedValue({ title: "saved-value" });
     const onDirtyChange = vi.fn();
 
     render(
@@ -171,22 +171,22 @@ describe('FormProvider + FormField', () => {
 
     expect(onDirtyChange).toHaveBeenLastCalledWith(false);
 
-    await user.type(screen.getByLabelText('title'), 'hello');
+    await user.type(screen.getByLabelText("title"), "hello");
     expect(onDirtyChange).toHaveBeenLastCalledWith(true);
 
-    await user.click(screen.getByRole('button', { name: /save/i }));
+    await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => {
       expect(onDirtyChange).toHaveBeenLastCalledWith(false);
     });
   });
 
-  it('fires error toast and preserves edited values on failed save', async () => {
-    const { toast } = await import('sonner');
+  it("fires error toast and preserves edited values on failed save", async () => {
+    const { toast } = await import("sonner");
     const user = userEvent.setup();
     const mutationFn = vi.fn().mockRejectedValue(
-      Object.assign(new Error('Bad request'), {
-        response: { data: { error: 'Validation failed' } },
+      Object.assign(new Error("Bad request"), {
+        response: { data: { error: "Validation failed" } },
       }),
     );
 
@@ -201,12 +201,12 @@ describe('FormProvider + FormField', () => {
       </Wrapper>,
     );
 
-    await user.type(screen.getByLabelText('title'), 'bad value');
-    await user.click(screen.getByRole('button', { name: /save/i }));
+    await user.type(screen.getByLabelText("title"), "bad value");
+    await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Validation failed');
+      expect(toast.error).toHaveBeenCalledWith("Validation failed");
     });
-    expect(screen.getByLabelText('title')).toHaveValue('bad value');
+    expect(screen.getByLabelText("title")).toHaveValue("bad value");
   });
 });

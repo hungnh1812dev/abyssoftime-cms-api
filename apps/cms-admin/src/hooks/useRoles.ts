@@ -1,7 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AxiosError } from 'axios';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AxiosError } from "axios";
+import { toast } from "sonner";
+
+import { api } from "@/lib/api";
 
 export interface RoleItem {
   documentId: string;
@@ -26,25 +27,25 @@ export interface UpdateRoleInput {
 }
 
 const KEYS = {
-  all: ['roles'] as const,
+  all: ["roles"] as const,
 };
 
 export function useRoleList() {
   return useQuery<RoleItem[]>({
     queryKey: KEYS.all,
-    queryFn: () => api.get<RoleItem[]>('/api/roles').then((response) => response.data),
+    queryFn: () => api.get<RoleItem[]>("/api/roles").then((response) => response.data),
   });
 }
 
 export function useCreateRole() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateRoleInput) => api.post<RoleItem>('/api/roles', data).then((response) => response.data),
+    mutationFn: (data: CreateRoleInput) => api.post<RoleItem>("/api/roles", data).then((response) => response.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: KEYS.all });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to create role';
+      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to create role";
       toast.error(message);
     },
   });
@@ -58,7 +59,7 @@ export function useUpdateRole() {
       queryClient.invalidateQueries({ queryKey: KEYS.all });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to update role';
+      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to update role";
       toast.error(message);
     },
   });
@@ -72,7 +73,7 @@ export function useDeleteRole() {
       queryClient.invalidateQueries({ queryKey: KEYS.all });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to delete role';
+      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to delete role";
       toast.error(message);
     },
   });

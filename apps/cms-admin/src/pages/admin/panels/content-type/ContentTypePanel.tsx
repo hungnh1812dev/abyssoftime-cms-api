@@ -1,44 +1,46 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { useSingleTypeDocument, useSaveSingleType, usePublishSingleType, useUnpublishSingleType } from '@/hooks/useSingleTypeDocuments';
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+
+import { LocaleSelector } from "@/components/locale/LocaleSelector";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import type { BreadcrumbItem } from "@/hooks/useBreadcrumbs";
 import {
   useCollectionDocument,
   useCreateCollectionDocument,
-  useUpdateCollectionDocument,
   usePublishCollectionDocument,
   useUnpublishCollectionDocument,
-} from '@/hooks/useCollectionDocuments';
-import { useLocales } from '@/hooks/useLocales';
-import { api } from '@/lib/api';
-import type { Document as CmsDocument, ContentType } from '@/types/cms';
-import { stripSystemFields } from '@/types/cms';
-import { useState } from 'react';
-import { LocaleSelector } from '@/components/locale/LocaleSelector';
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ContentDetailLayout } from './ContentDetailLayout';
-import { ContentTypeBuilder } from './ContentTypeBuilder';
-import type { BreadcrumbItem } from '@/hooks/useBreadcrumbs';
+  useUpdateCollectionDocument,
+} from "@/hooks/useCollectionDocuments";
+import { useLocales } from "@/hooks/useLocales";
+import { usePublishSingleType, useSaveSingleType, useSingleTypeDocument, useUnpublishSingleType } from "@/hooks/useSingleTypeDocuments";
+import { api } from "@/lib/api";
+import type { Document as CmsDocument, ContentType } from "@/types/cms";
+import { stripSystemFields } from "@/types/cms";
+
+import { ContentDetailLayout } from "./ContentDetailLayout";
+import { ContentTypeBuilder } from "./ContentTypeBuilder";
 
 function formatAuditDate(value: unknown): string {
-  if (!value) return '';
+  if (!value) return "";
   const date = new Date(String(value));
-  if (isNaN(date.getTime())) return '';
+  if (isNaN(date.getTime())) return "";
   const diffMs = Date.now() - date.getTime();
   const diffHours = diffMs / (1000 * 60 * 60);
   if (diffHours < 1) {
     const mins = Math.floor(diffMs / (1000 * 60));
-    return mins <= 1 ? 'just now' : `${mins} minutes ago`;
+    return mins <= 1 ? "just now" : `${mins} minutes ago`;
   }
   if (diffHours < 24) {
     const hours = Math.floor(diffHours);
-    return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+    return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
   }
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   }).format(date);
 }
 
@@ -49,11 +51,11 @@ interface Props {
 }
 
 export function ContentTypePanel({ contentType, id, isNew }: Props) {
-  const isSingle = contentType.Kind === 'single';
+  const isSingle = contentType.Kind === "single";
   const navigate = useNavigate();
   const { data: locales = [] } = useLocales();
-  const [selectedLocale, setSelectedLocale] = useState('');
-  const activeLocale = selectedLocale || locales.find((loc) => loc.isDefault)?.code || locales[0]?.code || '';
+  const [selectedLocale, setSelectedLocale] = useState("");
+  const activeLocale = selectedLocale || locales.find((loc) => loc.isDefault)?.code || locales[0]?.code || "";
   const [isDirty, setIsDirty] = useState(false);
   const [pendingLocale, setPendingLocale] = useState<string | null>(null);
 
@@ -70,8 +72,8 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
     setPendingLocale(null);
   }
 
-  const singleQuery = useSingleTypeDocument(isSingle ? contentType.Slug : '', activeLocale);
-  const collectionQuery = useCollectionDocument(!isSingle && !isNew ? contentType.Slug : '', id ?? '', activeLocale);
+  const singleQuery = useSingleTypeDocument(isSingle ? contentType.Slug : "", activeLocale);
+  const collectionQuery = useCollectionDocument(!isSingle && !isNew ? contentType.Slug : "", id ?? "", activeLocale);
 
   const saveSingle = useSaveSingleType();
   const createCollection = useCreateCollectionDocument();
@@ -82,7 +84,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
   const publishCollection = usePublishCollectionDocument();
   const unpublishCollection = useUnpublishCollectionDocument();
 
-  const breadcrumbs: BreadcrumbItem[] = [{ label: 'Home', to: '/admin' }, { label: 'Content Manager' }];
+  const breadcrumbs: BreadcrumbItem[] = [{ label: "Home", to: "/admin" }, { label: "Content Manager" }];
 
   const isLoading = isSingle ? singleQuery.isLoading : !isNew && collectionQuery.isLoading;
   const doc = isSingle ? singleQuery.data : isNew ? undefined : collectionQuery.data;
@@ -165,8 +167,8 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
   const isPublishing = isSingle ? publishSingle.isPending : publishCollection.isPending;
   const isUnpublishing = isSingle ? unpublishSingle.isPending : unpublishCollection.isPending;
 
-  const canPublish = doc.status !== 'published';
-  const canUnpublish = doc.status !== 'draft';
+  const canPublish = doc.status !== "published";
+  const canUnpublish = doc.status !== "draft";
   const schema = contentType.Fields ?? [];
 
   const apiBase = isSingle ? `/api/document-manager/single-type/${contentType.Slug}` : `/api/document-manager/collection-type/${contentType.Slug}/${doc.data.documentId as string}`;
@@ -199,7 +201,7 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
           contentTypeSlug={contentType.Slug}
           schema={schema}
           query={{
-            queryKey: ['documents', isSingle ? 'single-type' : 'collection-type', 'detail', contentType.Slug, doc.data.documentId as string, activeLocale, 'data'],
+            queryKey: ["documents", isSingle ? "single-type" : "collection-type", "detail", contentType.Slug, doc.data.documentId as string, activeLocale, "data"],
             queryFn: () => api.get<CmsDocument>(apiBase, { params: { locale: activeLocale } }).then((response) => stripSystemFields((response.data as CmsDocument).data)),
           }}
           mutationFn={mutationFn}
@@ -218,7 +220,13 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
                 </Button>
               )}
               {canUnpublish && (
-                <Button type="button" variant="destructive" onClick={handleUnpublish} disabled={submitting || isUnpublishing} loading={isUnpublishing} loadingText="Unpublishing...">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleUnpublish}
+                  disabled={submitting || isUnpublishing}
+                  loading={isUnpublishing}
+                  loadingText="Unpublishing...">
                   Unpublish
                 </Button>
               )}
