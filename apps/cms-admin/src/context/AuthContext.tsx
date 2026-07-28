@@ -1,11 +1,12 @@
 import axios from "axios";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 
-import { api, onSessionExpired, setAccessToken } from "@/lib/api";
+import { api, onSessionExpired } from "@/lib/api";
+import type { RoleItem } from "@/hooks/useRoles";
 
-// Delays between mount-time refresh retries on a transient failure (network
-// error, 5xx, 429) — not a definitive 401. Sized to ride out a Render
-// free-tier cold start (~30s, see docs/guide.md).
+// Delays between mount-time session retries on a transient failure (network
+// error, 5xx, 429) — not a definitive 401. Sized to ride out a cold-start
+// backend.
 // eslint-disable-next-line react-refresh/only-export-components
 export const MOUNT_REFRESH_RETRY_DELAYS_MS = [2000, 5000, 10000];
 
@@ -13,93 +14,73 @@ function sleep(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
-interface JwtPayload {
-  userId: string;
-  role: string;
-  exp: number;
-}
-
-function decodeToken(token: string): JwtPayload {
-  const payload = token.split(".")[1];
-  return JSON.parse(atob(payload)) as JwtPayload;
+export interface MeUser {
+  documentId: string;
+  email: string;
+  name: string;
+  username: string;
+  accountType: boolean;
+  verified: boolean;
+  roleId: string | null;
+  role: RoleItem | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface AuthState {
-  token: string | null;
-  role: string | null;
+  user: MeUser | null;
+  loading: boolean;
+}
+
+interface AuthContextValue {
+  user: MeUser | null;
+  role: RoleItem | null;
   userId: string | null;
   displayName: string | null;
   permissions: string[];
   loading: boolean;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
-interface AuthContextValue extends AuthState {
-  login: (accessToken: string) => void;
-  logout: () => void;
-}
-
-const LOGGED_OUT_STATE: AuthState = { token: null, role: null, userId: null, displayName: null, permissions: [], loading: false };
+const LOGGED_OUT_STATE: AuthState = { user: null, loading: false };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({
-    token: null,
-    role: null,
-    userId: null,
-    displayName: null,
-    permissions: [],
-    loading: true,
-  });
-
+  const [state, setState] = useState<AuthState>({ user: null, loading: true });
   const mountedRef = useRef(true);
 
-  // Fetches the caller's own role+permissions+displayName from GET /auth/me
-  // and merges them into state — split from login()/attemptMountRefresh() so
-  // a slow or failed fetch never blocks the access token itself from being
-  // usable (specs/access-token-auth-mismatch.md §13.6).
-  const fetchPermissions = useCallback(async () => {
-    try {
-      const response = await api.get<{ role: string; permissions: string[]; displayName: string }>("/auth/me");
-      if (!mountedRef.current) return;
-      setState((previous) => (previous.token ? { ...previous, permissions: response.data.permissions, displayName: response.data.displayName } : previous));
-    } catch {
-      // Non-fatal — sidebar gating just falls back to an empty permission
-      // set (and no display name) until the next successful fetch (next
-      // login/refresh).
-    }
+  const fetchMe = useCallback(async () => {
+    const response = await api.get<MeUser>("/auth/me");
+    return response.data;
   }, []);
 
   useEffect(() => {
     mountedRef.current = true;
 
     onSessionExpired(() => {
-      if (mountedRef.current) {
-        setAccessToken(null);
-        setState(LOGGED_OUT_STATE);
-      }
+      if (mountedRef.current) setState(LOGGED_OUT_STATE);
     });
 
-    // No client-readable signal indicates whether a session exists — the
-    // refresh token lives only in the HttpOnly cookie — so every mount
-    // attempts one silent, cookie-only refresh. A 401 definitively means
+    // No client-readable signal indicates whether a session exists — both
+    // tokens live only in HttpOnly cookies — so every mount attempts a
+    // silent, cookie-only refresh followed by GET /auth/me to hydrate
+    // identity/role/permissions. A 401 from either call definitively means
     // "no session" and logs out immediately. Anything else (network error,
-    // 5xx, 429) is a transient failure — most commonly a Render free-tier
-    // cold start — and gets retried before giving up, so a live session
-    // isn't discarded just because the server was briefly unreachable.
-    async function attemptMountRefresh() {
+    // 5xx, 429) is a transient failure — most commonly a cold-start backend —
+    // and gets retried before giving up, so a live session isn't discarded
+    // just because the server was briefly unreachable.
+    async function attemptMountSession() {
       for (let attempt = 0; mountedRef.current; attempt++) {
         try {
-          const response = await api.post<{ accessToken: string }>("/auth/refresh", undefined, {
+          await api.post("/auth/refresh", undefined, {
             _retried: true,
             headers: { "Cache-Control": "no-cache, no-store" },
           } as object);
+          const user = await fetchMe();
           if (!mountedRef.current) return;
-          const { accessToken } = response.data;
-          setAccessToken(accessToken);
-          const { userId, role } = decodeToken(accessToken);
-          setState({ token: accessToken, role, userId, displayName: null, permissions: [], loading: false });
-          void fetchPermissions();
+          setState({ user, loading: false });
           return;
         } catch (error) {
           if (!mountedRef.current) return;
@@ -118,32 +99,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    void attemptMountRefresh();
+    void attemptMountSession();
 
     return () => {
       mountedRef.current = false;
       onSessionExpired(null);
     };
-  }, [fetchPermissions]);
+  }, [fetchMe]);
 
-  function login(accessToken: string) {
-    const { userId, role } = decodeToken(accessToken);
-    setAccessToken(accessToken);
-    setState({ token: accessToken, role, userId, displayName: null, permissions: [], loading: false });
-    void fetchPermissions();
-  }
+  // Called after a successful POST /auth/login — the login response carries
+  // no token/user data (cookies only), so identity is hydrated with one
+  // follow-up GET /auth/me call.
+  const login = useCallback(async () => {
+    const user = await fetchMe();
+    setState({ user, loading: false });
+  }, [fetchMe]);
 
   const logout = useCallback(async () => {
-    setAccessToken(null);
     setState(LOGGED_OUT_STATE);
     try {
       await api.post("/auth/logout");
     } catch {
-      // cookie cleared server-side on best-effort basis
+      // cookies cleared server-side on a best-effort basis
     }
   }, []);
 
-  return <AuthContext.Provider value={{ ...state, login, logout }}>{children}</AuthContext.Provider>;
+  const value: AuthContextValue = {
+    user: state.user,
+    role: state.user?.role ?? null,
+    userId: state.user?.documentId ?? null,
+    displayName: state.user?.name ?? null,
+    permissions: state.user?.role?.permissions ?? [],
+    loading: state.loading,
+    login,
+    logout,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

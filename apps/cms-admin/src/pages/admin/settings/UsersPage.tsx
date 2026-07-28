@@ -26,7 +26,11 @@ interface InviteFields {
 }
 
 export function UsersPage() {
-  const { role: myRole, userId } = useAuth();
+  // TODO(Phase 2 / Task 2.3): role is now a live RoleItem object, not a slug
+  // string — this shim keeps the file compiling against the still-hardcoded
+  // ALL_ROLES/roleLevel model below until that task replaces both.
+  const { role: myRoleObj, userId } = useAuth();
+  const myRole = myRoleObj?.slug ?? null;
   const [page, setPage] = useState(1);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteRole, setInviteRole] = useState("");

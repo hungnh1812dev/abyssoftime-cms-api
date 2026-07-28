@@ -4,24 +4,23 @@ import { Navigate } from "react-router-dom";
 
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
-import { roleLevel } from "@/lib/roles";
 
-export function ProtectedRoute({ children, minRole }: { children: ReactNode; minRole?: string }) {
-  const { token, role, loading } = useAuth();
+export function ProtectedRoute({ children, minLevel }: { children: ReactNode; minLevel?: number }) {
+  const { user, role, loading } = useAuth();
 
-  const { data: setupData, isLoading: setupLoading } = useQuery({
-    queryKey: ["auth-setup"],
-    queryFn: () => api.get<{ adminExists: boolean }>("/auth/setup").then((response) => response.data),
-    enabled: !loading && !token,
+  const { data: hasUsersData, isLoading: hasUsersLoading } = useQuery({
+    queryKey: ["auth-has-users"],
+    queryFn: () => api.get<{ hasUsers: boolean }>("/auth/has-users").then((response) => response.data),
+    enabled: !loading && !user,
     staleTime: 30_000,
   });
 
-  if (loading || setupLoading) return null;
-  if (!token) {
-    const hasAdmin = setupData?.adminExists ?? true;
-    return <Navigate to={hasAdmin ? "/login" : "/register"} replace />;
+  if (loading || hasUsersLoading) return null;
+  if (!user) {
+    const hasUsers = hasUsersData?.hasUsers ?? true;
+    return <Navigate to={hasUsers ? "/login" : "/register"} replace />;
   }
-  if (minRole && roleLevel(role) < roleLevel(minRole)) {
+  if (minLevel !== undefined && (role?.level ?? 0) < minLevel) {
     return <Navigate to="/403" replace />;
   }
   return <>{children}</>;
