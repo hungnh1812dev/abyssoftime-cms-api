@@ -97,7 +97,7 @@ Tasks 1, 2, 3 have no dependencies on each other. Task 7 is the integration poin
 
 ### Phase 3 — Feature B: `updatedBy` on document responses
 
-- [ ] **Task 5:** `document.module.ts` — import `UserModule`. `document-response.mapper.ts` —
+- [x] **Task 5:** `document.module.ts` — import `UserModule`. `document-response.mapper.ts` —
       `toDocumentResponse(document, status, updatedBy)` takes the already-resolved value, stays pure/sync.
       `document-response.dto.ts` — new `UpdatedByResponseDto { documentId; name }`; add
       `updatedBy?: UpdatedByResponseDto | null` to `DocumentDataResponseDto`. Both document controllers —

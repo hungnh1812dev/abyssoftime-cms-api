@@ -14,6 +14,8 @@ import { Test } from "@nestjs/testing";
 
 import { JwtTokenService } from "@/common/token/jwt-token.service";
 import { type AuthenticatedRequest } from "@/common/types/authenticated-request";
+import { UserEntity } from "@/modules/users/domain/entities/user.entity";
+import { type IUserRepository, USER_REPOSITORY } from "@/modules/users/domain/repositories/user.repository";
 
 import { CollectionTypeDocumentController } from "./collection-type-document.controller";
 
@@ -28,12 +30,14 @@ describe("CollectionTypeDocumentController", () => {
   let duplicateDocument: jest.Mocked<DuplicateDocumentService>;
   let bulkCreateAndPublish: jest.Mocked<BulkCreateAndPublishService>;
   let bulkDelete: jest.Mocked<BulkDeleteService>;
+  let users: jest.Mocked<IUserRepository>;
 
   const now = new Date();
   const documentId = "11111111-1111-4111-8111-111111111111";
   const draft = new DocumentEntity(documentId, "draft", { position: "Engineer" }, now, now, null, "caller-1", "caller-1", null);
   const published = new DocumentEntity(documentId, "published", { position: "Engineer" }, now, now, now, "caller-1", "caller-1", "caller-1");
   const req = { user: { sub: "caller-1" } } as AuthenticatedRequest;
+  const updatedByUser = new UserEntity("caller-1", "jane@example.com", "Jane Doe", "janedoe", "hash", true, true, null, now, now);
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({
@@ -49,6 +53,7 @@ describe("CollectionTypeDocumentController", () => {
         { provide: BulkCreateAndPublishService, useValue: { execute: jest.fn() } },
         { provide: BulkDeleteService, useValue: { execute: jest.fn() } },
         { provide: JwtTokenService, useValue: { verifyAccessToken: jest.fn() } },
+        { provide: USER_REPOSITORY, useValue: { findById: jest.fn() } },
       ],
     }).compile();
 
@@ -62,6 +67,8 @@ describe("CollectionTypeDocumentController", () => {
     duplicateDocument = module.get(DuplicateDocumentService);
     bulkCreateAndPublish = module.get(BulkCreateAndPublishService);
     bulkDelete = module.get(BulkDeleteService);
+    users = module.get(USER_REPOSITORY);
+    users.findById.mockResolvedValue(updatedByUser);
   });
 
   describe("list()", () => {
@@ -88,7 +95,9 @@ describe("CollectionTypeDocumentController", () => {
       const result = await controller.bulkCreate("cv-page", { items: [{ data: { position: "Engineer" } }] }, req);
 
       expect(bulkCreateAndPublish.execute).toHaveBeenCalledWith("cv-page", [{ position: "Engineer" }], "caller-1");
-      expect(result).toEqual({ items: [{ data: { documentId, status: "published", createdAt: now, updatedAt: now, position: "Engineer" } }] });
+      expect(result).toEqual({
+        items: [{ data: { documentId, status: "published", createdAt: now, updatedAt: now, position: "Engineer", updatedBy: { documentId: "caller-1", name: "Jane Doe" } } }],
+      });
     });
 
     it("throws BadRequestException for an invalid slug, without touching the service", async () => {
@@ -121,7 +130,9 @@ describe("CollectionTypeDocumentController", () => {
 
       expect(saveDocument.execute).toHaveBeenCalledWith("cv-page", { position: "Engineer" }, undefined, "caller-1");
       expect(getDocumentForEdit.execute).not.toHaveBeenCalled();
-      expect(result).toEqual({ data: { documentId, status: "draft", createdAt: now, updatedAt: now, position: "Engineer" } });
+      expect(result).toEqual({
+        data: { documentId, status: "draft", createdAt: now, updatedAt: now, position: "Engineer", updatedBy: { documentId: "caller-1", name: "Jane Doe" } },
+      });
     });
 
     it("throws BadRequestException for an invalid slug, without touching the service", async () => {
@@ -137,7 +148,19 @@ describe("CollectionTypeDocumentController", () => {
       const result = await controller.get("cv-page", documentId);
 
       expect(getDocumentForEdit.execute).toHaveBeenCalledWith("cv-page", documentId);
-      expect(result).toEqual({ data: { documentId, status: "draft", createdAt: now, updatedAt: now, position: "Engineer" } });
+      expect(result).toEqual({
+        data: { documentId, status: "draft", createdAt: now, updatedAt: now, position: "Engineer", updatedBy: { documentId: "caller-1", name: "Jane Doe" } },
+      });
+    });
+
+    it("resolves updatedBy to null when the document has no updatedBy id", async () => {
+      const noUpdatedBy = new DocumentEntity(documentId, "draft", { position: "Engineer" }, now, now, null, null, null, null);
+      getDocumentForEdit.execute.mockResolvedValue({ document: noUpdatedBy, status: "draft" });
+
+      const result = await controller.get("cv-page", documentId);
+
+      expect(users.findById).not.toHaveBeenCalled();
+      expect(result.data.updatedBy).toBeNull();
     });
 
     it("throws BadRequestException for an invalid documentId, without touching the service", async () => {
@@ -156,6 +179,7 @@ describe("CollectionTypeDocumentController", () => {
       expect(saveDocument.execute).toHaveBeenCalledWith("cv-page", { position: "Engineer" }, documentId, "caller-1");
       expect(getDocumentForEdit.execute).toHaveBeenCalledWith("cv-page", documentId);
       expect(result.data.status).toBe("modified");
+      expect(result.data.updatedBy).toEqual({ documentId: "caller-1", name: "Jane Doe" });
     });
 
     it("throws BadRequestException for an invalid documentId, without touching any service", async () => {
@@ -222,7 +246,9 @@ describe("CollectionTypeDocumentController", () => {
 
       expect(duplicateDocument.execute).toHaveBeenCalledWith("cv-page", documentId, "caller-1");
       expect(getDocumentForEdit.execute).not.toHaveBeenCalled();
-      expect(result).toEqual({ data: { documentId: newDocumentId, status: "draft", createdAt: now, updatedAt: now, position: "Engineer" } });
+      expect(result).toEqual({
+        data: { documentId: newDocumentId, status: "draft", createdAt: now, updatedAt: now, position: "Engineer", updatedBy: { documentId: "caller-1", name: "Jane Doe" } },
+      });
     });
 
     it("throws BadRequestException for an invalid documentId, without touching the service", async () => {

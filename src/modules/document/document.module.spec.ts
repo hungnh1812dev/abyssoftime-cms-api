@@ -1,6 +1,7 @@
 import { MODULE_METADATA } from "@nestjs/common/constants";
 
 import { ContentTypeModule } from "@/modules/content-type/content-type.module";
+import { UserModule } from "@/modules/users/user.module";
 
 import { BulkCreateAndPublishService } from "./application/services/bulk-create-publish.service";
 import { BulkDeleteService } from "./application/services/bulk-delete.service";
@@ -29,10 +30,10 @@ import { PublicDocumentController } from "./presentation/public-document.control
 import { SingleTypeDocumentController } from "./presentation/single-type-document.controller";
 
 describe("DocumentModule", () => {
-  it("imports ContentTypeModule", () => {
+  it("imports ContentTypeModule and UserModule", () => {
     const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, DocumentModule) as unknown[];
 
-    expect(imports).toEqual([ContentTypeModule]);
+    expect(imports).toEqual([ContentTypeModule, UserModule]);
   });
 
   it("registers all three controllers", () => {
