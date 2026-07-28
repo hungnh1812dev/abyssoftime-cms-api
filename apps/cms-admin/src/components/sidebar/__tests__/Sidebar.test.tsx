@@ -15,7 +15,7 @@ vi.mock("@/hooks/useContentTypes", () => ({
   }),
 }));
 
-const ALL_SETTINGS_PERMISSIONS = ["media:read", "user:read", "api_token:manager", "role:manager", "permission:manager", "locales:manager"];
+const ALL_SETTINGS_PERMISSIONS = ["media:read", "user:read", "api_token:manager", "role:manager", "permission:manager"];
 
 const mockUseAuth = vi.fn(() => ({
   role: "super_admin",
@@ -137,7 +137,6 @@ describe("Sidebar — permission-based gating (CATALOG-T11)", () => {
     expect(screen.queryByText("Access Tokens")).not.toBeInTheDocument();
     expect(screen.queryByText("Roles")).not.toBeInTheDocument();
     expect(screen.queryByText("Permissions")).not.toBeInTheDocument();
-    expect(screen.queryByText("Internationalize")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Media Library" })).not.toBeInTheDocument();
   });
 
@@ -150,7 +149,6 @@ describe("Sidebar — permission-based gating (CATALOG-T11)", () => {
     expect(screen.queryByText("Access Tokens")).not.toBeInTheDocument();
     expect(screen.queryByText("Roles")).not.toBeInTheDocument();
     expect(screen.queryByText("Permissions")).not.toBeInTheDocument();
-    expect(screen.queryByText("Internationalize")).not.toBeInTheDocument();
   });
 
   it("shows the Roles link only when role:manager is granted, independent of permission:manager", () => {
@@ -161,7 +159,7 @@ describe("Sidebar — permission-based gating (CATALOG-T11)", () => {
     expect(screen.queryByText("Permissions")).not.toBeInTheDocument();
   });
 
-  it("shows every settings link for a role with all 6 permissions", () => {
+  it("shows every settings link for a role with all 5 permissions", () => {
     renderSidebar();
 
     expect(screen.getByText("Media Library")).toBeInTheDocument();
@@ -169,7 +167,6 @@ describe("Sidebar — permission-based gating (CATALOG-T11)", () => {
     expect(screen.getByText("Access Tokens")).toBeInTheDocument();
     expect(screen.getByText("Roles")).toBeInTheDocument();
     expect(screen.getByText("Permissions")).toBeInTheDocument();
-    expect(screen.getByText("Internationalize")).toBeInTheDocument();
   });
 });
 

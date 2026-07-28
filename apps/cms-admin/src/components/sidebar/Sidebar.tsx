@@ -59,7 +59,6 @@ export function Sidebar() {
           {hasPermission("api_token:manager") && <SidebarItem to="/admin/settings/access-tokens">Access Tokens</SidebarItem>}
           {hasPermission("role:manager") && <SidebarItem to="/admin/settings/roles">Roles</SidebarItem>}
           {hasPermission("permission:manager") && <SidebarItem to="/admin/settings/permissions">Permissions</SidebarItem>}
-          {hasPermission("locales:manager") && <SidebarItem to="/admin/settings/internationalize">Internationalize</SidebarItem>}
         </SidebarGroup>
       </nav>
 

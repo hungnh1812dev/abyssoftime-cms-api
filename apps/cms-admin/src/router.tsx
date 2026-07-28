@@ -53,12 +53,6 @@ const PermissionsPage = lazy(() =>
   })),
 );
 
-const InternationalizePage = lazy(() =>
-  import("@/pages/admin/settings/InternationalizePage").then((module) => ({
-    default: module.InternationalizePage,
-  })),
-);
-
 function PanelFallback() {
   return <div className="text-muted-foreground p-4">Loading…</div>;
 }
@@ -173,16 +167,6 @@ export function AppRouter() {
             <ProtectedRoute minLevel={ROLE_LEVEL.SUPER_ADMIN}>
               <Suspense fallback={<PanelFallback />}>
                 <PermissionsPage />
-              </Suspense>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="settings/internationalize"
-          element={
-            <ProtectedRoute minLevel={ROLE_LEVEL.SUPER_ADMIN}>
-              <Suspense fallback={<PanelFallback />}>
-                <InternationalizePage />
               </Suspense>
             </ProtectedRoute>
           }

@@ -30,7 +30,7 @@ each task completes.
 - [x] **Checkpoint 4** — 345/345 tests, lint, build green; curl-verified create/revoke (secret rotates)/delete against real backend; fixed a pre-existing Select-portal test flake surfaced under load; commit
 
 ## Phase 4 — Hide Locale Route & Nav
-- [ ] 4.1 Remove locale route + nav entry; confirm orphaned locale files still typecheck
+- [x] 4.1 Remove locale route + nav entry; confirm orphaned locale files still typecheck (345/345 tests, lint, build all green; confirmed no locale/internationalize chunk is bundled anymore)
 
 ## Phase 5 — Content Types, Documents & Media Contract Rewrite
 - [ ] 5.1 Rewrite `src/types/cms.ts` to new camelCase shapes
