@@ -10,11 +10,11 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 1:** `bun run lint && bun run build && bun test src/config/env.validation.spec.ts src/bootstrap/configure-app.spec.ts` green — commit
 
 ## Phase 2 — `configureCors` wiring + test coverage
-- [ ] `docs/documents/bootstrap-cors-techstack.md` (new) — single-delegate vs. two-middleware comparison table + `cors`-source evidence + `/health` fallthrough note
-- [ ] `configure-app.ts` — `configureCors(app, configService)`: single `CorsOptionsDelegate<Request>` branching on `req.path.startsWith("/api/v1/public/documents/")` → open/no-credentials, else → strict allowlist/credentials; wired into `configureApp` after `trust proxy` line
-- [ ] `configure-app.spec.ts` sub-step 1 (do first): update `ConfigService` mock in both existing describe blocks to return `CORS_ORIGINS` — breaks every existing test otherwise
-- [ ] `configure-app.spec.ts` sub-step 2: synthesized `PublicDocumentsEchoController` + new `describe("configureApp CORS", ...)` — 4 cases (allowed origin credentialed; disallowed origin rejected; public-docs open+no-credentials; OPTIONS preflight)
-- [ ] **Checkpoint 2:** `bun run lint && bun run build && bun test` (full suite) green, no regression — commit
+- [x] `docs/documents/bootstrap-cors-techstack.md` (new) — single-delegate vs. two-middleware comparison table + `cors`-source evidence + `/health` fallthrough note
+- [x] `configure-app.ts` — `configureCors(app, configService)`: single delegate branching on `req.path.startsWith("/api/v1/public/documents/")` → open/no-credentials, else → strict allowlist/credentials; wired into `configureApp` after `trust proxy` line (used locally-defined types, not `@nestjs/common`'s unexported `CorsOptionsDelegate`/`CorsOptionsCallback`)
+- [x] `configure-app.spec.ts` sub-step 1 (do first): update `ConfigService` mock in both existing describe blocks to return `CORS_ORIGINS` — breaks every existing test otherwise
+- [x] `configure-app.spec.ts` sub-step 2: synthesized `PublicDocumentsEchoController` + new `describe("configureApp CORS", ...)` — 4 cases (allowed origin credentialed; disallowed origin rejected; public-docs open+no-credentials; OPTIONS preflight)
+- [x] **Checkpoint 2:** `bun run lint && bun run build && bun run test` (full suite) green, no regression — commit
 
 ## Phase 3 — Docs
 - [ ] `.env.example` — comment documenting `CORS_ORIGINS` format, example `http://localhost:3000`
