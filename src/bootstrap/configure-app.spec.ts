@@ -17,6 +17,7 @@ import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "@/common/guards/permissions.guard";
 
 import { configureApp, parseCorsOrigins, parseTrustProxy } from "./configure-app";
+import * as forceIpv4DnsModule from "./force-ipv4-dns";
 
 describe("parseCorsOrigins", () => {
   it("parses a single origin", () => {
@@ -140,6 +141,56 @@ class QueryEchoController {
     return query;
   }
 }
+
+describe("configureApp SMTP_FORCE_IPV4_DNS", () => {
+  let app: NestExpressApplication;
+  let forceIpv4DnsSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    forceIpv4DnsSpy = jest.spyOn(forceIpv4DnsModule, "forceIpv4Dns").mockImplementation(() => undefined);
+  });
+
+  afterEach(async () => {
+    forceIpv4DnsSpy.mockRestore();
+    await app.close();
+  });
+
+  async function buildApp(smtpForceIpv4Dns: unknown): Promise<NestExpressApplication> {
+    const module = await Test.createTestingModule({
+      controllers: [QueryEchoController],
+      providers: [
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              if (key === "TRUST_PROXY") return "1";
+              if (key === "CORS_ORIGINS") return "http://localhost:3000";
+              if (key === "SMTP_FORCE_IPV4_DNS") return smtpForceIpv4Dns;
+              return undefined;
+            }),
+          },
+        },
+      ],
+    }).compile();
+
+    const builtApp = module.createNestApplication<NestExpressApplication>();
+    configureApp(builtApp);
+    await builtApp.init();
+    return builtApp;
+  }
+
+  it("calls forceIpv4Dns when SMTP_FORCE_IPV4_DNS is enabled", async () => {
+    app = await buildApp(true);
+
+    expect(forceIpv4DnsSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips forceIpv4Dns when SMTP_FORCE_IPV4_DNS is disabled", async () => {
+    app = await buildApp(false);
+
+    expect(forceIpv4DnsSpy).not.toHaveBeenCalled();
+  });
+});
 
 describe("configureApp query parser", () => {
   let app: NestExpressApplication;

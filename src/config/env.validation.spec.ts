@@ -36,6 +36,7 @@ describe("validate", () => {
     expect(result.SMTP_USER).toBe("");
     expect(result.SMTP_PASSWORD).toBe("");
     expect(result.SMTP_SECURE).toBe(false);
+    expect(result.SMTP_FORCE_IPV4_DNS).toBe(true);
     expect(result.EMAIL_FROM).toBe("no-reply@example.com");
     expect(result.FRONTEND_URL).toBe("http://localhost:3000");
   });
@@ -92,6 +93,7 @@ describe("validate", () => {
       SMTP_USER: "user@example.com",
       SMTP_PASSWORD: "hunter2",
       SMTP_SECURE: "true",
+      SMTP_FORCE_IPV4_DNS: "false",
       EMAIL_FROM: "hello@abyssoftime.com",
       FRONTEND_URL: "https://abyssoftime.com",
     });
@@ -101,8 +103,13 @@ describe("validate", () => {
     expect(result.SMTP_USER).toBe("user@example.com");
     expect(result.SMTP_PASSWORD).toBe("hunter2");
     expect(result.SMTP_SECURE).toBe(true);
+    expect(result.SMTP_FORCE_IPV4_DNS).toBe(false);
     expect(result.EMAIL_FROM).toBe("hello@abyssoftime.com");
     expect(result.FRONTEND_URL).toBe("https://abyssoftime.com");
+  });
+
+  it("rejects a SMTP_FORCE_IPV4_DNS value that isn't 'true'/'false'/a boolean", () => {
+    expect(() => validate({ ...requiredConfig, SMTP_FORCE_IPV4_DNS: "yes" })).toThrow();
   });
 
   it("falls back to defaults when the numeric fields are present but explicitly undefined", () => {

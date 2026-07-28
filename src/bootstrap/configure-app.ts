@@ -8,6 +8,8 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { type EnvironmentVariables } from "@/config/env.validation";
 
+import { forceIpv4Dns } from "./force-ipv4-dns";
+
 const API_VERSION = "0.0.1";
 
 // setGlobalPrefix only rewrites controller route strings — CORS middleware runs ahead of the Nest
@@ -82,6 +84,11 @@ export function configureApp(app: NestExpressApplication): void {
   app.use(cookieParser());
 
   const configService: ConfigService<EnvironmentVariables, true> = app.get(ConfigService);
+
+  if (configService.get("SMTP_FORCE_IPV4_DNS", { infer: true })) {
+    forceIpv4Dns();
+  }
+
   const trustProxy = configService.get("TRUST_PROXY", { infer: true });
   app.set("trust proxy", parseTrustProxy(trustProxy));
 
