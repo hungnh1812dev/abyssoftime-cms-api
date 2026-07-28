@@ -36,6 +36,7 @@ export interface CompleteVerificationRoles {
 export interface IUserRepository {
   findAll(): Promise<UserEntity[]>;
   findById(documentId: string): Promise<UserEntity | null>;
+  findByIds(documentIds: string[]): Promise<UserEntity[]>;
   findByEmail(email: string): Promise<UserEntity | null>;
   findByUsername(username: string): Promise<UserEntity | null>;
   findByResetTokenHash(resetTokenHash: string): Promise<UserEntity | null>;
