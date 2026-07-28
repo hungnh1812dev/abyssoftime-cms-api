@@ -109,6 +109,18 @@ export class EnvironmentVariables {
   @IsIn([true, false])
   SMTP_SECURE: boolean = false;
 
+  // Patches Node's DNS resolver to skip AAAA records so SMTP always connects over IPv4. Works
+  // around ISPs that advertise unreachable IPv6 routes to mail providers (EHOSTUNREACH). Disable
+  // if this host's IPv6 connectivity is known-good. See bootstrap/force-ipv4-dns.ts.
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === undefined) return true;
+    if (value === "true") return true;
+    if (value === "false") return false;
+    return value;
+  })
+  @IsIn([true, false])
+  SMTP_FORCE_IPV4_DNS: boolean = true;
+
   @IsString()
   @MinLength(1)
   EMAIL_FROM: string = "no-reply@example.com";
