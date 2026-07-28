@@ -9,13 +9,16 @@ import { renderWithProviders } from "@/test-utils";
 
 let mock: MockAdapter;
 
-const emptyTokenList = { items: [], total: 0, page: 1, limit: 20 };
-const contentTypesResponse = [{ ID: "ct-1", Name: "Blog Posts", Slug: "blog-posts", Kind: "collection" }];
+const permissionsResponse = [
+  { documentId: "p1", slug: "document:read", name: "Read Documents", description: "" },
+  { documentId: "p2", slug: "document:create", name: "Create Documents", description: "" },
+  { documentId: "p3", slug: "media:read", name: "Read Media", description: "" },
+];
 
 beforeEach(() => {
   mock = new MockAdapter(api);
-  mock.onGet("/api/access-tokens?page=1&limit=20").reply(200, emptyTokenList);
-  mock.onGet("/api/content-types").reply(200, contentTypesResponse);
+  mock.onGet("/access-tokens").reply(200, []);
+  mock.onGet("/permissions").reply(200, permissionsResponse);
 });
 
 afterEach(() => {
@@ -31,142 +34,112 @@ async function openCreateDialog() {
   return user;
 }
 
-describe("AccessTokensPage — permission popup", () => {
-  it("renders all 6 Documents action checkboxes using the final vocabulary", async () => {
+describe("AccessTokensPage — create dialog uses the shared permission catalog", () => {
+  it("renders the permission tree grouped by resource, from the live catalog", async () => {
     await openCreateDialog();
     await waitFor(() => {
-      expect(screen.getByText("Read")).toBeInTheDocument();
-      expect(screen.getByText("Create")).toBeInTheDocument();
-      expect(screen.getByText("Update")).toBeInTheDocument();
-      expect(screen.getByText("Delete")).toBeInTheDocument();
-      expect(screen.getByText("Publish")).toBeInTheDocument();
-      expect(screen.getByText("Unpublish")).toBeInTheDocument();
+      expect(screen.getByText("Read Documents")).toBeInTheDocument();
+      expect(screen.getByText("Create Documents")).toBeInTheDocument();
+      expect(screen.getByText("Read Media")).toBeInTheDocument();
     });
   });
 
-  it("the per-content-type sub-list is visible by default and disappears once Read (all types) is checked", async () => {
+  it("allows creating a token with zero permissions selected", async () => {
+    mock.onPost("/access-tokens").reply(201, { documentId: "t1", name: "My Token", permissions: [], expiresAt: null, createdAt: "", updatedAt: "", updatedBy: null, token: "plaintext" });
     const user = await openCreateDialog();
-    await waitFor(() => expect(screen.getByText("Blog Posts")).toBeInTheDocument());
+    await waitFor(() => screen.getByLabelText("Name"));
+    await user.type(screen.getByLabelText("Name"), "My Token");
+    await user.click(screen.getByRole("button", { name: /create token/i }));
 
-    await user.click(screen.getByText("Read"));
-    await waitFor(() => expect(screen.queryByText("Blog Posts")).not.toBeInTheDocument());
+    await waitFor(() => expect(mock.history.post).toHaveLength(1));
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({ name: "My Token", permissions: [], expiresIn: "never" });
   });
 
-  it("Create/Update/Delete/Publish/Unpublish never show a per-type sub-list (only Read does)", async () => {
-    const user = await openCreateDialog();
-    // Read's own per-type list is visible by default (Read unchecked) — hide it first.
-    await waitFor(() => screen.getByText("Read"));
-    await user.click(screen.getByText("Read"));
-    await waitFor(() => expect(screen.queryByText("Blog Posts")).not.toBeInTheDocument());
-
-    // Checking Create must not independently reveal a per-type list of its own.
-    await user.click(screen.getByText("Create"));
-    expect(screen.queryByText("Blog Posts")).not.toBeInTheDocument();
-  });
-
-  it("checking Read produces the document:read scope", async () => {
+  it("submits the selected permission slugs and expiresIn on create", async () => {
     mock
-      .onPost("/api/access-tokens")
-      .reply(201, { id: "t1", name: "My Token", prefix: "abcdef", scopes: ["document:read"], expiresAt: null, createdAt: "", token: "plaintext-token" });
+      .onPost("/access-tokens")
+      .reply(201, { documentId: "t1", name: "My Token", permissions: ["document:read"], expiresAt: null, createdAt: "", updatedAt: "", updatedBy: null, token: "plaintext-token" });
 
     const user = await openCreateDialog();
     await waitFor(() => screen.getByLabelText("Name"));
     await user.type(screen.getByLabelText("Name"), "My Token");
-    await user.click(screen.getByText("Read"));
-    await user.click(screen.getByText("Create Token"));
 
-    await waitFor(() => {
-      expect(mock.history.post).toHaveLength(1);
-    });
-    const body = JSON.parse(mock.history.post[0].data);
-    expect(body.scopes).toEqual(["document:read"]);
+    const readCheckbox = screen.getByText("Read Documents").closest("label")?.querySelector("input") as HTMLInputElement;
+    await user.click(readCheckbox);
+    await user.click(screen.getByRole("button", { name: /create token/i }));
+
+    await waitFor(() => expect(mock.history.post).toHaveLength(1));
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({ name: "My Token", permissions: ["document:read"], expiresIn: "never" });
   });
 
-  it("checking Create produces the document:create scope", async () => {
+  it("shows the plaintext token once after creation", async () => {
     mock
-      .onPost("/api/access-tokens")
-      .reply(201, { id: "t1", name: "My Token", prefix: "abcdef", scopes: ["document:create"], expiresAt: null, createdAt: "", token: "plaintext-token" });
+      .onPost("/access-tokens")
+      .reply(201, { documentId: "t1", name: "My Token", permissions: [], expiresAt: null, createdAt: "", updatedAt: "", updatedBy: null, token: "plaintext-token" });
 
     const user = await openCreateDialog();
     await waitFor(() => screen.getByLabelText("Name"));
     await user.type(screen.getByLabelText("Name"), "My Token");
-    await user.click(screen.getByText("Create"));
-    await user.click(screen.getByText("Create Token"));
+    await user.click(screen.getByRole("button", { name: /create token/i }));
 
-    await waitFor(() => {
-      expect(mock.history.post).toHaveLength(1);
-    });
-    const body = JSON.parse(mock.history.post[0].data);
-    expect(body.scopes).toEqual(["document:create"]);
+    await waitFor(() => expect(screen.getByText("plaintext-token")).toBeInTheDocument());
   });
 
-  it("renders Media (media:read) and Content Types (content_types:read) checkboxes under Other", async () => {
+  it("Create button stays disabled until a name is entered", async () => {
     await openCreateDialog();
-    await waitFor(() => {
-      expect(screen.getByText("Media assets")).toBeInTheDocument();
-      expect(screen.getByText("Content type definitions")).toBeInTheDocument();
-    });
+    await waitFor(() => screen.getByRole("button", { name: /create token/i }));
+    expect(screen.getByRole("button", { name: /create token/i })).toBeDisabled();
   });
+});
 
-  it("checking Media produces the media:read scope", async () => {
-    mock
-      .onPost("/api/access-tokens")
-      .reply(201, { id: "t1", name: "My Token", prefix: "abcdef", scopes: ["media:read"], expiresAt: null, createdAt: "", token: "plaintext-token" });
-
-    const user = await openCreateDialog();
-    await waitFor(() => screen.getByLabelText("Name"));
-    await user.type(screen.getByLabelText("Name"), "My Token");
-    await user.click(screen.getByText("Media assets"));
-    await user.click(screen.getByText("Create Token"));
-
-    await waitFor(() => expect(mock.history.post).toHaveLength(1));
-    const body = JSON.parse(mock.history.post[0].data);
-    expect(body.scopes).toEqual(["media:read"]);
-  });
-
-  it("checking Content Types produces the content_types:read scope (underscore, not hyphen)", async () => {
-    mock
-      .onPost("/api/access-tokens")
-      .reply(201, { id: "t1", name: "My Token", prefix: "abcdef", scopes: ["content_types:read"], expiresAt: null, createdAt: "", token: "plaintext-token" });
-
-    const user = await openCreateDialog();
-    await waitFor(() => screen.getByLabelText("Name"));
-    await user.type(screen.getByLabelText("Name"), "My Token");
-    await user.click(screen.getByText("Content type definitions"));
-    await user.click(screen.getByText("Create Token"));
-
-    await waitFor(() => expect(mock.history.post).toHaveLength(1));
-    const body = JSON.parse(mock.history.post[0].data);
-    expect(body.scopes).toEqual(["content_types:read"]);
-  });
-
-  it("Create button stays disabled until a name is entered and at least one scope is selected", async () => {
-    const user = await openCreateDialog();
-    await waitFor(() => screen.getByText("Create Token"));
-
-    expect(screen.getByText("Create Token").closest("button")).toBeDisabled();
-
-    await user.type(screen.getByLabelText("Name"), "My Token");
-    expect(screen.getByText("Create Token").closest("button")).toBeDisabled();
-
-    await user.click(screen.getByText("Create"));
-    expect(screen.getByText("Create Token").closest("button")).not.toBeDisabled();
-  });
-
-  it("renders scope badges in the token list using the final-vocabulary labels", async () => {
-    mock.onGet("/api/access-tokens?page=1&limit=20").reply(200, {
-      items: [{ id: "t1", name: "Existing", prefix: "abcdef", scopes: ["document:read", "media:read", "content_types:read"], expiresAt: null, lastUsedAt: null, createdAt: "" }],
-      total: 1,
-      page: 1,
-      limit: 20,
-    });
-
+describe("AccessTokensPage — token list", () => {
+  it("renders permission badges using catalog names, not raw slugs", async () => {
+    mock.onGet("/access-tokens").reply(200, [
+      { documentId: "t1", name: "Existing", permissions: ["document:read", "media:read"], expiresAt: null, createdAt: "", updatedAt: "", updatedBy: null },
+    ]);
     renderWithProviders(<AccessTokensPage />);
 
     await waitFor(() => {
       expect(screen.getByText("Read Documents")).toBeInTheDocument();
-      expect(screen.getByText("Media")).toBeInTheDocument();
-      expect(screen.getByText("Content Types")).toBeInTheDocument();
+      expect(screen.getByText("Read Media")).toBeInTheDocument();
+      expect(screen.queryByText("document:read")).not.toBeInTheDocument();
     });
+  });
+
+  it("shows a new plaintext token once after Revoke", async () => {
+    mock.onGet("/access-tokens").reply(200, [{ documentId: "t1", name: "Existing", permissions: [], expiresAt: null, createdAt: "", updatedAt: "", updatedBy: null }]);
+    mock.onPost("/access-tokens/t1/revoke").reply(200, {
+      documentId: "t1",
+      name: "Existing",
+      permissions: [],
+      expiresAt: null,
+      createdAt: "",
+      updatedAt: "",
+      updatedBy: null,
+      token: "rotated-plaintext-token",
+    });
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithProviders(<AccessTokensPage />);
+
+    await waitFor(() => screen.getByText("Existing"));
+    await user.click(screen.getByRole("button", { name: /revoke/i }));
+
+    await waitFor(() => expect(screen.getByText("rotated-plaintext-token")).toBeInTheDocument());
+    confirmSpy.mockRestore();
+  });
+
+  it("deletes a token on Delete", async () => {
+    mock.onGet("/access-tokens").reply(200, [{ documentId: "t1", name: "Existing", permissions: [], expiresAt: null, createdAt: "", updatedAt: "", updatedBy: null }]);
+    mock.onDelete("/access-tokens/t1").reply(204);
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithProviders(<AccessTokensPage />);
+
+    await waitFor(() => screen.getByText("Existing"));
+    await user.click(screen.getByRole("button", { name: /delete/i }));
+
+    await waitFor(() => expect(mock.history.delete).toHaveLength(1));
+    confirmSpy.mockRestore();
   });
 });

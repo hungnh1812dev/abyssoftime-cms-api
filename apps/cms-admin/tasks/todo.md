@@ -25,9 +25,9 @@ each task completes.
 - [x] **Checkpoint 3** — 343/343 tests, lint, build green; curl-verified `GET /users`/`GET /roles` shapes against real backend match hook types exactly; commit
 
 ## Phase 3 — Access Tokens Rebuild
-- [ ] 3.1 Rewrite `useAccessTokens.ts` (unpaginated, new shapes, `expiresIn`, revoke hook)
-- [ ] 3.2 Rebuild `AccessTokensPage` scope picker on shared `PermissionTree`
-- [ ] **Checkpoint 4** — test/lint/build green; live create/revoke/delete token walkthrough; commit
+- [x] 3.1 Rewrite `useAccessTokens.ts` (unpaginated, new shapes, `expiresIn`, revoke hook)
+- [x] 3.2 Rebuild `AccessTokensPage` scope picker on shared `PermissionTree`
+- [x] **Checkpoint 4** — 345/345 tests, lint, build green; curl-verified create/revoke (secret rotates)/delete against real backend; fixed a pre-existing Select-portal test flake surfaced under load; commit
 
 ## Phase 4 — Hide Locale Route & Nav
 - [ ] 4.1 Remove locale route + nav entry; confirm orphaned locale files still typecheck

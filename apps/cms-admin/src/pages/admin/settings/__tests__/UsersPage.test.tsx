@@ -99,7 +99,7 @@ describe("UsersPage — dynamic role hierarchy (canManage gating)", () => {
     const bobRow = screen.getByText("Bob Editor").closest("tr")!;
     await user.click(bobRow.querySelector("[role='combobox']")!);
 
-    expect(screen.getByRole("option", { name: "Editor" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("option", { name: "Editor" })).toBeInTheDocument());
     expect(screen.getByRole("option", { name: "Guest" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Super Admin" })).not.toBeInTheDocument();
   });
@@ -116,7 +116,8 @@ describe("UsersPage — dynamic role hierarchy (canManage gating)", () => {
 
     const bobRow = screen.getByText("Bob Editor").closest("tr")!;
     await user.click(bobRow.querySelector("[role='combobox']")!);
-    await user.click(screen.getByRole("option", { name: "Guest" }));
+    const guestOption = await screen.findByRole("option", { name: "Guest" });
+    await user.click(guestOption);
 
     await waitFor(() => expect(capturedBody).toEqual({ roleId: "r3" }));
   });
