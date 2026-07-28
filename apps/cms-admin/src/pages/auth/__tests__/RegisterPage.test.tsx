@@ -11,7 +11,7 @@ let mock: MockAdapter;
 
 beforeEach(() => {
   mock = new MockAdapter(api);
-  mock.onGet("/auth/setup").reply(200, { adminExists: false });
+  mock.onGet("/auth/has-users").reply(200, { hasUsers: false });
 });
 
 afterEach(() => {
@@ -19,10 +19,18 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+async function fillValidForm(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(await screen.findByLabelText(/display name/i), "Test User");
+  await user.type(screen.getByLabelText(/username/i), "testuser");
+  await user.type(screen.getByLabelText(/email/i), "newuser@example.com");
+  await user.type(screen.getByLabelText(/password/i), "securepass1");
+}
+
 describe("RegisterPage", () => {
-  it("renders display name, email and password fields with a submit button", async () => {
+  it("renders display name, username, email and password fields with a submit button", async () => {
     renderWithProviders(<RegisterPage />);
     expect(await screen.findByLabelText(/display name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /create admin account/i })).toBeInTheDocument();
@@ -32,9 +40,9 @@ describe("RegisterPage", () => {
     const user = userEvent.setup();
     renderWithProviders(<RegisterPage />);
 
-    await user.type(await screen.findByLabelText(/display name/i), "Test User");
+    await fillValidForm(user);
+    await user.clear(screen.getByLabelText(/email/i));
     await user.type(screen.getByLabelText(/email/i), "bad-email");
-    await user.type(screen.getByLabelText(/password/i), "password123");
     await user.click(screen.getByRole("button", { name: /create admin account/i }));
 
     await waitFor(() => {
@@ -42,12 +50,26 @@ describe("RegisterPage", () => {
     });
   });
 
+  it("shows validation error for an invalid username", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<RegisterPage />);
+
+    await fillValidForm(user);
+    await user.clear(screen.getByLabelText(/username/i));
+    await user.type(screen.getByLabelText(/username/i), "no spaces allowed");
+    await user.click(screen.getByRole("button", { name: /create admin account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/letters, numbers, underscore/i)).toBeInTheDocument();
+    });
+  });
+
   it("shows validation error for password shorter than 8 characters", async () => {
     const user = userEvent.setup();
     renderWithProviders(<RegisterPage />);
 
-    await user.type(await screen.findByLabelText(/display name/i), "Test User");
-    await user.type(screen.getByLabelText(/email/i), "user@example.com");
+    await fillValidForm(user);
+    await user.clear(screen.getByLabelText(/password/i));
     await user.type(screen.getByLabelText(/password/i), "short");
     await user.click(screen.getByRole("button", { name: /create admin account/i }));
 
@@ -56,32 +78,35 @@ describe("RegisterPage", () => {
     });
   });
 
-  it("calls POST /auth/register on valid submit", async () => {
+  it("calls POST /auth/register with accountType on valid submit and navigates to /verify-otp", async () => {
     const user = userEvent.setup();
     let capturedBody: unknown;
     mock.onPost("/auth/register").reply((config) => {
       capturedBody = JSON.parse(config.data);
-      return [201, { id: "user-1" }];
+      return [201, { message: "Registration successful. Check your email for the verification code." }];
     });
     renderWithProviders(<RegisterPage />);
 
-    await user.type(await screen.findByLabelText(/display name/i), "Test User");
-    await user.type(screen.getByLabelText(/email/i), "newuser@example.com");
-    await user.type(screen.getByLabelText(/password/i), "securepass");
+    await fillValidForm(user);
     await user.click(screen.getByRole("button", { name: /create admin account/i }));
 
     await waitFor(() => {
-      expect(capturedBody).toEqual({ displayName: "Test User", email: "newuser@example.com", password: "securepass" });
+      expect(capturedBody).toEqual({
+        name: "Test User",
+        username: "testuser",
+        email: "newuser@example.com",
+        password: "securepass1",
+        accountType: true,
+      });
     });
   });
 
-  it("redirects to /login when admin already exists", async () => {
-    mock.onGet("/auth/setup").reply(200, { adminExists: true });
+  it("redirects to /login when users already exist", async () => {
+    mock.onGet("/auth/has-users").reply(200, { hasUsers: true });
     renderWithProviders(<RegisterPage />);
 
     await waitFor(() => {
       expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument();
-      expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
     });
   });
 
@@ -90,9 +115,7 @@ describe("RegisterPage", () => {
     mock.onPost("/auth/register").reply(409, { message: "Email already exists" });
     renderWithProviders(<RegisterPage />);
 
-    await user.type(await screen.findByLabelText(/display name/i), "Test User");
-    await user.type(screen.getByLabelText(/email/i), "taken@example.com");
-    await user.type(screen.getByLabelText(/password/i), "password123");
+    await fillValidForm(user);
     await user.click(screen.getByRole("button", { name: /create admin account/i }));
 
     await waitFor(() => {

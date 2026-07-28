@@ -3,8 +3,11 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/pages/admin/layout/AdminLayout";
+import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
+import { ResetPasswordPage } from "@/pages/auth/ResetPasswordPage";
+import { VerifyOtpPage } from "@/pages/auth/VerifyOtpPage";
 
 import { AdminPage } from "./pages/admin/AdminPage";
 
@@ -56,12 +59,6 @@ const InternationalizePage = lazy(() =>
   })),
 );
 
-const InviteAcceptPage = lazy(() =>
-  import("@/pages/auth/InviteAcceptPage").then((module) => ({
-    default: module.InviteAcceptPage,
-  })),
-);
-
 function PanelFallback() {
   return <div className="text-muted-foreground p-4">Loading…</div>;
 }
@@ -80,14 +77,9 @@ export function AppRouter() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
-      <Route
-        path="/invite/:token"
-        element={
-          <Suspense fallback={<PanelFallback />}>
-            <InviteAcceptPage />
-          </Suspense>
-        }
-      />
+      <Route path="/verify-otp" element={<VerifyOtpPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         path="/403"
         element={

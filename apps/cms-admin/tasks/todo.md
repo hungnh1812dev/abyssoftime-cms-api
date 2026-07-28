@@ -12,10 +12,10 @@ each task completes.
 - [x] 1.3 `ProtectedRoute` → `minLevel`; delete dead `AdminRoute.tsx`
 - [x] 1.4 `LoginPage` + `router.tsx` role-level constants
 - [x] **Checkpoint 1** — test/lint/build green; curl-verified against real backend (no browser tool available in this environment — see summary); commit
-- [ ] 1.5 `RegisterPage` (+ username/accountType) + new `VerifyOtpPage`
-- [ ] 1.6 New `ForgotPasswordPage` + `ResetPasswordPage`
-- [ ] 1.7 Remove invite flow entirely (delete files + strip UsersPage block)
-- [ ] **Checkpoint 2** — test/lint/build green; live full-auth walkthrough; commit
+- [x] 1.5 `RegisterPage` (+ username/accountType) + new `VerifyOtpPage`
+- [x] 1.6 New `ForgotPasswordPage` + `ResetPasswordPage`
+- [x] 1.7 Remove invite flow entirely (delete files + strip UsersPage block)
+- [x] **Checkpoint 2** — test/lint/build green (331 tests); curl-verified register/verify/login/forgot-password against real backend; `/invite/:token` route removed (static check, no browser tool available); commit
 
 ## Phase 2 — Dynamic Roles, Permissions & Users
 - [ ] 2.1 Delete `lib/roles.ts`; rewrite `useRoles.ts`/`usePermissions.ts` paths
