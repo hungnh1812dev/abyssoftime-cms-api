@@ -1,5 +1,6 @@
 import { quoteIdent } from "@/modules/content-type/application/schema/sql-identifier";
 import { FieldDefinition, FieldType } from "@/modules/content-type/domain/entities/field-definition";
+import { FilterOperator, ParsedFilter } from "@/modules/document/domain/entities/filter";
 
 export class InvalidOrderByFieldError extends Error {
   constructor(field: string) {
@@ -33,13 +34,7 @@ export function buildSearchWhere(search: string | undefined, searchableColumns: 
   return { sql: `(${clause})`, params: [`%${escapeSearchValue(search)}%`] };
 }
 
-export type FilterOperator = "$eq" | "$ne" | "$contains" | "$gt" | "$gte" | "$lt" | "$lte";
-
-export interface ParsedFilter {
-  column: string;
-  operator: FilterOperator;
-  value: string | number | boolean;
-}
+export type { FilterOperator, ParsedFilter };
 
 const SQL_COMPARATOR_BY_OPERATOR: Record<Exclude<FilterOperator, "$contains">, string> = {
   $eq: "=",

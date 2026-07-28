@@ -4,7 +4,7 @@ import { BadRequestException } from "@nestjs/common";
 
 import { FieldDefinition } from "@/modules/content-type/domain/entities/field-definition";
 
-import { parseFilters } from "./filter-query.parser";
+import { FilterQueryParams, parseFilters } from "./filter-query.parser";
 
 describe("parseFilters", () => {
   const FIELDS: FieldDefinition[] = [
@@ -101,5 +101,15 @@ describe("parseFilters", () => {
 
   it("rejects an unparseable date for a timestamp system column", () => {
     expect(() => parseFilters(buildContentType(), { updated_at: { $gt: "not-a-date" } })).toThrow(BadRequestException);
+  });
+
+  it("rejects a non-string (array) value even when it would otherwise coerce, e.g. via a repeated query param", () => {
+    const rawFilters = { created_at: { $gte: ["2024-01-01T00:00:00.000Z"] } } as unknown as FilterQueryParams;
+    expect(() => parseFilters(buildContentType(), rawFilters)).toThrow(BadRequestException);
+  });
+
+  it("rejects a non-string (object) value for a text field", () => {
+    const rawFilters = { wordGroup: { $eq: { nested: "x" } } } as unknown as FilterQueryParams;
+    expect(() => parseFilters(buildContentType(), rawFilters)).toThrow(BadRequestException);
   });
 });

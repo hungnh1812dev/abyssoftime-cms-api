@@ -101,7 +101,29 @@ See `tasks/plan.md` for full context, approach, and confirmed decisions.
       documented "36 paths, 47 operations" count is unchanged. The param itself is already
       documented via `ListQueryDto`'s own `@ApiPropertyOptional` (visible in the generated
       `/api-docs-json`), which is the mechanism this file describes rather than duplicates.
-- [ ] **Checkpoint 3 (final):** `bun run build && bun run test:cov && bun run test:e2e && bun run
-      lint` all green; five-axis code review (`agent-skills:code-reviewer`) over the full diff — fix
-      or explicitly defer findings with reasoning; `SPEC.md` trimmed to a one-line pointer at
-      `docs/documents/document.md`, per "Root docs" rule; confirm final commit(s) with user
+- [x] **Checkpoint 3 (final):** `bun run build && bun run test:cov && bun run test:e2e && bun run
+      lint` all green (676 unit tests/117 suites, 22 e2e tests/3 suites — one pre-existing, unrelated
+      1ms timestamp flake in `bulk-create-publish.service.spec.ts` reproduced and confirmed to pass
+      on retry, not a regression; `main.ts`'s pre-existing `no-floating-promises` lint warning is the
+      only lint output, matching baseline). Five-axis code review
+      (`agent-skills:code-reviewer`) over the full diff (`5c9afe5..HEAD`) found two Important issues,
+      both fixed:
+      1. `filter-query.parser.ts`'s `coerceValue` never confirmed a filter value was actually a
+         string — `qs`'s "extended" parser (the very parser this diff turns on globally) can hand it
+         an array/object for `text`/`document_id`/timestamp filters, which then flowed through
+         unvalidated and could produce an unhandled `500` instead of the documented "always `400` on
+         bad input" guarantee. Fixed with a single `typeof rawValue !== "string"` check right after
+         destructuring the operator/value pair, before any class-specific coercion runs; two new RED→
+         GREEN test cases added (array value on a timestamp column, object value on a text field).
+      2. `domain/repositories/document.repository.ts` imported `ParsedFilter` from
+         `infrastructure/persistence/sql/where-builder.ts` — the only domain→infrastructure import in
+         the codebase, an unprecedented boundary violation. Fixed by moving `FilterOperator`/
+         `ParsedFilter` into a new `domain/entities/filter.ts` (mirroring `field-definition.ts`'s
+         existing "plain types live in `domain/entities`" precedent); `where-builder.ts` now imports
+         and re-exports them from there instead of defining them itself, so every other existing
+         import site (`filter-query.parser.ts`, `where-builder.spec.ts`) needed no change.
+      A Suggestion-level finding (`$ne` excludes `NULL` rows under standard SQL three-valued logic,
+      undocumented) was addressed by adding a short caveat to `docs/documents/document.md`'s "List
+      query parsing" section rather than a code change, since it's correct existing SQL semantics,
+      not a bug. `SPEC.md` trimmed to a one-line pointer at `docs/documents/document.md`, per "Root
+      docs" rule. Confirmed with user before the final commit.
