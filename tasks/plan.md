@@ -81,11 +81,11 @@ vulnerability class, not just a compatibility nuisance.
 - [x] **Checkpoint 2:** `bun run lint && bun run build && bun run test` (full suite) green, no regression vs. the pre-existing test count. Automatically verifiable → commit here. (One known pre-existing flake reproduced: `bulk-create-publish.service.spec.ts`'s 1ms timestamp comparison, same one documented in `docs/documents/swagger.md` — unrelated to this change, retried and passed.)
 
 ### Phase 3 — Docs
-- [ ] `.env.example` — add a comment above the blank `CORS_ORIGINS=` line: comma-separated exact origins, no wildcards, example `http://localhost:3000`
-- [ ] `docs/documents/cors.md` (new) — the two policies, the single-delegate mechanism and why (summarizing the techstack doc), the `/health` fallthrough note, the `CORS_ORIGINS` contract
-- [ ] `docs/ENTRYPOINT.md` — add one bullet for `docs/documents/cors.md`, matching existing entry style
-- [ ] `docs/cms-admin-integration.md` — §1: replace the "CORS is not configured" paragraph with the real policy + how to get an origin added; §7: remove the now-resolved "CORS is not configured" bullet from "Known gaps"
-- [ ] **Checkpoint 3:** doc read-through — no section still says CORS is unconfigured; automated checks (`bun run lint && bun run build && bun test`) unchanged from Checkpoint 2 — commit.
+- [x] `.env.example` — add a comment above the blank `CORS_ORIGINS=` line: comma-separated exact origins, no wildcards, example `http://localhost:3000`
+- [x] `docs/documents/cors.md` (new) — the two policies, the single-delegate mechanism and why (summarizing the techstack doc), the `/health` fallthrough note, the `CORS_ORIGINS` contract
+- [x] `docs/ENTRYPOINT.md` — add one bullet for `docs/documents/cors.md`, matching existing entry style
+- [x] `docs/cms-admin-integration.md` — §1: replace the "CORS is not configured" paragraph with the real policy + how to get an origin added; §7: remove the now-resolved "CORS is not configured" bullet from "Known gaps"
+- [x] **Checkpoint 3:** doc read-through — no section still says CORS is unconfigured; automated checks (`bun run lint && bun run build && bun run test`) unchanged from Checkpoint 2 — commit.
 
 ### Phase 4 — Five-axis code review (Opus) + fixes + `SPEC.md` trim + close-out
 - [ ] **Run the review on Opus** — `[CAREFUL]` mandates Opus for the Review phase; switch to / invoke Opus for this step (e.g. `agent-skills:code-reviewer`)

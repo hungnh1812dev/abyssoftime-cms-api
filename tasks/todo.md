@@ -17,11 +17,11 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 2:** `bun run lint && bun run build && bun run test` (full suite) green, no regression — commit
 
 ## Phase 3 — Docs
-- [ ] `.env.example` — comment documenting `CORS_ORIGINS` format, example `http://localhost:3000`
-- [ ] `docs/documents/cors.md` (new) — two policies, single-delegate mechanism + why, `/health` note, env contract
-- [ ] `docs/ENTRYPOINT.md` — add bullet for `docs/documents/cors.md`
-- [ ] `docs/cms-admin-integration.md` — §1 real policy + how to get an origin added; §7 remove resolved gap
-- [ ] **Checkpoint 3:** doc read-through, no stale "CORS not configured" mentions — commit
+- [x] `.env.example` — comment documenting `CORS_ORIGINS` format, example `http://localhost:3000`
+- [x] `docs/documents/cors.md` (new) — two policies, single-delegate mechanism + why, `/health` note, env contract
+- [x] `docs/ENTRYPOINT.md` — add bullet for `docs/documents/cors.md`
+- [x] `docs/cms-admin-integration.md` — §1 real policy + how to get an origin added; §7 remove resolved gap
+- [x] **Checkpoint 3:** doc read-through, no stale "CORS not configured" mentions — commit
 
 ## Phase 4 — Five-axis review (Opus) + fixes + `SPEC.md` trim + close-out
 - [ ] Run the review on **Opus** (`[CAREFUL]` requires it)
