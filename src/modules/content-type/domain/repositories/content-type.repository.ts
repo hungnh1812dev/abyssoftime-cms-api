@@ -13,6 +13,7 @@ export interface UpsertContentTypeData {
 export interface IContentTypeRepository {
   create(data: UpsertContentTypeData): Promise<ContentTypeEntity>;
   update(slug: string, data: UpsertContentTypeData): Promise<ContentTypeEntity>;
+  updateListFields(slug: string, listFields: string[]): Promise<ContentTypeEntity>;
   delete(slug: string): Promise<void>;
   findBySlug(slug: string): Promise<ContentTypeEntity | null>;
   findAll(): Promise<ContentTypeEntity[]>;

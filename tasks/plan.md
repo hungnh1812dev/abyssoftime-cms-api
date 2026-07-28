@@ -69,7 +69,7 @@ Tasks 1, 2, 3 have no dependencies on each other. Task 7 is the integration poin
       `PrismaUserRepository` (`prisma.user.findMany({ where: { documentId: { in: ids } } })`). Empty input →
       `[]`, no query.
       - Verify: empty-input short-circuit, partial matches, no assumed result ordering.
-- [ ] **Task 3:** `prisma/postgresql/schema.prisma` — add `listFieldsOverride Json? @map("list_fields_override")`
+- [x] **Task 3:** `prisma/postgresql/schema.prisma` — add `listFieldsOverride Json? @map("list_fields_override")`
       to `ContentType`. New migration (`ALTER TABLE "content_types" ADD COLUMN "list_fields_override" JSONB;`).
       `content-type.repository.ts` — add `updateListFields(slug, listFields): Promise<ContentTypeEntity>` to
       `IContentTypeRepository` (narrow method, not routed through `update()`). `prisma-content-type.repository.ts`

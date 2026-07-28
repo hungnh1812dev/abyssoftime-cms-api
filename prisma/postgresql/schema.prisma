@@ -83,16 +83,17 @@ model MediaAsset {
 }
 
 model ContentType {
-    id             Int      @default(autoincrement())
-    documentId     String   @id @unique @default(uuid()) @map("document_id")
-    slug           String   @unique
-    name           String
-    kind           String
-    draftToPublish Boolean  @map("draft_to_publish")
-    fields         Json
-    listFields     Json     @map("list_fields")
-    createdAt      DateTime @default(now()) @map("created_at")
-    updatedAt      DateTime @updatedAt @map("updated_at")
+    id                 Int      @default(autoincrement())
+    documentId         String   @id @unique @default(uuid()) @map("document_id")
+    slug               String   @unique
+    name               String
+    kind               String
+    draftToPublish     Boolean  @map("draft_to_publish")
+    fields             Json
+    listFields         Json     @map("list_fields")
+    listFieldsOverride Json?    @map("list_fields_override")
+    createdAt          DateTime @default(now()) @map("created_at")
+    updatedAt          DateTime @updatedAt @map("updated_at")
 
     @@map("content_types")
 }

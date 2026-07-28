@@ -29,6 +29,7 @@ describe("PrismaContentTypeRepository", () => {
     draftToPublish: true,
     fields,
     listFields,
+    listFieldsOverride: null as unknown,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-02T00:00:00.000Z"),
   };
@@ -166,6 +167,46 @@ describe("PrismaContentTypeRepository", () => {
     expect(prisma.contentType.findMany).toHaveBeenCalledWith();
     expect(result).toHaveLength(1);
     expectMappedEntity(result[0]);
+  });
+
+  it("findBySlug() falls back to listFields when listFieldsOverride is null", async () => {
+    prisma.contentType.findUnique.mockResolvedValue({ ...record, listFieldsOverride: null });
+
+    const result = await repository.findBySlug("en-it-vocab");
+
+    expect(result!.listFields).toEqual(listFields);
+  });
+
+  it("findBySlug() prefers listFieldsOverride over listFields when both are present", async () => {
+    prisma.contentType.findUnique.mockResolvedValue({ ...record, listFieldsOverride: ["wordGroup", "updatedAt"] });
+
+    const result = await repository.findBySlug("en-it-vocab");
+
+    expect(result!.listFields).toEqual(["wordGroup", "updatedAt"]);
+  });
+
+  it("updateListFields() updates only listFieldsOverride and maps the merged record", async () => {
+    prisma.contentType.update.mockResolvedValue({ ...record, listFieldsOverride: ["wordGroup", "updatedAt"] });
+
+    const result = await repository.updateListFields("en-it-vocab", ["wordGroup", "updatedAt"]);
+
+    expect(prisma.contentType.update).toHaveBeenCalledWith({
+      where: { slug: "en-it-vocab" },
+      data: { listFieldsOverride: ["wordGroup", "updatedAt"] },
+    });
+    expect(result.listFields).toEqual(["wordGroup", "updatedAt"]);
+  });
+
+  it("updateListFields() translates a P2025 not-found error into ContentTypeNotFoundError", async () => {
+    prisma.contentType.update.mockRejectedValue(knownRequestError("P2025"));
+
+    await expect(repository.updateListFields("missing", ["wordGroup"])).rejects.toThrow(ContentTypeNotFoundError);
+  });
+
+  it("updateListFields() rethrows unrelated errors", async () => {
+    prisma.contentType.update.mockRejectedValue(new Error("db down"));
+
+    await expect(repository.updateListFields("en-it-vocab", ["wordGroup"])).rejects.toThrow("db down");
   });
 
   it("findAllSummaries() selects only name/slug/kind/draftToPublish", async () => {
