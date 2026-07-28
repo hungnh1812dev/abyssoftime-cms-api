@@ -41,6 +41,13 @@ export function parseCorsOrigins(raw: string): string[] {
 function configureCors(app: NestExpressApplication, configService: ConfigService<EnvironmentVariables, true>): void {
   const allowedOrigins = parseCorsOrigins(configService.get("CORS_ORIGINS", { infer: true }));
 
+  // env.validation only checks the raw string is non-empty; a value like "," parses to an empty
+  // array, which the `cors` package treats as deny-all rather than allow-all — safe, but silent.
+  // Fail loudly at boot instead of leaving every /api/v1/* request unexplainedly CORS-blocked.
+  if (allowedOrigins.length === 0) {
+    throw new Error("CORS_ORIGINS must contain at least one valid origin");
+  }
+
   function delegate(req: Request, callback: CorsOptionsCallback): void {
     if (req.path.startsWith(PUBLIC_DOCUMENTS_PATH_PREFIX)) {
       callback(null, { origin: true, credentials: false });
