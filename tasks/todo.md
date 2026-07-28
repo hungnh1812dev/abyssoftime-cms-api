@@ -18,8 +18,8 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 2 (Feature B core):** build/lint/test green — commit
 
 ## Phase 4 — Integration
-- [ ] Task 7 — `projectFields` sources system columns (incl. resolved `updatedBy`) instead of only `row.fields`
-- [ ] **Checkpoint 3 (final, full integration):** full test suite green; manual end-to-end walkthrough — commit
+- [x] Task 7 — `projectFields` sources system columns (incl. resolved `updatedBy`) instead of only `row.fields`
+- [x] **Checkpoint 3 (final, full integration):** full test suite green; manual end-to-end walkthrough — commit
 
 ## Phase 5 — Docs
 - [ ] `SPEC.md` trimmed to pointer
