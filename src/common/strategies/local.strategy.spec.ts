@@ -1,6 +1,6 @@
 import * as bcrypt from "bcryptjs";
 
-import { ForbiddenException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, UnauthorizedException } from "@nestjs/common";
 
 import { RoleEntity } from "@/modules/roles/domain/entities/role.entiry";
 import { type IRoleRepository } from "@/modules/roles/domain/repositories/role.repository";
@@ -36,6 +36,16 @@ describe("LocalStrategy", () => {
     users = { findByEmail: jest.fn() };
     roles = { findById: jest.fn() };
     strategy = new LocalStrategy(users as unknown as IUserRepository, roles as unknown as IRoleRepository);
+  });
+
+  it.each([
+    ["non-string password", email, 12345 as unknown as string],
+    ["non-string email", 12345 as unknown as string, password],
+    ["empty password", email, ""],
+    ["missing email", undefined as unknown as string, password],
+  ])("throws BadRequestException for %s (guards run before the ValidationPipe)", async (_case, badEmail, badPassword) => {
+    await expect(strategy.validate(badEmail, badPassword)).rejects.toThrow(BadRequestException);
+    expect(users.findByEmail).not.toHaveBeenCalled();
   });
 
   it("throws UnauthorizedException when no user matches the email", async () => {

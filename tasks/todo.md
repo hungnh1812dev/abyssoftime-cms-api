@@ -28,11 +28,11 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 3:** doc read-through — no section still describes the old hand-rolled guard/login — commit
 
 ## Phase 4 — Five-axis review (Opus) + fixes + `SPEC.md` trim + close-out
-- [ ] Run the review on **Opus** (`[CAREFUL]` requires it — don't run on Sonnet)
-- [ ] Five-axis review over the full cycle diff (message parity, timing mitigation, `req.user` shape, `TokenModule` untouched)
-- [ ] Fix Important/correctness findings; re-verify build/test/lint; record findings + resolutions
-- [ ] `SPEC.md` — trim to a one-line pointer at `docs/documents/auth.md` (+ techstack doc)
-- [ ] **Checkpoint 4 (final):** automated checks green after fixes; `SPEC.md` reduced to pointer — commit
+- [x] Run the review on **Opus** (`[CAREFUL]` requires it — don't run on Sonnet)
+- [x] Five-axis review over the full cycle diff (message parity, timing mitigation, `req.user` shape, `TokenModule` untouched)
+- [x] Fix Important/correctness findings; re-verify build/test/lint; record findings + resolutions — fixed the guards-before-pipes `LocalStrategy` input-validation gap (see `tasks/plan.md`)
+- [x] `SPEC.md` — trim to a one-line pointer at `docs/documents/auth.md` (+ techstack doc)
+- [x] **Checkpoint 4 (final):** automated checks green after fixes; `SPEC.md` reduced to pointer — commit
 
 ## Phase 5 — Manual verification (non-blocking for the Phase 2 commit)
 - [ ] User runs `bun run start:dev` against a real DB: login success (cookies set), wrong-password (401), unverified-user (403), one JWT-guarded route with/without a valid `access_token` cookie (200 vs 401 "Missing access token")
