@@ -5,6 +5,7 @@ import { ConfigService } from "@nestjs/config";
 import { PassportModule } from "@nestjs/passport";
 
 import { JwtStrategy } from "@/common/strategies/jwt.strategy";
+import { LocalStrategy } from "@/common/strategies/local.strategy";
 import { RoleModule } from "@/modules/roles/role.module";
 import { UserModule } from "@/modules/users/user.module";
 
@@ -55,6 +56,7 @@ describe("AuthModule", () => {
       ForgotPasswordService,
       ResetPasswordService,
       JwtStrategy,
+      LocalStrategy,
       { provide: EMAIL_TEMPLATE_RENDERER, useClass: HandlebarsEmailTemplateRenderer },
       {
         provide: EMAIL_SENDER,

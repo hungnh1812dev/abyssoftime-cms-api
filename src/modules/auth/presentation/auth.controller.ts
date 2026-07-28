@@ -16,10 +16,12 @@ import { type Request, type Response } from "express";
 
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { AuthGuard } from "@nestjs/passport";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { ACCESS_TOKEN_COOKIE } from "@/common/guards/jwt-auth.guard";
 import { RateLimitGuard } from "@/common/guards/rate-limit.guard";
+import { type ValidatedLoginUser } from "@/common/strategies/local.strategy";
 import { type EnvironmentVariables } from "@/config/env.validation";
 
 import { HasUsersResponseDto, MessageResponseDto } from "./dto/auth-response.dto";
@@ -90,13 +92,16 @@ export class AuthController {
 
   @Post("login")
   @HttpCode(HttpStatus.OK)
-  @UseGuards(RateLimitGuard)
+  @UseGuards(RateLimitGuard, AuthGuard("local"))
   @ApiOperation({ summary: "Log in — sets access_token/refresh_token httpOnly cookies on success" })
   @ApiResponse({ status: 200, type: MessageResponseDto })
   @ApiResponse({ status: 401, description: "Unknown email or wrong password (same message either way)" })
   @ApiResponse({ status: 403, description: "Email not verified yet" })
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response): Promise<{ message: string }> {
-    const { accessToken, refreshToken } = await this.loginService.execute(dto);
+  // dto is unused in the handler body — kept only so Swagger's request-body introspection (which
+  // reads the @Body()-decorated parameter's type) still documents the { email, password } shape.
+  // The actual credential check now runs in LocalStrategy.validate() via AuthGuard("local").
+  login(@Body() dto: LoginDto, @Req() req: Request & { user: ValidatedLoginUser }, @Res({ passthrough: true }) res: Response): { message: string } {
+    const { accessToken, refreshToken } = this.loginService.execute(req.user);
     this.setAuthCookies(res, accessToken, refreshToken);
     return { message: "Login successful." };
   }
