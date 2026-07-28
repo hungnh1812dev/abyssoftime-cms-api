@@ -44,15 +44,7 @@ export class ContentTypeController {
   @ApiResponse({ status: 400, description: "Unsafe/malformed slug" })
   @ApiResponse({ status: 404, description: "No content type with that slug" })
   async getBySlug(@Param("slug") slug: string): Promise<ContentTypeEntity> {
-    try {
-      assertSafeSlug(slug);
-    } catch (error) {
-      if (error instanceof UnsafeSqlIdentifierError) {
-        throw new BadRequestException(error.message);
-      }
-      throw error;
-    }
-
+    validateSlugParam(slug);
     return this.getContentTypeService.execute(slug);
   }
 
@@ -61,9 +53,21 @@ export class ContentTypeController {
   @RequirePermissions("content_type:manager")
   @ApiOperation({ summary: "Set the columns shown by default in a content type's list view" })
   @ApiResponse({ status: 200, type: ContentTypeResponseDto })
-  @ApiResponse({ status: 400, description: "Empty array, or an entry that isn't a listable system column or eligible field" })
+  @ApiResponse({ status: 400, description: "Unsafe/malformed slug, empty array, or an entry that isn't a listable system column or eligible field" })
   @ApiResponse({ status: 404, description: "No content type with that slug" })
   async updateListFields(@Param("slug") slug: string, @Body() dto: UpdateListFieldsDto): Promise<ContentTypeEntity> {
+    validateSlugParam(slug);
     return this.updateListFieldsService.execute(slug, dto.listFields);
+  }
+}
+
+function validateSlugParam(slug: string): void {
+  try {
+    assertSafeSlug(slug);
+  } catch (error) {
+    if (error instanceof UnsafeSqlIdentifierError) {
+      throw new BadRequestException(error.message);
+    }
+    throw error;
   }
 }

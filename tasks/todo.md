@@ -28,6 +28,6 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 4:** doc read-through — commit
 
 ## Phase 6 — Review + close-out
-- [ ] Five-axis review (correctness / readability / architecture / security / performance)
-- [ ] Address findings
-- [ ] **Checkpoint 5 (final):** all checks green — commit
+- [x] Five-axis review (correctness / readability / architecture / security / performance)
+- [x] Address findings
+- [x] **Checkpoint 5 (final):** all checks green — commit

@@ -104,6 +104,21 @@ describe("CollectionTypeDocumentController", () => {
       await expect(controller.bulkCreate("Bad Slug!", { items: [{ data: {} }] }, req)).rejects.toThrow(BadRequestException);
       expect(bulkCreateAndPublish.execute).not.toHaveBeenCalled();
     });
+
+    it("resolves updatedBy once for the whole batch, not once per item", async () => {
+      const secondId = "22222222-2222-4222-8222-222222222222";
+      const secondPublished = new DocumentEntity(secondId, "published", { position: "Manager" }, now, now, now, "caller-1", "caller-1", "caller-1");
+      bulkCreateAndPublish.execute.mockResolvedValue([published, secondPublished]);
+
+      const result = await controller.bulkCreate("cv-page", { items: [{ data: { position: "Engineer" } }, { data: { position: "Manager" } }] }, req);
+
+      expect(users.findById).toHaveBeenCalledTimes(1);
+      expect(users.findById).toHaveBeenCalledWith("caller-1");
+      expect(result.items.map((item) => item.data.updatedBy)).toEqual([
+        { documentId: "caller-1", name: "Jane Doe" },
+        { documentId: "caller-1", name: "Jane Doe" },
+      ]);
+    });
   });
 
   describe("bulkDelete()", () => {
