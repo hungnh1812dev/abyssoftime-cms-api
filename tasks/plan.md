@@ -57,8 +57,8 @@ Slicing note: this is a single cohesive infrastructure conversion, not several i
 - [x] **Checkpoint 2:** `bun run build`, `bunx tsc --noEmit`, `bun run lint`, `bun run test:cov` all green — **commit here.** This is the last code phase; its checkpoint is automatically verifiable, so per the workflow "checkpoint commit timing" rule this commit is NOT held open waiting on Phase 5's manual DB walkthrough.
 
 ### Phase 3 — Docs (`auth.md`)
-- [ ] `docs/documents/auth.md` — update the guard/login/module writeup: `JwtAuthGuard` now extends `AuthGuard("jwt")`; the two new strategies under `src/common/strategies/`; `LoginService` shrunk to token-signing; `AuthController.login` on `AuthGuard("local")`; `PassportModule` + strategy providers in `AuthModule`; the Tests section (new strategy specs, rewritten guard/login-service specs). Cross-link `auth-passport-techstack.md`
-- [ ] **Checkpoint 3:** doc read-through — no section still describes the old hand-rolled guard or the old `LoginService` credential flow — commit.
+- [x] `docs/documents/auth.md` — update the guard/login/module writeup: `JwtAuthGuard` now extends `AuthGuard("jwt")`; the two new strategies under `src/common/strategies/`; `LoginService` shrunk to token-signing; `AuthController.login` on `AuthGuard("local")`; `PassportModule` + strategy providers in `AuthModule`; the Tests section (new strategy specs, rewritten guard/login-service specs). Cross-link `auth-passport-techstack.md`
+- [x] **Checkpoint 3:** doc read-through — no section still describes the old hand-rolled guard or the old `LoginService` credential flow — commit.
 
 ### Phase 4 — Five-axis code review (Opus) + fixes + `SPEC.md` trim + close-out
 - [ ] **Run the review on Opus** — `[CAREFUL]` mandates Opus for the Review phase, not just planning. Reminder for whoever executes Build: switch to / invoke Opus for this step (e.g. `agent-skills:code-reviewer`), don't run it on Sonnet
