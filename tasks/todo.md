@@ -5,8 +5,8 @@ See `tasks/plan.md` for full context and rationale.
 ## Phase 1 — Foundational relocations
 - [x] Task 1 — relocate `LISTABLE_FIELD_TYPES`/`LISTABLE_SYSTEM_COLUMNS` into `content-type` module; `where-builder.ts` imports from there
 - [x] Task 2 — `IUserRepository.findByIds` + Prisma implementation
-- [ ] Task 3 — `listFieldsOverride` column + migration + repository merge in `toEntity()`
-- [ ] **Checkpoint 1:** build/lint/test green
+- [x] Task 3 — `listFieldsOverride` column + migration + repository merge in `toEntity()`
+- [x] **Checkpoint 1:** build/lint/test green
 
 ## Phase 2 — Feature A: `PATCH .../list-fields`
 - [ ] Task 4 — DTO + `UpdateListFieldsService` (validation) + controller route + `content_type:manager` permission (super_admin only)

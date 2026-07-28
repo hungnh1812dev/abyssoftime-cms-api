@@ -46,6 +46,21 @@ export class PrismaContentTypeRepository implements IContentTypeRepository {
     }
   }
 
+  async updateListFields(slug: string, listFields: string[]): Promise<ContentTypeEntity> {
+    try {
+      const record = await this.prisma.contentType.update({
+        where: { slug },
+        data: { listFieldsOverride: listFields },
+      });
+      return this.toEntity(record);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        throw new ContentTypeNotFoundError(slug);
+      }
+      throw error;
+    }
+  }
+
   async delete(slug: string): Promise<void> {
     try {
       await this.prisma.contentType.delete({ where: { slug } });
@@ -87,6 +102,7 @@ export class PrismaContentTypeRepository implements IContentTypeRepository {
     draftToPublish: boolean;
     fields: unknown;
     listFields: unknown;
+    listFieldsOverride?: unknown;
     createdAt: Date;
     updatedAt: Date;
   }): ContentTypeEntity {
@@ -97,7 +113,7 @@ export class PrismaContentTypeRepository implements IContentTypeRepository {
       record.kind as ContentKind,
       record.draftToPublish,
       record.fields as FieldDefinition[],
-      record.listFields as string[],
+      (record.listFieldsOverride ?? record.listFields) as string[],
       record.createdAt,
       record.updatedAt,
     );
