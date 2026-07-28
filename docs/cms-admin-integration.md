@@ -13,11 +13,14 @@ requirements, permission gating, and per-flow gotchas.
 - Base URL: `http://localhost:8080` in local dev (`PORT` env var). All routes are under `/api/v1/*` **except**
   `GET /health`, which is unprefixed.
 - Every request/response body is JSON except media upload (`multipart/form-data`).
-- **CORS is not configured in this backend today** (`src/bootstrap/configure-app.ts` has no `app.enableCors()`
-  call). If CMS-Admin runs on a different origin/port than the API, cross-origin requests — including the
-  cookie-bearing ones auth depends on — will fail. Until CORS is added, either:
-  - proxy CMS-Admin's dev server to the API under the same origin (e.g. Vite/webpack dev-server proxy), or
-  - flag this to the backend team to add `app.enableCors({ origin: <admin-origin>, credentials: true })`.
+- **CORS is configured with a strict, credentialed, exact-match allowlist** (`CORS_ORIGINS` env var,
+  comma-separated origins — see `docs/documents/cors.md`). Every authenticated `/api/v1/*` route, including the
+  cookie-bearing auth ones, only sends `Access-Control-Allow-Origin` + `Access-Control-Allow-Credentials: true`
+  back to an origin that's in that allowlist; any other origin gets neither header and the browser blocks the
+  response. **If CMS-Admin's dev/staging/prod origin isn't already in `CORS_ORIGINS`, ask the backend team to
+  add it** — there's no wildcard fallback and no way to work around this client-side. `/public/documents/*` (the
+  two public read routes, §5.8) is the one exception: it's open to any origin, without credentials, since those
+  routes carry no session.
 - Every `fetch`/`axios` call that touches an authenticated route **must** send cookies:
   ```js
   fetch(url, { credentials: "include", ... })
@@ -328,7 +331,6 @@ to the backend team rather than working around client-side:
 - **No `GET /users/:id` or `GET /roles/:id`** single-fetch routes — detail views must reuse the list response.
 - **No locale/i18n support anywhere** (no `locale` query param on any route, no locales module) — if the admin
   UI needs multi-language content, that's not implemented server-side.
-- **CORS is not configured** — see §1.
 
 ## 8. Quick smoke-test sequence
 
