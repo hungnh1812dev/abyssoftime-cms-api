@@ -59,6 +59,9 @@ export function parseFilters(contentType: ContentTypeEntity, rawFilters: FilterQ
     }
 
     const [rawOperator, rawValue] = operatorEntries[0];
+    if (typeof rawValue !== "string") {
+      throw new BadRequestException(`Invalid filter value for "${column}": must be a single string value`);
+    }
     if (!KNOWN_OPERATORS.has(rawOperator as FilterOperator)) {
       throw new BadRequestException(`Invalid filter operator: "${rawOperator}"`);
     }
