@@ -16,3 +16,7 @@ export interface FieldDefinition {
 export function isComponentField(field: FieldDefinition): boolean {
   return field.type === "component";
 }
+
+export const LISTABLE_FIELD_TYPES: ReadonlySet<FieldType> = new Set(["text", "number", "boolean"]);
+
+export const LISTABLE_SYSTEM_COLUMNS: readonly string[] = ["documentId", "status", "createdAt", "updatedAt", "publishedAt", "updatedBy"];

@@ -1,4 +1,4 @@
-import { FieldDefinition, isComponentField } from "./field-definition";
+import { FieldDefinition, isComponentField, LISTABLE_FIELD_TYPES, LISTABLE_SYSTEM_COLUMNS } from "./field-definition";
 
 describe("isComponentField", () => {
   it("returns true for a component field", () => {
@@ -11,5 +11,17 @@ describe("isComponentField", () => {
     const field: FieldDefinition = { name: "wordGroup", type: "text" };
 
     expect(isComponentField(field)).toBe(false);
+  });
+});
+
+describe("LISTABLE_FIELD_TYPES", () => {
+  it("contains exactly text, number, and boolean", () => {
+    expect(LISTABLE_FIELD_TYPES).toEqual(new Set(["text", "number", "boolean"]));
+  });
+});
+
+describe("LISTABLE_SYSTEM_COLUMNS", () => {
+  it("contains exactly the response-DTO-facing system column names", () => {
+    expect(LISTABLE_SYSTEM_COLUMNS).toEqual(["documentId", "status", "createdAt", "updatedAt", "publishedAt", "updatedBy"]);
   });
 });
