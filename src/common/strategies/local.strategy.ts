@@ -1,7 +1,7 @@
 import * as bcrypt from "bcryptjs";
 import { Strategy } from "passport-local";
 
-import { ForbiddenException, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 
 import { RoleEntity } from "@/modules/roles/domain/entities/role.entiry";
@@ -29,6 +29,13 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(email: string, password: string): Promise<ValidatedLoginUser> {
+    // AuthGuard("local") runs before the global ValidationPipe (guards precede pipes in the Nest
+    // lifecycle), so LoginDto's class-validator decorators never see this request — replicate the
+    // shape check the pipe used to provide, otherwise a non-string password crashes bcrypt.compare.
+    if (typeof email !== "string" || !email || typeof password !== "string" || !password) {
+      throw new BadRequestException("Invalid email or password");
+    }
+
     const user = await this.users.findByEmail(email);
     if (!user) {
       await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
