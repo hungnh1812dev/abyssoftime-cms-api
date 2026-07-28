@@ -24,11 +24,11 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 3:** doc read-through, no stale "CORS not configured" mentions — commit
 
 ## Phase 4 — Five-axis review (Opus) + fixes + `SPEC.md` trim + close-out
-- [ ] Run the review on **Opus** (`[CAREFUL]` requires it)
-- [ ] Five-axis review — focus: no request can hit both policy branches, `credentials:false` always paired with open origin, no empty-array-as-wildcard footgun
-- [ ] Fix Important/correctness findings; re-verify build/test/lint; record findings + resolutions
-- [ ] `SPEC.md` — trim to pointer at `docs/documents/cors.md` (+ techstack doc); delete `specs/cors.md`
-- [ ] **Checkpoint 4 (final):** automated checks green after fixes; `SPEC.md` reduced to pointer — commit
+- [x] Run the review on **Opus** (`[CAREFUL]` requires it) — verdict: APPROVE, no blocking issues
+- [x] Five-axis review — no request hits both policy branches; `credentials:false` always paired with open origin; empty-array parse is deny-all not wildcard (traced `cors` source)
+- [x] Fixed: `CORS_ORIGINS=","` boot-time gap (parsed-empty-array now throws at boot) + 2 test-coverage gaps (public-docs credentials/preflight); re-verified build/test/lint all green (698 tests)
+- [x] `SPEC.md` — trimmed to pointer at `docs/documents/cors.md` (+ techstack doc); deleted `specs/cors.md`
+- [x] **Checkpoint 4 (final):** automated checks green after fixes; `SPEC.md` reduced to pointer — commit
 
 ## Phase 5 — Manual verification (non-blocking for earlier commits)
 - [ ] User runs `bun run start:dev`; curl-verifies allowed-origin credentialed headers on `/api/v1/permissions` and reflected-origin/no-credentials headers on `/api/v1/public/documents/single-type/x`

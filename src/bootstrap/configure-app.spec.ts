@@ -245,4 +245,49 @@ describe("configureApp CORS", () => {
     expect(response.headers["access-control-allow-origin"]).toBe(ALLOWED_ORIGIN);
     expect(response.headers["access-control-allow-credentials"]).toBe("true");
   });
+
+  it("never sets Access-Control-Allow-Credentials on /api/v1/public/documents/* even for an allowlisted origin", async () => {
+    const response = await request(app.getHttpServer()).get("/api/v1/public/documents/single-type/x").set("Origin", ALLOWED_ORIGIN).expect(200);
+
+    expect(response.headers["access-control-allow-origin"]).toBe(ALLOWED_ORIGIN);
+    expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
+  });
+
+  it("responds 2xx to an OPTIONS preflight on /api/v1/public/documents/* from an arbitrary origin, with no credentials header", async () => {
+    const arbitraryOrigin = "http://anything.example.com";
+    const response = await request(app.getHttpServer())
+      .options("/api/v1/public/documents/single-type/x")
+      .set("Origin", arbitraryOrigin)
+      .set("Access-Control-Request-Method", "GET")
+      .expect(204);
+
+    expect(response.headers["access-control-allow-origin"]).toBe(arbitraryOrigin);
+    expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
+  });
+});
+
+describe("configureApp CORS_ORIGINS validation", () => {
+  it("throws at boot if CORS_ORIGINS parses to an empty origin list", async () => {
+    const module = await Test.createTestingModule({
+      controllers: [QueryEchoController],
+      providers: [
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              if (key === "TRUST_PROXY") return "1";
+              if (key === "CORS_ORIGINS") return ",";
+              return undefined;
+            }),
+          },
+        },
+      ],
+    }).compile();
+
+    const app = module.createNestApplication<NestExpressApplication>();
+
+    expect(() => configureApp(app)).toThrow(/CORS_ORIGINS/);
+
+    await app.close();
+  });
 });
