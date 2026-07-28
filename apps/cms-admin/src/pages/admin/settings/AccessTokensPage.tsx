@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { PermissionTree } from "@/components/permissions/PermissionTree";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -7,105 +8,88 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useAccessTokenList, useCreateAccessToken, useDeleteAccessToken } from "@/hooks/useAccessTokens";
-import { useContentTypes } from "@/hooks/useContentTypes";
+import { type ExpiresIn, useAccessTokenList, useCreateAccessToken, useDeleteAccessToken, useRevokeAccessToken } from "@/hooks/useAccessTokens";
+import { usePermissions } from "@/hooks/usePermissions";
 
-const EXPIRY_OPTIONS = [
-  { label: "7 days", value: "168h" },
-  { label: "30 days", value: "720h" },
-  { label: "90 days", value: "2160h" },
-  { label: "1 year", value: "8760h" },
-  { label: "No expiration", value: "" },
-] as const;
+const EXPIRY_OPTIONS: Array<{ label: string; value: ExpiresIn }> = [
+  { label: "30 minutes", value: "30m" },
+  { label: "1 hour", value: "1h" },
+  { label: "1 day", value: "1d" },
+  { label: "1 month", value: "1m" },
+  { label: "1 year", value: "1y" },
+  { label: "Never", value: "never" },
+];
 
-const DOCUMENT_ACTIONS = [
-  { scope: "document:read", label: "Read" },
-  { scope: "document:create", label: "Create" },
-  { scope: "document:update", label: "Update" },
-  { scope: "document:delete", label: "Delete" },
-  { scope: "document:publish", label: "Publish" },
-  { scope: "document:unpublish", label: "Unpublish" },
-] as const;
+function TokenRevealDialog({ open, onOpenChange, token }: { open: boolean; onOpenChange: (open: boolean) => void; token: string | null }) {
+  function copyToken() {
+    if (token) navigator.clipboard.writeText(token);
+  }
 
-function formatScope(scope: string): string {
-  if (scope === "document:read") return "Read Documents";
-  if (scope.startsWith("document:read:")) return scope.replace("document:read:", "");
-  if (scope === "document:create") return "Create Documents";
-  if (scope === "document:update") return "Update Documents";
-  if (scope === "document:delete") return "Delete Documents";
-  if (scope === "document:publish") return "Publish Documents";
-  if (scope === "document:unpublish") return "Unpublish Documents";
-  if (scope === "media:read") return "Media";
-  if (scope === "content_types:read") return "Content Types";
-  return scope;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Token</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-muted-foreground text-sm">Copy this token now. It will not be shown again.</p>
+          <div className="bg-muted rounded-md border p-3">
+            <code className="text-xs break-all">{token}</code>
+          </div>
+          <Button size="sm" onClick={copyToken} className="w-full">
+            Copy Token
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export function AccessTokensPage() {
-  const [page, setPage] = useState(1);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [tokenName, setTokenName] = useState("");
-  const [selectedScopes, setSelectedScopes] = useState<string[]>([]);
-  const [expiresIn, setExpiresIn] = useState("");
-  const [createdToken, setCreatedToken] = useState<string | null>(null);
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [expiresIn, setExpiresIn] = useState<ExpiresIn>("never");
+  const [revealedToken, setRevealedToken] = useState<string | null>(null);
 
-  const { data, isLoading } = useAccessTokenList(page);
+  const { data: tokens = [], isLoading } = useAccessTokenList();
+  const { data: permissions = [] } = usePermissions();
   const createToken = useCreateAccessToken();
+  const revokeToken = useRevokeAccessToken();
   const deleteToken = useDeleteAccessToken();
-  const { data: contentTypes } = useContentTypes();
 
-  const tokens = data?.items ?? [];
-  const total = data?.total ?? 0;
-  const hasNext = page * 20 < total;
-  const hasPrev = page > 1;
-  const ctList = contentTypes ?? [];
+  const permissionNameBySlug = new Map(permissions.map((permission) => [permission.slug, permission.name]));
 
-  const hasReadAll = selectedScopes.includes("document:read");
-
-  function toggleScope(scope: string) {
-    setSelectedScopes((previousScopes) => {
-      if (scope === "document:read") {
-        if (previousScopes.includes("document:read")) {
-          return previousScopes.filter((item) => item !== "document:read");
-        }
-        return [...previousScopes.filter((item) => !item.startsWith("document:read")), "document:read"];
-      }
-
-      if (scope.startsWith("document:read:")) {
-        const without = previousScopes.filter((item) => item !== scope && item !== "document:read");
-        if (previousScopes.includes(scope)) {
-          return without;
-        }
-        return [...without, scope];
-      }
-
-      return previousScopes.includes(scope) ? previousScopes.filter((item) => item !== scope) : [...previousScopes, scope];
-    });
+  function resetCreateForm() {
+    setTokenName("");
+    setSelectedPermissions([]);
+    setExpiresIn("never");
   }
 
   function handleCreate() {
-    if (!tokenName || selectedScopes.length === 0) return;
+    if (!tokenName) return;
     createToken.mutate(
-      { name: tokenName, scopes: selectedScopes, expiresIn: expiresIn || undefined },
+      { name: tokenName, permissions: selectedPermissions, expiresIn },
       {
         onSuccess: (response) => {
-          setCreatedToken(response.token);
-          setTokenName("");
-          setSelectedScopes([]);
-          setExpiresIn("");
+          setCreateOpen(false);
+          resetCreateForm();
+          setRevealedToken(response.token);
         },
       },
     );
   }
 
-  function copyToken() {
-    if (createdToken) {
-      navigator.clipboard.writeText(createdToken);
-    }
-  }
-
-  function closeDialog() {
-    setDialogOpen(false);
-    setCreatedToken(null);
+  function handleRevoke(id: string, name: string) {
+    if (!confirm(`Revoke and rotate the secret for "${name}"? The current token will stop working immediately.`)) return;
+    revokeToken.mutate(
+      { id },
+      {
+        onSuccess: (response) => {
+          setRevealedToken(response.token);
+        },
+      },
+    );
   }
 
   return (
@@ -113,99 +97,45 @@ export function AccessTokensPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Access Tokens</h1>
         <Dialog
-          open={dialogOpen}
+          open={createOpen}
           onOpenChange={(open: boolean) => {
-            if (!open) closeDialog();
-            else setDialogOpen(true);
+            setCreateOpen(open);
+            if (!open) resetCreateForm();
           }}>
           <DialogTrigger render={<Button size="sm" />}>Create new token</DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{createdToken ? "Token Created" : "Create Access Token"}</DialogTitle>
+              <DialogTitle>Create Access Token</DialogTitle>
             </DialogHeader>
-            {createdToken ? (
-              <div className="space-y-3">
-                <p className="text-muted-foreground text-sm">Copy this token now. It will not be shown again.</p>
-                <div className="bg-muted rounded-md border p-3">
-                  <code className="text-xs break-all">{createdToken}</code>
-                </div>
-                <Button size="sm" onClick={copyToken} className="w-full">
-                  Copy Token
-                </Button>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label htmlFor="token-name">Name</Label>
+                <Input id="token-name" value={tokenName} onChange={(event) => setTokenName(event.target.value)} placeholder="e.g. Frontend production" />
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <Label htmlFor="token-name">Name</Label>
-                  <Input id="token-name" value={tokenName} onChange={(event) => setTokenName(event.target.value)} placeholder="e.g. Frontend production" />
-                </div>
-                <div className="space-y-3">
-                  <Label>Scopes</Label>
-
-                  <div className="space-y-2">
-                    <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Documents</div>
-                    <div className="space-y-2 rounded-md border p-3">
-                      <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-                        <input type="checkbox" checked={hasReadAll} onChange={() => toggleScope("document:read")} className="rounded" />
-                        Read
-                      </label>
-                      {!hasReadAll && ctList.length > 0 && (
-                        <div className="ml-5 space-y-1 border-l pl-3">
-                          {ctList.map((contentType) => {
-                            const scope = `document:read:${contentType.Slug}`;
-                            return (
-                              <label key={contentType.ID} className="flex cursor-pointer items-center gap-2 text-sm">
-                                <input type="checkbox" checked={selectedScopes.includes(scope)} onChange={() => toggleScope(scope)} className="rounded" />
-                                <span>{contentType.Name}</span>
-                                <span className="text-muted-foreground text-xs">({contentType.Kind})</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {DOCUMENT_ACTIONS.filter((action) => action.scope !== "document:read").map((action) => (
-                        <label key={action.scope} className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-                          <input type="checkbox" checked={selectedScopes.includes(action.scope)} onChange={() => toggleScope(action.scope)} className="rounded" />
-                          {action.label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Other</div>
-                    <div className="space-y-2 rounded-md border p-3">
-                      <label className="flex cursor-pointer items-center gap-2 text-sm">
-                        <input type="checkbox" checked={selectedScopes.includes("media:read")} onChange={() => toggleScope("media:read")} className="rounded" />
-                        Media assets
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-2 text-sm">
-                        <input type="checkbox" checked={selectedScopes.includes("content_types:read")} onChange={() => toggleScope("content_types:read")} className="rounded" />
-                        Content type definitions
-                      </label>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label>Expiration</Label>
-                  <Select value={expiresIn} onValueChange={(value: string | null) => setExpiresIn(value ?? "")}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select expiration" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {EXPIRY_OPTIONS.map((option) => (
-                        <SelectItem key={option.value || "none"} value={option.value || "none"}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button className="w-full" onClick={handleCreate} disabled={createToken.isPending || !tokenName || selectedScopes.length === 0}>
-                  {createToken.isPending ? "Creating…" : "Create Token"}
-                </Button>
+              <div className="space-y-1">
+                <Label>Permissions</Label>
+                <p className="text-muted-foreground text-xs">Leave empty for a token with no scoped permissions.</p>
+                <PermissionTree permissions={permissions} selected={selectedPermissions} onChange={setSelectedPermissions} />
               </div>
-            )}
+              <div className="space-y-1">
+                <Label>Expiration</Label>
+                <Select value={expiresIn} onValueChange={(value: string | null) => setExpiresIn((value as ExpiresIn) ?? "never")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select expiration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXPIRY_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button className="w-full" onClick={handleCreate} disabled={createToken.isPending || !tokenName}>
+                {createToken.isPending ? "Creating…" : "Create Token"}
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
@@ -217,42 +147,45 @@ export function AccessTokensPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Token</TableHead>
-              <TableHead>Scopes</TableHead>
+              <TableHead>Permissions</TableHead>
               <TableHead>Expires</TableHead>
-              <TableHead>Last Used</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {tokens.map((token) => (
-              <TableRow key={token.id}>
+              <TableRow key={token.documentId}>
                 <TableCell className="font-medium">{token.name}</TableCell>
                 <TableCell>
-                  <code className="text-muted-foreground text-xs">{token.prefix}••••••</code>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {token.scopes.map((scope) => (
-                      <Badge key={scope} variant="secondary" className="text-xs">
-                        {formatScope(scope)}
-                      </Badge>
-                    ))}
-                  </div>
+                  {token.permissions.length === 0 ? (
+                    <span className="text-muted-foreground text-xs">No permissions</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {token.permissions.map((slug) => (
+                        <Badge key={slug} variant="secondary" className="text-xs">
+                          {permissionNameBySlug.get(slug) ?? slug}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">{token.expiresAt ? new Date(token.expiresAt).toLocaleDateString() : "Never"}</TableCell>
-                <TableCell className="text-muted-foreground text-sm">{token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleDateString() : "Never"}</TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => {
-                      if (confirm(`Delete token "${token.name}"?`)) {
-                        deleteToken.mutate(token.id);
-                      }
-                    }}>
-                    Delete
-                  </Button>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleRevoke(token.documentId, token.name)}>
+                      Revoke
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm(`Delete token "${token.name}"?`)) {
+                          deleteToken.mutate(token.documentId);
+                        }
+                      }}>
+                      Delete
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -260,19 +193,11 @@ export function AccessTokensPage() {
         </Table>
       )}
 
-      <div className="flex items-center justify-between">
-        <span className="text-muted-foreground text-sm">
-          {total} token{total !== 1 ? "s" : ""}
-        </span>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage - 1)} disabled={!hasPrev}>
-            Prev
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage + 1)} disabled={!hasNext}>
-            Next
-          </Button>
-        </div>
-      </div>
+      <p className="text-muted-foreground text-sm">
+        {tokens.length} token{tokens.length !== 1 ? "s" : ""}
+      </p>
+
+      <TokenRevealDialog open={revealedToken !== null} onOpenChange={(open) => !open && setRevealedToken(null)} token={revealedToken} />
     </div>
   );
 }

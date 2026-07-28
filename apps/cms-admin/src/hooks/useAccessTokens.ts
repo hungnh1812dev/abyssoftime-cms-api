@@ -1,58 +1,62 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AxiosError } from "axios";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/errors";
+
+export type ExpiresIn = "30m" | "1h" | "1d" | "1m" | "1y" | "never";
 
 export interface AccessTokenItem {
-  id: string;
+  documentId: string;
   name: string;
-  prefix: string;
-  scopes: string[];
-  expiresAt: string | null;
-  lastUsedAt: string | null;
-  createdAt: string;
-}
-
-interface TokenListResponse {
-  items: AccessTokenItem[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-interface CreateTokenResponse {
-  id: string;
-  name: string;
-  prefix: string;
-  scopes: string[];
+  permissions: string[];
   expiresAt: string | null;
   createdAt: string;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+export interface AccessTokenSecret extends AccessTokenItem {
+  // Plaintext secret — present only on create/revoke responses, shown once.
   token: string;
 }
 
 const KEYS = {
-  list: (page: number) => ["access-tokens", "list", page] as const,
   all: ["access-tokens"] as const,
 };
 
-export function useAccessTokenList(page: number) {
-  return useQuery<TokenListResponse>({
-    queryKey: KEYS.list(page),
-    queryFn: () => api.get<TokenListResponse>(`/api/access-tokens?page=${page}&limit=20`).then((response) => response.data),
+// GET /access-tokens is not paginated — it returns every token (no secret).
+export function useAccessTokenList() {
+  return useQuery<AccessTokenItem[]>({
+    queryKey: KEYS.all,
+    queryFn: () => api.get<AccessTokenItem[]>("/access-tokens").then((response) => response.data),
   });
 }
 
 export function useCreateAccessToken() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { name: string; scopes: string[]; expiresIn?: string }) => api.post<CreateTokenResponse>("/api/access-tokens", data).then((response) => response.data),
+    mutationFn: (data: { name: string; permissions: string[]; expiresIn: ExpiresIn }) =>
+      api.post<AccessTokenSecret>("/access-tokens", data).then((response) => response.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: KEYS.all });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to create token";
-      toast.error(message);
+      toast.error(apiErrorMessage(error, "Failed to create token"));
+    },
+  });
+}
+
+export function useRevokeAccessToken() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data?: { name?: string; permissions?: string[]; expiresIn?: ExpiresIn } }) =>
+      api.post<AccessTokenSecret>(`/access-tokens/${id}/revoke`, data ?? {}).then((response) => response.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: KEYS.all });
+    },
+    onError: (error: unknown) => {
+      toast.error(apiErrorMessage(error, "Failed to revoke token"));
     },
   });
 }
@@ -60,13 +64,12 @@ export function useCreateAccessToken() {
 export function useDeleteAccessToken() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.delete(`/api/access-tokens/${id}`),
+    mutationFn: (id: string) => api.delete(`/access-tokens/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: KEYS.all });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to delete token";
-      toast.error(message);
+      toast.error(apiErrorMessage(error, "Failed to delete token"));
     },
   });
 }
