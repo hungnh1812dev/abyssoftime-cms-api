@@ -16,7 +16,25 @@ import { AppController } from "@/app.controller";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "@/common/guards/permissions.guard";
 
-import { configureApp, parseTrustProxy } from "./configure-app";
+import { configureApp, parseCorsOrigins, parseTrustProxy } from "./configure-app";
+
+describe("parseCorsOrigins", () => {
+  it("parses a single origin", () => {
+    expect(parseCorsOrigins("http://localhost:3000")).toEqual(["http://localhost:3000"]);
+  });
+
+  it("parses multiple origins separated by commas, trimming whitespace", () => {
+    expect(parseCorsOrigins("http://localhost:3000, https://admin.example.com ,https://foo.example.com")).toEqual([
+      "http://localhost:3000",
+      "https://admin.example.com",
+      "https://foo.example.com",
+    ]);
+  });
+
+  it("drops empty segments from a trailing comma", () => {
+    expect(parseCorsOrigins("http://localhost:3000,")).toEqual(["http://localhost:3000"]);
+  });
+});
 
 describe("parseTrustProxy", () => {
   it("parses boolean-looking strings as booleans", () => {

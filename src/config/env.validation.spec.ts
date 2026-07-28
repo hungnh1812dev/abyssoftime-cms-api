@@ -6,6 +6,7 @@ describe("validate", () => {
     JWT_REFRESH_SECRET: "refresh-secret",
     COOKIE_SECURE: "true",
     COOKIE_SAMESITE: "lax",
+    CORS_ORIGINS: "http://localhost:3000",
   };
 
   it("throws when required fields are missing", () => {
@@ -63,6 +64,10 @@ describe("validate", () => {
 
   it("rejects a COOKIE_SAMESITE value outside lax/strict/none", () => {
     expect(() => validate({ ...requiredConfig, COOKIE_SAMESITE: "invalid" })).toThrow();
+  });
+
+  it("rejects an empty CORS_ORIGINS value", () => {
+    expect(() => validate({ ...requiredConfig, CORS_ORIGINS: "" })).toThrow();
   });
 
   it("overrides RATE_LIMIT_FPS/RATE_LIMIT_BURST when explicitly provided", () => {
