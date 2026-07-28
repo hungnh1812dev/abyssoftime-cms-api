@@ -1,42 +1,42 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AxiosError } from "axios";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
-import type { Document, PaginatedResponse } from "@/types/cms";
+import { apiErrorMessage } from "@/lib/errors";
+import type { Document, ListedDocumentItem, PaginatedResponse } from "@/types/cms";
 
 function onMutationError(error: unknown) {
-  const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Something went wrong";
-  toast.error(message);
+  toast.error(apiErrorMessage(error, "Something went wrong"));
 }
 
 const KEYS = {
   list: (slug: string) => ["documents", "collection-type", slug] as const,
-  detail: (slug: string, id: string, locale: string) => ["documents", "collection-type", "detail", slug, id, locale] as const,
+  detail: (slug: string, id: string) => ["documents", "collection-type", "detail", slug, id] as const,
 };
 
-export function useCollectionDocuments(slug: string, start: number, size: number, locale: string, orderBy: string = "id", sortDir: "asc" | "desc" = "desc", search: string = "") {
+// Note: system-column orderBy values are snake_case at the wire level ("id",
+// "created_at", "updated_at", "document_id") even though the same columns
+// come back camelCase in response bodies ("documentId", "createdAt") —
+// confirmed against the live API, not documented in the written API
+// reference. Content-type schema field names (e.g. "title") pass through
+// as-is, unaffected by this.
+export function useCollectionDocuments(slug: string, start: number, size: number, orderBy: string = "id", sortDir: "asc" | "desc" = "desc", search: string = "") {
   return useQuery({
-    queryKey: [...KEYS.list(slug), start, size, locale, orderBy, sortDir, search] as const,
+    queryKey: [...KEYS.list(slug), start, size, orderBy, sortDir, search] as const,
     queryFn: () =>
       api
-        .get<PaginatedResponse<Document>>(`/api/document-manager/collection-type/${slug}`, {
-          params: { start, size, locale, orderBy, sortDir, search: search || undefined },
+        .get<PaginatedResponse<ListedDocumentItem>>(`/documents/collection-type/${slug}`, {
+          params: { start, size, orderBy, sortDir, search: search || undefined },
         })
         .then((response) => response.data),
     enabled: Boolean(slug),
   });
 }
 
-export function useCollectionDocument(slug: string, documentId: string, locale: string) {
+export function useCollectionDocument(slug: string, documentId: string) {
   return useQuery({
-    queryKey: KEYS.detail(slug, documentId, locale),
-    queryFn: () =>
-      api
-        .get<Document>(`/api/document-manager/collection-type/${slug}/${documentId}`, {
-          params: { locale },
-        })
-        .then((response) => response.data),
+    queryKey: KEYS.detail(slug, documentId),
+    queryFn: () => api.get<Document>(`/documents/collection-type/${slug}/${documentId}`).then((response) => response.data),
     enabled: Boolean(documentId),
   });
 }
@@ -44,8 +44,8 @@ export function useCollectionDocument(slug: string, documentId: string, locale: 
 export function useCreateCollectionDocument() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ contentTypeSlug, locale, data }: { contentTypeSlug: string; locale?: string; data: Record<string, unknown> }) =>
-      api.post<Document>(`/api/document-manager/collection-type/${contentTypeSlug}`, { data }, { params: { locale } }).then((response) => response.data),
+    mutationFn: ({ contentTypeSlug, data }: { contentTypeSlug: string; data: Record<string, unknown> }) =>
+      api.post<Document>(`/documents/collection-type/${contentTypeSlug}`, { data }).then((response) => response.data),
     onSuccess: (_, { contentTypeSlug }) => queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
     onError: onMutationError,
   });
@@ -54,13 +54,11 @@ export function useCreateCollectionDocument() {
 export function useUpdateCollectionDocument() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ contentTypeSlug, id, locale, data }: { contentTypeSlug: string; id: string; data: Record<string, unknown>; locale?: string }) =>
-      api.put<Document>(`/api/document-manager/collection-type/${contentTypeSlug}/${id}`, { data }, { params: { locale } }).then((response) => response.data),
+    mutationFn: ({ contentTypeSlug, id, data }: { contentTypeSlug: string; id: string; data: Record<string, unknown> }) =>
+      api.put<Document>(`/documents/collection-type/${contentTypeSlug}/${id}`, { data }).then((response) => response.data),
     onSuccess: (result, { contentTypeSlug }) => {
       queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) });
-      queryClient.invalidateQueries({
-        queryKey: KEYS.detail(contentTypeSlug, result.data.documentId as string, result.data.locale as string),
-      });
+      queryClient.invalidateQueries({ queryKey: KEYS.detail(contentTypeSlug, result.data.documentId) });
     },
     onError: onMutationError,
   });
@@ -69,7 +67,7 @@ export function useUpdateCollectionDocument() {
 export function useDeleteCollectionDocument() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ contentTypeSlug, id }: { contentTypeSlug: string; id: string }) => api.delete(`/api/document-manager/collection-type/${contentTypeSlug}/${id}`),
+    mutationFn: ({ contentTypeSlug, id }: { contentTypeSlug: string; id: string }) => api.delete(`/documents/collection-type/${contentTypeSlug}/${id}`),
     onSuccess: (_, { contentTypeSlug }) => queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
     onError: onMutationError,
   });
@@ -77,7 +75,7 @@ export function useDeleteCollectionDocument() {
 
 interface BulkDeleteFailure {
   documentId: string;
-  error: string;
+  error?: string;
 }
 
 interface BulkDeleteResponse {
@@ -85,11 +83,14 @@ interface BulkDeleteResponse {
   failed: BulkDeleteFailure[];
 }
 
+// Partial success, no rollback — unlike bulk-create (not implemented in this
+// UI), a bulk delete can fail per-row; the caller must reconcile
+// `deleted` vs `failed` itself rather than treat this as all-or-nothing.
 export function useBulkDeleteCollectionDocuments() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ contentTypeSlug, documentIds }: { contentTypeSlug: string; documentIds: string[] }) =>
-      api.delete<BulkDeleteResponse>(`/api/document-manager/collection-type/${contentTypeSlug}/bulk`, { data: { documentIds } }).then((response) => response.data),
+      api.delete<BulkDeleteResponse>(`/documents/collection-type/${contentTypeSlug}/bulk`, { data: { documentIds } }).then((response) => response.data),
     onSuccess: (result, { contentTypeSlug }) => {
       queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) });
       if (result.failed.length === 0) {
@@ -105,8 +106,8 @@ export function useBulkDeleteCollectionDocuments() {
 export function useDuplicateCollectionDocument() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ contentTypeSlug, id, locale }: { contentTypeSlug: string; id: string; locale?: string }) =>
-      api.post<Document>(`/api/document-manager/collection-type/${contentTypeSlug}/${id}/duplicate`, undefined, { params: { locale } }).then((response) => response.data),
+    mutationFn: ({ contentTypeSlug, id }: { contentTypeSlug: string; id: string }) =>
+      api.post<Document>(`/documents/collection-type/${contentTypeSlug}/${id}/duplicate`).then((response) => response.data),
     onSuccess: (_, { contentTypeSlug }) => queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) }),
     onError: onMutationError,
   });
@@ -115,12 +116,10 @@ export function useDuplicateCollectionDocument() {
 export function usePublishCollectionDocument() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ contentTypeSlug, id, locale }: { contentTypeSlug: string; id: string; locale?: string }) =>
-      api.post<{ status: string }>(`/api/document-manager/collection-type/${contentTypeSlug}/${id}/publish`, undefined, { params: { locale } }).then((response) => response.data),
-    onSuccess: (_, { contentTypeSlug, id, locale }) => {
-      queryClient.invalidateQueries({
-        queryKey: KEYS.detail(contentTypeSlug, id, locale ?? ""),
-      });
+    mutationFn: ({ contentTypeSlug, id }: { contentTypeSlug: string; id: string }) =>
+      api.post<{ status: string }>(`/documents/collection-type/${contentTypeSlug}/${id}/publish`).then((response) => response.data),
+    onSuccess: (_, { contentTypeSlug, id }) => {
+      queryClient.invalidateQueries({ queryKey: KEYS.detail(contentTypeSlug, id) });
       queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) });
     },
     onError: onMutationError,
@@ -130,12 +129,10 @@ export function usePublishCollectionDocument() {
 export function useUnpublishCollectionDocument() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ contentTypeSlug, id, locale }: { contentTypeSlug: string; id: string; locale?: string }) =>
-      api.post<{ status: string }>(`/api/document-manager/collection-type/${contentTypeSlug}/${id}/unpublish`, undefined, { params: { locale } }).then((response) => response.data),
-    onSuccess: (_, { contentTypeSlug, id, locale }) => {
-      queryClient.invalidateQueries({
-        queryKey: KEYS.detail(contentTypeSlug, id, locale ?? ""),
-      });
+    mutationFn: ({ contentTypeSlug, id }: { contentTypeSlug: string; id: string }) =>
+      api.post<{ status: string }>(`/documents/collection-type/${contentTypeSlug}/${id}/unpublish`).then((response) => response.data),
+    onSuccess: (_, { contentTypeSlug, id }) => {
+      queryClient.invalidateQueries({ queryKey: KEYS.detail(contentTypeSlug, id) });
       queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) });
     },
     onError: onMutationError,

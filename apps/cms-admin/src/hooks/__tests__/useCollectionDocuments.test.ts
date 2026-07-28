@@ -40,7 +40,7 @@ function createWrapper() {
 
 describe("useBulkDeleteCollectionDocuments", () => {
   it("sends documentIds in the DELETE body and invalidates the list query key on success", async () => {
-    mock.onDelete("/api/document-manager/collection-type/articles/bulk").reply(200, { deleted: ["doc-1", "doc-2"], failed: [] });
+    mock.onDelete("/documents/collection-type/articles/bulk").reply(200, { deleted: ["doc-1", "doc-2"], failed: [] });
 
     const { Wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
@@ -54,7 +54,7 @@ describe("useBulkDeleteCollectionDocuments", () => {
   });
 
   it("shows a success toast when every document is deleted", async () => {
-    mock.onDelete("/api/document-manager/collection-type/articles/bulk").reply(200, { deleted: ["doc-1"], failed: [] });
+    mock.onDelete("/documents/collection-type/articles/bulk").reply(200, { deleted: ["doc-1"], failed: [] });
     const { toast } = await import("sonner");
 
     const { Wrapper } = createWrapper();
@@ -68,7 +68,7 @@ describe("useBulkDeleteCollectionDocuments", () => {
   });
 
   it("shows a partial-failure toast with both counts when some documents fail", async () => {
-    mock.onDelete("/api/document-manager/collection-type/articles/bulk").reply(200, {
+    mock.onDelete("/documents/collection-type/articles/bulk").reply(200, {
       deleted: ["doc-1"],
       failed: [{ documentId: "doc-2", error: "not found" }],
     });
@@ -89,9 +89,9 @@ describe("useBulkDeleteCollectionDocuments", () => {
 
 describe("useCollectionDocuments", () => {
   it("forwards a non-empty search param in the request", async () => {
-    mock.onGet("/api/document-manager/collection-type/articles").reply(200, { items: [], total: 0, start: 0, size: 10 });
+    mock.onGet("/documents/collection-type/articles").reply(200, { items: [], total: 0, start: 0, size: 10 });
     const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useCollectionDocuments("articles", 0, 10, "en", "id", "desc", "foo"), { wrapper: Wrapper });
+    const { result } = renderHook(() => useCollectionDocuments("articles", 0, 10, "documentId", "desc", "foo"), { wrapper: Wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
@@ -99,9 +99,9 @@ describe("useCollectionDocuments", () => {
   });
 
   it("omits the search param from the request when empty", async () => {
-    mock.onGet("/api/document-manager/collection-type/articles").reply(200, { items: [], total: 0, start: 0, size: 10 });
+    mock.onGet("/documents/collection-type/articles").reply(200, { items: [], total: 0, start: 0, size: 10 });
     const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useCollectionDocuments("articles", 0, 10, "en", "id", "desc"), { wrapper: Wrapper });
+    const { result } = renderHook(() => useCollectionDocuments("articles", 0, 10, "documentId", "desc"), { wrapper: Wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 

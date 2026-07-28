@@ -160,7 +160,8 @@ function renderField(field: FieldDefinition, prefix: string, keyPrefix: string, 
     return (
       <div key={fieldKey} className={colSpan}>
         <label className="mb-1 block text-sm font-medium">{field.name}</label>
-        <MediaInput name={fieldName} ext={field.ext} />
+        {/* No per-field extension allowlist — the API accepts PNG/JPEG only, enforced server-side on upload */}
+        <MediaInput name={fieldName} />
       </div>
     );
   }

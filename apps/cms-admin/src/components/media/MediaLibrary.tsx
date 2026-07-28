@@ -10,27 +10,18 @@ interface MediaLibraryProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (asset: MediaAsset) => void;
-  ext?: string[];
 }
 
-export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryProps) {
-  const [page, setPage] = useState(1);
+export function MediaLibrary({ isOpen, onClose, onSelect }: MediaLibraryProps) {
   const [showUpload, setShowUpload] = useState(false);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<MediaAsset | null>(null);
 
-  const { data, isLoading } = useMediaList(page, 20);
+  const { data: items = [], isLoading } = useMediaList();
   const upload = useUploadMedia();
   const deleteMedia = useDeleteMedia();
 
   if (!isOpen) return null;
-
-  const items = data?.items ?? [];
-  const total = data?.total ?? 0;
-  const hasNext = page * 20 < total;
-  const hasPrev = page > 1;
-
-  const filteredItems = ext ? items.filter((asset) => ext.includes(asset.fileExt)) : items;
 
   async function handleUpload() {
     for (const file of stagedFiles) {
@@ -82,7 +73,7 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
               <input
                 type="file"
                 multiple
-                accept={ext ? ext.map((extension) => `.${extension}`).join(",") : "image/*"}
+                accept="image/png,image/jpeg"
                 onChange={(event) => setStagedFiles(Array.from(event.target.files ?? []))}
                 className="sr-only"
               />
@@ -133,13 +124,11 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
             <p className="text-muted-foreground text-sm">Loading…</p>
           ) : (
             <div className="grid grid-cols-4 gap-3">
-              {filteredItems.map((asset) => (
-                <div key={asset.ID} className="group relative">
+              {items.map((asset) => (
+                <div key={asset.documentId} className="group relative">
                   <button
                     type="button"
-                    className={`relative aspect-square w-full overflow-hidden rounded-lg border-2 transition-all ${
-                      ext && !ext.includes(asset.fileExt) ? "border-muted opacity-40" : "border-border hover:border-primary hover:ring-primary/20 hover:shadow-md hover:ring-2"
-                    }`}
+                    className="border-border hover:border-primary hover:ring-primary/20 relative aspect-square w-full overflow-hidden rounded-lg border-2 transition-all hover:shadow-md hover:ring-2"
                     disabled={deleteMedia.isPending}
                     onClick={() => {
                       onSelect(asset);
@@ -166,16 +155,8 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
 
         <div className="flex items-center justify-between border-t p-4">
           <span className="text-muted-foreground text-sm">
-            {total} asset{total !== 1 ? "s" : ""}
+            {items.length} asset{items.length !== 1 ? "s" : ""}
           </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage - 1)} disabled={!hasPrev} aria-label="Previous page">
-              Prev
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage + 1)} disabled={!hasNext} aria-label="Next page">
-              Next
-            </Button>
-          </div>
         </div>
       </div>
 

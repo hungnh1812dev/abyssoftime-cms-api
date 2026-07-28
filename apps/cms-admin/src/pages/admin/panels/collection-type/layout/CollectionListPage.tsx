@@ -6,7 +6,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { ColumnChooserDialog } from "@/components/collection/ColumnChooserDialog";
 import { PageSizeSelector } from "@/components/collection/PageSizeSelector";
 import { CheckboxInput } from "@/components/form/inputs/CheckboxInput";
-import { LocaleSelector } from "@/components/locale/LocaleSelector";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -17,22 +16,21 @@ import { type CollectionColumnDef, getRegistration } from "@/content-type-regist
 import { useBulkDeleteCollectionDocuments, useCollectionDocuments, useDeleteCollectionDocument, useDuplicateCollectionDocument } from "@/hooks/useCollectionDocuments";
 import { useUpdateListFields } from "@/hooks/useContentTypes";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useLocales } from "@/hooks/useLocales";
 import { PAGE_SIZE_OPTIONS } from "@/lib/pageSize";
-import { type ContentType, type Document, type FieldDefinition, type Locale } from "@/types/cms";
+import { type ContentType, type FieldDefinition, type ListedDocumentItem } from "@/types/cms";
 
 interface Props {
   contentType: ContentType;
 }
 
-const SYSTEM_FIELD_KEYS = new Set(["createdAt", "updatedAt", "updatedByName"]);
+const SYSTEM_FIELD_KEYS = new Set(["createdAt", "updatedAt", "updatedBy"]);
 
 function deriveColumns(contentType: ContentType): CollectionColumnDef[] {
-  const registration = getRegistration(contentType.Slug);
+  const registration = getRegistration(contentType.slug);
   if (registration?.columns) return registration.columns;
 
   const listFieldNames = (contentType.listFields ?? []).filter((name) => !SYSTEM_FIELD_KEYS.has(name));
-  const fields = contentType.Fields ?? [];
+  const fields = contentType.fields ?? [];
   const fieldMap = new Map<string, FieldDefinition>();
   for (const field of fields) fieldMap.set(field.name, field);
 
@@ -62,11 +60,11 @@ function deriveSystemVisibility(listFields: string[]): { showCreatedAt: boolean;
   return {
     showCreatedAt: listFields.includes("createdAt"),
     showUpdatedAt: listFields.includes("updatedAt"),
-    showUpdatedBy: listFields.includes("updatedByName"),
+    showUpdatedBy: listFields.includes("updatedBy"),
   };
 }
 
-function cellValue(doc: Document, col: CollectionColumnDef): React.ReactNode {
+function cellValue(doc: ListedDocumentItem, col: CollectionColumnDef): React.ReactNode {
   const raw = doc.data[col.key];
   switch (col.type) {
     case "boolean":
@@ -96,9 +94,13 @@ function formatDate(value: unknown): string {
 type SortField = string;
 type SortDir = "asc" | "desc";
 
+// System-column orderBy values are snake_case at the wire level even though
+// the same columns are camelCase in response bodies — see the note in
+// useCollectionDocuments.ts. Content-type schema field names pass through
+// as-is.
 function getSortableFieldNames(contentType: ContentType): Set<string> {
-  const names = new Set<string>(["id", "createdAt", "updatedAt"]);
-  for (const field of contentType.Fields ?? []) {
+  const names = new Set<string>(["id", "created_at", "updated_at"]);
+  for (const field of contentType.fields ?? []) {
     if (field.type === "text" || field.type === "number" || field.type === "boolean") {
       names.add(field.name);
     }
@@ -108,7 +110,7 @@ function getSortableFieldNames(contentType: ContentType): Set<string> {
 
 const DEFAULT_PAGE_SIZE: number = PAGE_SIZE_OPTIONS[0];
 
-function parseListState(params: URLSearchParams, locales: Locale[], sortableFields: Set<string>) {
+function parseListState(params: URLSearchParams, sortableFields: Set<string>) {
   const rawOrderBy = params.get("orderBy") ?? "";
   const orderBy: SortField = sortableFields.has(rawOrderBy) ? rawOrderBy : "id";
 
@@ -117,26 +119,21 @@ function parseListState(params: URLSearchParams, locales: Locale[], sortableFiel
   const rawPage = Number(params.get("page"));
   const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
 
-  const rawLocale = params.get("locale");
-  const knownLocale = locales.find((loc) => loc.code === rawLocale);
-  const locale = knownLocale?.code ?? locales.find((loc) => loc.isDefault)?.code ?? locales[0]?.code ?? "";
-
   const rawPageSize = Number(params.get("pageSize"));
   const pageSize = (PAGE_SIZE_OPTIONS as readonly number[]).includes(rawPageSize) ? rawPageSize : DEFAULT_PAGE_SIZE;
 
   const search = params.get("search") ?? "";
 
-  return { orderBy, sortDir, page, locale, pageSize, search };
+  return { orderBy, sortDir, page, pageSize, search };
 }
 
 type ListState = ReturnType<typeof parseListState>;
 
-function toCanonicalParams(state: ListState, defaultLocaleCode: string): URLSearchParams {
+function toCanonicalParams(state: ListState): URLSearchParams {
   const params = new URLSearchParams();
   if (state.orderBy !== "id") params.set("orderBy", state.orderBy);
   if (state.sortDir !== "desc") params.set("sortDir", state.sortDir);
   if (state.page !== 1) params.set("page", String(state.page));
-  if (state.locale !== defaultLocaleCode) params.set("locale", state.locale);
   if (state.pageSize !== DEFAULT_PAGE_SIZE) params.set("pageSize", String(state.pageSize));
   if (state.search !== "") params.set("search", state.search);
   return params;
@@ -178,25 +175,22 @@ export function CollectionListPage({ contentType }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
-  const { data: locales = [] } = useLocales();
   const [searchParams, setSearchParams] = useSearchParams();
   const sortableFields = getSortableFieldNames(contentType);
-  const { orderBy, sortDir, page: currentPage, locale: activeLocale, pageSize, search: activeSearch } = parseListState(searchParams, locales, sortableFields);
+  const { orderBy, sortDir, page: currentPage, pageSize, search: activeSearch } = parseListState(searchParams, sortableFields);
   const start = (currentPage - 1) * pageSize;
-  const defaultLocaleCode = locales.find((loc) => loc.isDefault)?.code ?? locales[0]?.code ?? "";
 
   function updateListState(patch: Partial<ListState>) {
-    const next = { orderBy, sortDir, page: currentPage, locale: activeLocale, pageSize, search: activeSearch, ...patch };
-    setSearchParams(toCanonicalParams(next, defaultLocaleCode), { replace: true });
+    const next = { orderBy, sortDir, page: currentPage, pageSize, search: activeSearch, ...patch };
+    setSearchParams(toCanonicalParams(next), { replace: true });
   }
 
   useEffect(() => {
-    if (locales.length === 0) return;
-    const canonical = toCanonicalParams({ orderBy, sortDir, page: currentPage, locale: activeLocale, pageSize, search: activeSearch }, defaultLocaleCode);
+    const canonical = toCanonicalParams({ orderBy, sortDir, page: currentPage, pageSize, search: activeSearch });
     if (canonical.toString() !== searchParams.toString()) {
       setSearchParams(canonical, { replace: true });
     }
-  }, [searchParams, locales, orderBy, sortDir, currentPage, activeLocale, pageSize, activeSearch, defaultLocaleCode, setSearchParams]);
+  }, [searchParams, orderBy, sortDir, currentPage, pageSize, activeSearch, setSearchParams]);
 
   // Local draft so keystrokes render immediately — the debounced value is what
   // actually gets written to the URL/query (documented exception to the
@@ -216,19 +210,19 @@ export function CollectionListPage({ contentType }: Props) {
 
   useEffect(() => {
     if (debouncedSearch === activeSearch) return;
-    const canonical = toCanonicalParams({ orderBy, sortDir, page: 1, locale: activeLocale, pageSize, search: debouncedSearch }, defaultLocaleCode);
+    const canonical = toCanonicalParams({ orderBy, sortDir, page: 1, pageSize, search: debouncedSearch });
     setSearchParams(canonical, { replace: true });
-  }, [debouncedSearch, activeSearch, orderBy, sortDir, activeLocale, pageSize, defaultLocaleCode, setSearchParams]);
+  }, [debouncedSearch, activeSearch, orderBy, sortDir, pageSize, setSearchParams]);
 
   const queryClient = useQueryClient();
-  const { data: page, isLoading } = useCollectionDocuments(contentType.Slug, start, pageSize, activeLocale, orderBy, sortDir, activeSearch);
+  const { data: page, isLoading } = useCollectionDocuments(contentType.slug, start, pageSize, orderBy, sortDir, activeSearch);
   const { mutate: deleteDoc } = useDeleteCollectionDocument();
   const { mutate: bulkDeleteDocs } = useBulkDeleteCollectionDocuments();
   const { mutateAsync: duplicateDoc } = useDuplicateCollectionDocument();
   const updateListFields = useUpdateListFields();
   const navigate = useNavigate();
 
-  const hasRegistryOverride = Boolean(getRegistration(contentType.Slug)?.columns);
+  const hasRegistryOverride = Boolean(getRegistration(contentType.slug)?.columns);
   const columns = deriveColumns(contentType);
   const hasSearchableColumn = columns.some((column) => column.type === "text");
   const systemVis = deriveSystemVisibility(contentType.listFields ?? []);
@@ -236,17 +230,17 @@ export function CollectionListPage({ contentType }: Props) {
   const total = page?.total ?? 0;
 
   function handleCreate() {
-    navigate(`/admin/content-type/collection-type/${contentType.Slug}/new`);
+    navigate(`/admin/content-type/collection-type/${contentType.slug}/new`);
   }
 
-  function handleDelete(event: React.MouseEvent, doc: Document) {
+  function handleDelete(event: React.MouseEvent, doc: ListedDocumentItem) {
     event.stopPropagation();
-    setDeleteTarget(doc.data.documentId as string);
+    setDeleteTarget(doc.documentId);
   }
 
   function confirmDelete() {
     if (!deleteTarget) return;
-    deleteDoc({ contentTypeSlug: contentType.Slug, id: deleteTarget });
+    deleteDoc({ contentTypeSlug: contentType.slug, id: deleteTarget });
     setDeleteTarget(null);
   }
 
@@ -254,7 +248,7 @@ export function CollectionListPage({ contentType }: Props) {
     setSelectedIds((current) => {
       const next = new Set(current);
       for (const doc of docs) {
-        const documentId = doc.data.documentId as string;
+        const documentId = doc.documentId;
         if (checked) next.add(documentId);
         else next.delete(documentId);
       }
@@ -272,24 +266,23 @@ export function CollectionListPage({ contentType }: Props) {
   }
 
   function confirmBulkDelete() {
-    bulkDeleteDocs({ contentTypeSlug: contentType.Slug, documentIds: Array.from(selectedIds) }, { onSuccess: () => setSelectedIds(new Set()) });
+    bulkDeleteDocs({ contentTypeSlug: contentType.slug, documentIds: Array.from(selectedIds) }, { onSuccess: () => setSelectedIds(new Set()) });
     setBulkDeleteConfirmOpen(false);
   }
 
-  function handleDuplicate(event: React.MouseEvent, doc: Document) {
+  function handleDuplicate(event: React.MouseEvent, doc: ListedDocumentItem) {
     event.stopPropagation();
     duplicateDoc({
-      contentTypeSlug: contentType.Slug,
-      id: doc.data.documentId as string,
-      locale: activeLocale,
+      contentTypeSlug: contentType.slug,
+      id: doc.documentId,
     }).then((newDoc) => {
-      navigate(`/admin/content-type/collection-type/${contentType.Slug}/${newDoc.data.documentId}`);
+      navigate(`/admin/content-type/collection-type/${contentType.slug}/${newDoc.data.documentId}`);
     });
   }
 
-  function handleEdit(event: React.MouseEvent, doc: Document) {
+  function handleEdit(event: React.MouseEvent, doc: ListedDocumentItem) {
     event.stopPropagation();
-    navigate(`/admin/content-type/collection-type/${contentType.Slug}/${doc.data.documentId}`);
+    navigate(`/admin/content-type/collection-type/${contentType.slug}/${doc.documentId}`);
   }
 
   function handleSort(sortField: SortField) {
@@ -298,17 +291,17 @@ export function CollectionListPage({ contentType }: Props) {
     setSelectedIds(new Set());
   }
 
-  function handleRowClick(doc: Document) {
-    navigate(`/admin/content-type/collection-type/${contentType.Slug}/${doc.data.documentId}`);
+  function handleRowClick(doc: ListedDocumentItem) {
+    navigate(`/admin/content-type/collection-type/${contentType.slug}/${doc.documentId}`);
   }
 
   function handleSaveListFields(selectedFields: string[]) {
     updateListFields.mutate(
-      { slug: contentType.Slug, listFields: selectedFields },
+      { slug: contentType.slug, listFields: selectedFields },
       {
         onSuccess: () => {
           setColumnChooserOpen(false);
-          queryClient.invalidateQueries({ queryKey: ["documents", "collection-type", contentType.Slug] });
+          queryClient.invalidateQueries({ queryKey: ["documents", "collection-type", contentType.slug] });
         },
       },
     );
@@ -326,19 +319,12 @@ export function CollectionListPage({ contentType }: Props) {
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-0.5">
           <Breadcrumb items={[{ label: "Home", to: "/admin" }, { label: "Content Manager" }]} />
-          <h1 className="text-xl font-semibold">{contentType.Name}</h1>
+          <h1 className="text-xl font-semibold">{contentType.name}</h1>
         </div>
         <div className="flex items-center gap-2">
           {hasSearchableColumn && (
             <Input type="text" placeholder="Search…" aria-label="Search" className="h-7 w-48" value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} />
           )}
-          <LocaleSelector
-            value={activeLocale}
-            onChange={(code) => {
-              updateListState({ locale: code, page: 1 });
-              setSelectedIds(new Set());
-            }}
-          />
           <PageSizeSelector
             value={pageSize}
             onChange={(size) => {
@@ -412,12 +398,9 @@ export function CollectionListPage({ contentType }: Props) {
                   <TableHead className="w-10">
                     <CheckboxInput
                       aria-label="Select all"
-                      checked={docs.length > 0 && docs.every((doc) => selectedIds.has(doc.data.documentId as string))}
+                      checked={docs.length > 0 && docs.every((doc) => selectedIds.has(doc.documentId))}
                       onCheckedChange={(checked) => toggleSelectAll(checked === true)}
                     />
-                  </TableHead>
-                  <TableHead className="w-16">
-                    <SortableHeader label="Id" field="id" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
                   </TableHead>
                   {columns.map((column) =>
                     sortableFields.has(column.key) ? (
@@ -430,12 +413,12 @@ export function CollectionListPage({ contentType }: Props) {
                   )}
                   {systemVis.showCreatedAt && (
                     <TableHead>
-                      <SortableHeader label="Created At" field="createdAt" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
+                      <SortableHeader label="Created At" field="created_at" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
                     </TableHead>
                   )}
                   {systemVis.showUpdatedAt && (
                     <TableHead>
-                      <SortableHeader label="Updated At" field="updatedAt" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
+                      <SortableHeader label="Updated At" field="updated_at" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
                     </TableHead>
                   )}
                   {systemVis.showUpdatedBy && <TableHead>Updated By</TableHead>}
@@ -445,21 +428,20 @@ export function CollectionListPage({ contentType }: Props) {
               </TableHeader>
               <TableBody>
                 {docs.map((doc) => (
-                  <TableRow key={doc.data.documentId as string} className="cursor-pointer" onClick={() => handleRowClick(doc)}>
+                  <TableRow key={doc.documentId} className="cursor-pointer" onClick={() => handleRowClick(doc)}>
                     <TableCell onClick={(event) => event.stopPropagation()}>
                       <CheckboxInput
-                        aria-label={`Select ${doc.data.documentId}`}
-                        checked={selectedIds.has(doc.data.documentId as string)}
-                        onCheckedChange={(checked) => toggleSelectRow(doc.data.documentId as string, checked === true)}
+                        aria-label={`Select ${doc.documentId}`}
+                        checked={selectedIds.has(doc.documentId)}
+                        onCheckedChange={(checked) => toggleSelectRow(doc.documentId, checked === true)}
                       />
                     </TableCell>
-                    <TableCell className="font-mono text-sm">{String(doc.data.id ?? "")}</TableCell>
                     {columns.map((column) => (
                       <TableCell key={column.key}>{cellValue(doc, column)}</TableCell>
                     ))}
-                    {systemVis.showCreatedAt && <TableCell className="text-muted-foreground text-sm">{formatDate(doc.data.createdAt)}</TableCell>}
-                    {systemVis.showUpdatedAt && <TableCell className="text-muted-foreground text-sm">{formatDate(doc.data.updatedAt)}</TableCell>}
-                    {systemVis.showUpdatedBy && <TableCell className="text-muted-foreground text-sm">{String(doc.data.updatedByName ?? "")}</TableCell>}
+                    {systemVis.showCreatedAt && <TableCell className="text-muted-foreground text-sm">{formatDate(doc.createdAt)}</TableCell>}
+                    {systemVis.showUpdatedAt && <TableCell className="text-muted-foreground text-sm">{formatDate(doc.updatedAt)}</TableCell>}
+                    {systemVis.showUpdatedBy && <TableCell className="text-muted-foreground text-sm">{doc.updatedBy?.name ?? ""}</TableCell>}
                     <TableCell>
                       <Badge variant={statusVariant[doc.status] ?? "draft"}>{doc.status}</Badge>
                     </TableCell>

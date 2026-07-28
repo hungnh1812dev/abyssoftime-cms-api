@@ -35,8 +35,8 @@ function makeMeUser(overrides: Partial<MeUser> = {}): MeUser {
 }
 
 const contentTypes: ContentType[] = [
-  { ID: "1", DocumentID: "d1", Name: "Blog", Slug: "blog", Kind: "collection", CreatedAt: "", UpdatedAt: "" },
-  { ID: "2", DocumentID: "d2", Name: "About", Slug: "about", Kind: "single", CreatedAt: "", UpdatedAt: "" },
+  { documentId: "d1", name: "Blog", slug: "blog", kind: "collection", draftToPublish: true, fields: [], listFields: [], createdAt: "", updatedAt: "" },
+  { documentId: "d2", name: "About", slug: "about", kind: "single", draftToPublish: true, fields: [], listFields: [], createdAt: "", updatedAt: "" },
 ];
 
 let mock: MockAdapter;
@@ -65,14 +65,14 @@ function renderSidebar(user: MeUser = makeMeUser()) {
 
 describe("Sidebar", () => {
   it("renders content type names fetched from the API", async () => {
-    mock.onGet("/api/content-types").reply(200, contentTypes);
+    mock.onGet("/content-types").reply(200, contentTypes);
     renderSidebar();
     await waitFor(() => expect(screen.getByText("Blog")).toBeInTheDocument());
     expect(screen.getByText("About")).toBeInTheDocument();
   });
 
   it("renders nav links pointing to new content-type routes by kind", async () => {
-    mock.onGet("/api/content-types").reply(200, contentTypes);
+    mock.onGet("/content-types").reply(200, contentTypes);
     renderSidebar();
     await waitFor(() => expect(screen.getByRole("link", { name: "Blog" })).toBeInTheDocument());
     expect(screen.getByRole("link", { name: "Blog" })).toHaveAttribute("href", "/admin/content-type/collection-type/blog");
@@ -80,7 +80,7 @@ describe("Sidebar", () => {
   });
 
   it("renders no content-type links when no content types exist", async () => {
-    mock.onGet("/api/content-types").reply(200, []);
+    mock.onGet("/content-types").reply(200, []);
     renderSidebar();
     await waitFor(() => expect(screen.getByRole("link", { name: /media library/i })).toBeInTheDocument());
     expect(screen.queryByRole("link", { name: "Blog" })).toBeNull();
@@ -88,7 +88,7 @@ describe("Sidebar", () => {
   });
 
   it("groups content types into Single Types and Collection Types sections", async () => {
-    mock.onGet("/api/content-types").reply(200, contentTypes);
+    mock.onGet("/content-types").reply(200, contentTypes);
     renderSidebar();
 
     await waitFor(() => expect(screen.getByText("Blog")).toBeInTheDocument());
@@ -104,7 +104,7 @@ describe("Sidebar", () => {
   });
 
   it("omits a section heading when no content type of that kind exists", async () => {
-    mock.onGet("/api/content-types").reply(200, [contentTypes[0]]); // collection only
+    mock.onGet("/content-types").reply(200, [contentTypes[0]]); // collection only
     renderSidebar();
 
     await waitFor(() => expect(screen.getByText("Blog")).toBeInTheDocument());
@@ -113,7 +113,7 @@ describe("Sidebar", () => {
   });
 
   it("renders a Settings section with a Media Library link to /admin/settings/media", async () => {
-    mock.onGet("/api/content-types").reply(200, []);
+    mock.onGet("/content-types").reply(200, []);
     renderSidebar();
 
     await waitFor(() => expect(screen.getByRole("link", { name: /media library/i })).toBeInTheDocument());
@@ -121,13 +121,13 @@ describe("Sidebar", () => {
   });
 
   it("renders a Logout button", async () => {
-    mock.onGet("/api/content-types").reply(200, []);
+    mock.onGet("/content-types").reply(200, []);
     renderSidebar();
     await waitFor(() => expect(screen.getByRole("button", { name: /logout/i })).toBeInTheDocument());
   });
 
   it("calls POST /auth/logout when Logout is clicked", async () => {
-    mock.onGet("/api/content-types").reply(200, []);
+    mock.onGet("/content-types").reply(200, []);
     mock.onPost("/auth/logout").reply(200, { message: "Logged out" });
     const user = userEvent.setup();
     renderSidebar();

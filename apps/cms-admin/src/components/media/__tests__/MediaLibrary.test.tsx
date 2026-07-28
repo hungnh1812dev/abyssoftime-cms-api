@@ -9,39 +9,38 @@ import { renderWithProviders } from "@/test-utils";
 
 let mock: MockAdapter;
 
-const mediaResponse = {
-  items: [
-    {
-      ID: "a1",
-      documentId: "a1",
-      url: "https://cdn/a1.jpg",
-      thumbnailUrl: "https://cdn/a1.jpg",
-      publicId: "p1",
-      fileName: "a1_abc.jpg",
-      fileExt: "jpg",
-      hash: "abc",
-      documentRef: "",
-      contentTypeId: "",
-      createdAt: "",
-    },
-    {
-      ID: "a2",
-      documentId: "a2",
-      url: "https://cdn/a2.jpg",
-      thumbnailUrl: "https://cdn/a2.jpg",
-      publicId: "p2",
-      fileName: "a2_def.jpg",
-      fileExt: "jpg",
-      hash: "def",
-      documentRef: "",
-      contentTypeId: "",
-      createdAt: "",
-    },
-  ],
-  total: 2,
-  page: 1,
-  limit: 20,
-};
+const mediaItems = [
+  {
+    documentId: "a1",
+    fileName: "a1_abc.jpg",
+    mimeType: "image/jpeg",
+    size: 1024,
+    width: 800,
+    height: 600,
+    url: "https://cdn/a1.jpg",
+    thumbnailUrl: "https://cdn/a1.jpg",
+    publicId: "p1",
+    hash: "abc",
+    uploadedBy: null,
+    createdAt: "",
+    updatedAt: "",
+  },
+  {
+    documentId: "a2",
+    fileName: "a2_def.jpg",
+    mimeType: "image/jpeg",
+    size: 2048,
+    width: 800,
+    height: 600,
+    url: "https://cdn/a2.jpg",
+    thumbnailUrl: "https://cdn/a2.jpg",
+    publicId: "p2",
+    hash: "def",
+    uploadedBy: null,
+    createdAt: "",
+    updatedAt: "",
+  },
+];
 
 beforeEach(() => {
   mock = new MockAdapter(api);
@@ -54,7 +53,7 @@ afterEach(() => {
 
 describe("MediaLibrary", () => {
   it("renders thumbnails from API when open", async () => {
-    mock.onGet("/api/media?page=1&limit=20").reply(200, mediaResponse);
+    mock.onGet("/media").reply(200, mediaItems);
 
     renderWithProviders(<MediaLibrary isOpen onClose={vi.fn()} onSelect={vi.fn()} />);
 
@@ -64,7 +63,7 @@ describe("MediaLibrary", () => {
   });
 
   it("calls onSelect and onClose when a thumbnail is clicked", async () => {
-    mock.onGet("/api/media?page=1&limit=20").reply(200, mediaResponse);
+    mock.onGet("/media").reply(200, mediaItems);
     const onSelect = vi.fn();
     const onClose = vi.fn();
 
@@ -73,7 +72,7 @@ describe("MediaLibrary", () => {
     await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(2));
     await userEvent.click(screen.getAllByRole("img")[0]);
 
-    expect(onSelect).toHaveBeenCalledWith(mediaResponse.items[0]);
+    expect(onSelect).toHaveBeenCalledWith(mediaItems[0]);
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -82,20 +81,19 @@ describe("MediaLibrary", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("shows prev/next pagination buttons", async () => {
-    mock.onGet("/api/media?page=1&limit=20").reply(200, { ...mediaResponse, total: 50 });
+  it("shows the total asset count with no pagination controls (GET /media is unpaginated)", async () => {
+    mock.onGet("/media").reply(200, mediaItems);
 
     renderWithProviders(<MediaLibrary isOpen onClose={vi.fn()} onSelect={vi.fn()} />);
 
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /next/i })).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByText("2 assets")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
   });
 
   // ---- Delete ----------------------------------------------------------------
 
   it("renders a delete button for each asset tile", async () => {
-    mock.onGet("/api/media?page=1&limit=20").reply(200, mediaResponse);
+    mock.onGet("/media").reply(200, mediaItems);
 
     renderWithProviders(<MediaLibrary isOpen onClose={vi.fn()} onSelect={vi.fn()} />);
 
@@ -104,9 +102,9 @@ describe("MediaLibrary", () => {
   });
 
   it("opens confirm dialog on delete click (does not call API)", async () => {
-    mock.onGet("/api/media?page=1&limit=20").reply(200, mediaResponse);
+    mock.onGet("/media").reply(200, mediaItems);
     let deleteCalled = false;
-    mock.onDelete("/api/media/a1").reply(() => {
+    mock.onDelete("/media/a1").reply(() => {
       deleteCalled = true;
       return [204];
     });
@@ -123,8 +121,8 @@ describe("MediaLibrary", () => {
   });
 
   it("fires DELETE on confirm and invalidates the list", async () => {
-    mock.onGet("/api/media?page=1&limit=20").reply(200, mediaResponse);
-    mock.onDelete("/api/media/a1").reply(204);
+    mock.onGet("/media").reply(200, mediaItems);
+    mock.onDelete("/media/a1").reply(204);
 
     renderWithProviders(<MediaLibrary isOpen onClose={vi.fn()} onSelect={vi.fn()} />);
 
@@ -136,11 +134,11 @@ describe("MediaLibrary", () => {
     await userEvent.click(confirmBtn);
 
     await waitFor(() => expect(mock.history.delete).toHaveLength(1));
-    expect(mock.history.delete[0].url).toBe("/api/media/a1");
+    expect(mock.history.delete[0].url).toBe("/media/a1");
   });
 
   it("closes confirm dialog on cancel click", async () => {
-    mock.onGet("/api/media?page=1&limit=20").reply(200, mediaResponse);
+    mock.onGet("/media").reply(200, mediaItems);
 
     renderWithProviders(<MediaLibrary isOpen onClose={vi.fn()} onSelect={vi.fn()} />);
 

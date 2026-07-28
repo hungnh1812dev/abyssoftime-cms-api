@@ -7,7 +7,6 @@ import type { MediaAsset } from "@/types/cms";
 interface MediaInputProps {
   name?: string;
   control?: Control;
-  ext?: string[];
   "aria-label"?: string;
 }
 
@@ -15,17 +14,16 @@ function isMediaAssetObject(value: unknown): value is MediaAsset {
   return typeof value === "object" && value !== null && "url" in value;
 }
 
-export function MediaInput({ name, control, ext, "aria-label": ariaLabel }: MediaInputProps) {
-  return <Controller name={name ?? ""} control={control} defaultValue={null} render={({ field }) => <MediaInputInner field={field} ariaLabel={ariaLabel ?? name} ext={ext} />} />;
+export function MediaInput({ name, control, "aria-label": ariaLabel }: MediaInputProps) {
+  return <Controller name={name ?? ""} control={control} defaultValue={null} render={({ field }) => <MediaInputInner field={field} ariaLabel={ariaLabel ?? name} />} />;
 }
 
 interface MediaInputInnerProps {
   field: { value: unknown; onChange: (value: unknown) => void };
   ariaLabel?: string;
-  ext?: string[];
 }
 
-function MediaInputInner({ field, ariaLabel, ext }: MediaInputInnerProps) {
+function MediaInputInner({ field, ariaLabel }: MediaInputInnerProps) {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
   const asset = isMediaAssetObject(field.value) ? field.value : null;
@@ -84,7 +82,7 @@ function MediaInputInner({ field, ariaLabel, ext }: MediaInputInnerProps) {
           </div>
         )}
       </div>
-      <MediaLibrary isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} onSelect={handleSelect} ext={ext} />
+      <MediaLibrary isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} onSelect={handleSelect} />
     </>
   );
 }

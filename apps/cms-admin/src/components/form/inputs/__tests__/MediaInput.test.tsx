@@ -11,30 +11,27 @@ import { api } from "@/lib/api";
 
 let mock: MockAdapter;
 
-const mediaResponse = {
-  items: [
-    {
-      ID: "a1",
-      documentId: "doc-uuid-1",
-      url: "https://cdn/a1.jpg",
-      thumbnailUrl: "https://cdn/a1.jpg",
-      publicId: "p1",
-      fileName: "a1_abc.jpg",
-      fileExt: "jpg",
-      hash: "abc",
-      width: 800,
-      height: 600,
-      createdAt: "",
-    },
-  ],
-  total: 1,
-  page: 1,
-  limit: 20,
-};
+const mediaItems = [
+  {
+    documentId: "doc-uuid-1",
+    url: "https://cdn/a1.jpg",
+    thumbnailUrl: "https://cdn/a1.jpg",
+    publicId: "p1",
+    fileName: "a1_abc.jpg",
+    mimeType: "image/jpeg",
+    size: 1024,
+    hash: "abc",
+    width: 800,
+    height: 600,
+    uploadedBy: null,
+    createdAt: "",
+    updatedAt: "",
+  },
+];
 
 beforeEach(() => {
   mock = new MockAdapter(api);
-  mock.onGet("/api/media?page=1&limit=20").reply(200, mediaResponse);
+  mock.onGet("/media").reply(200, mediaItems);
 });
 
 afterEach(() => {
@@ -96,10 +93,10 @@ describe("MediaInput", () => {
     await userEvent.click(screen.getByTestId("media-upload-zone"));
 
     await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(1));
-    await userEvent.click(screen.getByRole("img", { name: mediaResponse.items[0].fileName }));
+    await userEvent.click(screen.getByRole("img", { name: mediaItems[0].fileName }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    const zoneImg = await screen.findByRole("img", { name: mediaResponse.items[0].fileName });
+    const zoneImg = await screen.findByRole("img", { name: mediaItems[0].fileName });
     expect(zoneImg).toHaveAttribute("src", "https://cdn/a1.jpg");
   });
 

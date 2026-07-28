@@ -7,18 +7,12 @@ import { useDeleteMedia, useMediaList, useUploadMedia } from "@/hooks/useMedia";
 import type { MediaAsset } from "@/types/cms";
 
 export function MediaLibraryPage() {
-  const [page, setPage] = useState(1);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<MediaAsset | null>(null);
 
-  const { data, isLoading } = useMediaList(page, 20);
+  const { data: items = [], isLoading } = useMediaList();
   const upload = useUploadMedia();
   const deleteMedia = useDeleteMedia();
-
-  const items = data?.items ?? [];
-  const total = data?.total ?? 0;
-  const hasNext = page * 20 < total;
-  const hasPrev = page > 1;
 
   async function handleUpload() {
     for (const file of stagedFiles) {
@@ -91,7 +85,7 @@ export function MediaLibraryPage() {
       ) : (
         <div className="grid grid-cols-5 gap-4">
           {items.map((asset) => (
-            <div key={asset.ID} className="group relative">
+            <div key={asset.documentId} className="group relative">
               <div className="relative aspect-square overflow-hidden rounded border">
                 <img src={asset.thumbnailUrl || asset.url} alt={asset.fileName} className="h-full w-full object-contain" />
                 <span className="absolute right-0 bottom-0 left-0 truncate bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{asset.fileName}</span>
@@ -108,19 +102,9 @@ export function MediaLibraryPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <span className="text-muted-foreground text-sm">
-          {total} asset{total !== 1 ? "s" : ""}
-        </span>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage - 1)} disabled={!hasPrev}>
-            Prev
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage + 1)} disabled={!hasNext}>
-            Next
-          </Button>
-        </div>
-      </div>
+      <p className="text-muted-foreground text-sm">
+        {items.length} asset{items.length !== 1 ? "s" : ""}
+      </p>
 
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent>

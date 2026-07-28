@@ -1,25 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
-import { toast } from "sonner";
 
 import { api } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/errors";
+import { toast } from "sonner";
 import type { Document } from "@/types/cms";
 
 function onMutationError(error: unknown) {
-  const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Something went wrong";
-  toast.error(message);
+  toast.error(apiErrorMessage(error, "Something went wrong"));
 }
 
 const KEYS = {
-  document: (slug: string, locale: string) => ["documents", "single-type", slug, locale] as const,
+  document: (slug: string) => ["documents", "single-type", slug] as const,
 };
 
-export function useSingleTypeDocument(slug: string, locale: string) {
+export function useSingleTypeDocument(slug: string) {
   return useQuery({
-    queryKey: KEYS.document(slug, locale),
+    queryKey: KEYS.document(slug),
     queryFn: async () => {
       try {
-        const response = await api.get<Document>(`/api/document-manager/single-type/${slug}`, { params: { locale } });
+        const response = await api.get<Document>(`/documents/single-type/${slug}`);
         return response.data;
       } catch (error) {
         const status = (error as AxiosError).response?.status;
@@ -38,10 +38,10 @@ export function useSingleTypeDocument(slug: string, locale: string) {
 export function useSaveSingleType() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ contentTypeSlug, locale, data }: { contentTypeSlug: string; locale?: string; data: Record<string, unknown> }) =>
-      api.put<Document>(`/api/document-manager/single-type/${contentTypeSlug}`, { data }, { params: { locale } }).then((response) => response.data),
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["documents", "single-type"] });
+    mutationFn: ({ contentTypeSlug, data }: { contentTypeSlug: string; data: Record<string, unknown> }) =>
+      api.put<Document>(`/documents/single-type/${contentTypeSlug}`, { data }).then((response) => response.data),
+    onSuccess: (result, { contentTypeSlug }) => {
+      queryClient.invalidateQueries({ queryKey: KEYS.document(contentTypeSlug) });
       return result;
     },
     onError: onMutationError,
@@ -51,10 +51,10 @@ export function useSaveSingleType() {
 export function usePublishSingleType() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ contentTypeSlug, locale }: { contentTypeSlug: string; locale?: string }) =>
-      api.post<{ status: string }>(`/api/document-manager/single-type/${contentTypeSlug}/publish`, undefined, { params: { locale } }).then((response) => response.data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["documents", "single-type"] });
+    mutationFn: ({ contentTypeSlug }: { contentTypeSlug: string }) =>
+      api.post<{ status: string }>(`/documents/single-type/${contentTypeSlug}/publish`).then((response) => response.data),
+    onSuccess: (_, { contentTypeSlug }) => {
+      queryClient.invalidateQueries({ queryKey: KEYS.document(contentTypeSlug) });
     },
     onError: onMutationError,
   });
@@ -63,10 +63,10 @@ export function usePublishSingleType() {
 export function useUnpublishSingleType() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ contentTypeSlug, locale }: { contentTypeSlug: string; locale?: string }) =>
-      api.post<{ status: string }>(`/api/document-manager/single-type/${contentTypeSlug}/unpublish`, undefined, { params: { locale } }).then((response) => response.data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["documents", "single-type"] });
+    mutationFn: ({ contentTypeSlug }: { contentTypeSlug: string }) =>
+      api.post<{ status: string }>(`/documents/single-type/${contentTypeSlug}/unpublish`).then((response) => response.data),
+    onSuccess: (_, { contentTypeSlug }) => {
+      queryClient.invalidateQueries({ queryKey: KEYS.document(contentTypeSlug) });
     },
     onError: onMutationError,
   });

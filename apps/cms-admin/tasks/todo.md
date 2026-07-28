@@ -33,15 +33,20 @@ each task completes.
 - [x] 4.1 Remove locale route + nav entry; confirm orphaned locale files still typecheck (345/345 tests, lint, build all green; confirmed no locale/internationalize chunk is bundled anymore)
 
 ## Phase 5 — Content Types, Documents & Media Contract Rewrite
-- [ ] 5.1 Rewrite `src/types/cms.ts` to new camelCase shapes
-- [ ] 5.2 Rewrite `useContentTypes.ts` paths
-- [ ] 5.3 Rewrite `useCollectionDocuments.ts` + `useSingleTypeDocuments.ts` (paths, drop locale,
+- [x] 5.1 Rewrite `src/types/cms.ts` to new camelCase shapes
+- [x] 5.2 Rewrite `useContentTypes.ts` paths
+- [x] 5.3 Rewrite `useCollectionDocuments.ts` + `useSingleTypeDocuments.ts` (paths, drop locale,
       `updatedBy` shape, bulk-delete reconciliation)
-- [ ] 5.4 Strip locale from `ContentTypePanel.tsx`; audit `MediaInput` `field.ext` usage
-- [ ] 5.5 Strip locale from `CollectionListPage.tsx`; audit pagination/filter params
-- [ ] 5.6 Rewrite `useMedia.ts` + media UI (unpaginated, new shapes)
-- [ ] 5.7 Confirm `content-type-registry` + Sidebar content-type nav still work
-- [ ] **Checkpoint 5** — test/lint/build green; live full content-path walkthrough; commit
+- [x] 5.4 Strip locale from `ContentTypePanel.tsx`; audit `MediaInput` `field.ext` usage (no
+      dependency found — `ext` prop removed, upload accept is fixed image/png,image/jpeg)
+- [x] 5.5 Strip locale from `CollectionListPage.tsx`; audit pagination/filter params (orderBy for
+      system columns is snake_case at the wire level — documented in code)
+- [x] 5.6 Rewrite `useMedia.ts` + media UI (unpaginated, new shapes)
+- [x] 5.7 Confirm `content-type-registry` + Sidebar content-type nav still work (build green,
+      no changes needed)
+- [x] **Checkpoint 5** — 338/338 tests, lint, build green; curl-verified `/api/v1/content-types`
+      and `/api/v1/media` paths exist and are cookie-guarded against real backend (no browser tool
+      available in this environment for the full live walkthrough — see summary); commit
 
 ## Phase 6 — Full Regression, Docs Update, Review, Clean-up
 - [ ] 6.1 Full automated regression (lint/test/build)

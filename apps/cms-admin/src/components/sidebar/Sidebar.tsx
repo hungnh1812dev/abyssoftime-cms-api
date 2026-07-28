@@ -16,8 +16,8 @@ export function Sidebar() {
   const { data: contentTypes } = useContentTypes();
   const { displayName, permissions, logout } = useAuth();
 
-  const singleTypes = (contentTypes ?? []).filter((contentType) => contentType.Kind === "single");
-  const collectionTypes = (contentTypes ?? []).filter((contentType) => contentType.Kind === "collection");
+  const singleTypes = (contentTypes ?? []).filter((contentType) => contentType.kind === "single");
+  const collectionTypes = (contentTypes ?? []).filter((contentType) => contentType.kind === "collection");
 
   // Permission-based gating (specs/access-token-auth-mismatch.md §13.6) —
   // fully replaces the former roleLevel-tier checks. Items are omitted from
@@ -36,8 +36,8 @@ export function Sidebar() {
           {singleTypes.length > 0 && (
             <SidebarSubGroup label="Single Types">
               {singleTypes.map((contentType) => (
-                <SidebarItem key={contentType.ID} to={`/admin/content-type/single-type/${contentType.Slug}`}>
-                  {contentType.Name}
+                <SidebarItem key={contentType.slug} to={`/admin/content-type/single-type/${contentType.slug}`}>
+                  {contentType.name}
                 </SidebarItem>
               ))}
             </SidebarSubGroup>
@@ -45,8 +45,8 @@ export function Sidebar() {
           {collectionTypes.length > 0 && (
             <SidebarSubGroup label="Collection Types">
               {collectionTypes.map((contentType) => (
-                <SidebarItem key={contentType.ID} to={`/admin/content-type/collection-type/${contentType.Slug}`}>
-                  {contentType.Name}
+                <SidebarItem key={contentType.slug} to={`/admin/content-type/collection-type/${contentType.slug}`}>
+                  {contentType.name}
                 </SidebarItem>
               ))}
             </SidebarSubGroup>

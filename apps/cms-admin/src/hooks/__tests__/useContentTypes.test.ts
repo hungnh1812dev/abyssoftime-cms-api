@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { useContentType, useContentTypeBySlug, useContentTypes, useUpdateListFields } from "@/hooks/useContentTypes";
+import { useContentTypeBySlug, useContentTypes, useUpdateListFields } from "@/hooks/useContentTypes";
 import { api } from "@/lib/api";
 import type { ContentType } from "@/types/cms";
 
@@ -29,41 +29,30 @@ function createWrapper() {
 }
 
 const ct: ContentType = {
-  ID: "1",
-  DocumentID: "doc-1",
-  Name: "Blog",
-  Slug: "blog",
-  Kind: "collection",
-  CreatedAt: "2024-01-01T00:00:00Z",
-  UpdatedAt: "2024-01-01T00:00:00Z",
+  documentId: "doc-1",
+  name: "Blog",
+  slug: "blog",
+  kind: "collection",
+  draftToPublish: true,
+  fields: [{ name: "title", type: "text" }],
+  listFields: ["title"],
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
 };
 
 describe("useContentTypes", () => {
-  it("returns list of content types from GET /api/content-types", async () => {
-    mock.onGet("/api/content-types").reply(200, [ct]);
+  it("returns list of content types from GET /content-types", async () => {
+    const summary = { slug: ct.slug, name: ct.name, kind: ct.kind, draftToPublish: ct.draftToPublish };
+    mock.onGet("/content-types").reply(200, [summary]);
     const { result } = renderHook(() => useContentTypes(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual([ct]);
-  });
-});
-
-describe("useContentType", () => {
-  it("returns a single content type from GET /api/content-types/{id}", async () => {
-    mock.onGet("/api/content-types/1").reply(200, ct);
-    const { result } = renderHook(() => useContentType("1"), { wrapper: createWrapper() });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual(ct);
-  });
-
-  it("is disabled when id is empty", () => {
-    const { result } = renderHook(() => useContentType(""), { wrapper: createWrapper() });
-    expect(result.current.fetchStatus).toBe("idle");
+    expect(result.current.data).toEqual([summary]);
   });
 });
 
 describe("useContentTypeBySlug", () => {
-  it("returns a content type from GET /api/content-types/{slug}", async () => {
-    mock.onGet("/api/content-types/blog").reply(200, ct);
+  it("returns a content type from GET /content-types/{slug}", async () => {
+    mock.onGet("/content-types/blog").reply(200, ct);
     const { result } = renderHook(() => useContentTypeBySlug("blog"), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(ct);
@@ -76,8 +65,8 @@ describe("useContentTypeBySlug", () => {
 });
 
 describe("useUpdateListFields", () => {
-  it("sends PATCH to /api/content-types/{slug}/list-fields", async () => {
-    mock.onPatch("/api/content-types/blog/list-fields").reply(200, { listFields: ["title", "slug"] });
+  it("sends PATCH to /content-types/{slug}/list-fields and returns the full content type", async () => {
+    mock.onPatch("/content-types/blog/list-fields").reply(200, { ...ct, listFields: ["title", "slug"] });
     const { result } = renderHook(() => useUpdateListFields(), { wrapper: createWrapper() });
 
     result.current.mutate({ slug: "blog", listFields: ["title", "slug"] });
@@ -85,5 +74,6 @@ describe("useUpdateListFields", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mock.history.patch).toHaveLength(1);
     expect(JSON.parse(mock.history.patch[0].data)).toEqual({ listFields: ["title", "slug"] });
+    expect(result.current.data?.listFields).toEqual(["title", "slug"]);
   });
 });
