@@ -17,7 +17,7 @@ import { ResetPasswordService } from "./application/services/reset-password.serv
 import { VerifyOtpService } from "./application/services/verify-otp.service";
 import { EMAIL_SENDER } from "./domain/ports/email-sender.port";
 import { EMAIL_TEMPLATE_RENDERER } from "./infrastructure/email/renderers/email-template-renderer";
-import { resolveEmailTemplateRenderer } from "./infrastructure/email/renderers/resolve-email-template-renderer";
+import { HandlebarsEmailTemplateRenderer } from "./infrastructure/email/renderers/handlebars-email-template.renderer";
 import { resolveEmailSender } from "./infrastructure/email/resolve-email-sender";
 import { AuthController } from "./presentation/auth.controller";
 
@@ -52,7 +52,7 @@ import { AuthController } from "./presentation/auth.controller";
     RefreshTokenService,
     ForgotPasswordService,
     ResetPasswordService,
-    { provide: EMAIL_TEMPLATE_RENDERER, useFactory: resolveEmailTemplateRenderer, inject: [ConfigService] },
+    { provide: EMAIL_TEMPLATE_RENDERER, useClass: HandlebarsEmailTemplateRenderer },
     {
       provide: EMAIL_SENDER,
       useFactory: resolveEmailSender,

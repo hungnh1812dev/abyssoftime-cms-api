@@ -4,9 +4,6 @@ import { IsIn, IsInt, IsString, Min, MinLength, validateSync } from "class-valid
 export const SUPPORTED_DB_DRIVERS = ["postgresql", "mysql", "sqlite"] as const;
 export type DbDriver = (typeof SUPPORTED_DB_DRIVERS)[number];
 
-export const SUPPORTED_EMAIL_TEMPLATE_ENGINES = ["ts", "handlebars"] as const;
-export type EmailTemplateEngine = (typeof SUPPORTED_EMAIL_TEMPLATE_ENGINES)[number];
-
 export class EnvironmentVariables {
   // DB Connection
   @IsIn(SUPPORTED_DB_DRIVERS)
@@ -114,11 +111,6 @@ export class EnvironmentVariables {
   @IsString()
   @MinLength(1)
   FRONTEND_URL: string = "http://localhost:3000";
-
-  // Email template rendering — "ts" (default, TypeScript template functions) or "handlebars" (.hbs files),
-  // see resolve-email-template-renderer.ts
-  @IsIn(SUPPORTED_EMAIL_TEMPLATE_ENGINES)
-  EMAIL_TEMPLATE_ENGINE: EmailTemplateEngine = "ts";
 }
 
 export function validate(config: Record<string, unknown>): EnvironmentVariables {
