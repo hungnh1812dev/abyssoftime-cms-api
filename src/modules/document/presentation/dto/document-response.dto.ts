@@ -56,6 +56,9 @@ export class ListedDocumentItemResponseDto {
 
   @ApiProperty()
   updatedAt!: Date;
+
+  @ApiPropertyOptional({ type: UpdatedByResponseDto, nullable: true })
+  updatedBy?: UpdatedByResponseDto | null;
 }
 
 export class ListDocumentsResponseDto {
