@@ -1,7 +1,7 @@
-import axios from 'axios';
+import axios from "axios";
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
+  baseURL: import.meta.env.VITE_API_URL || "",
   withCredentials: true,
 });
 
@@ -37,7 +37,7 @@ async function refreshAccessToken(): Promise<string> {
   if (_refreshPromise) return _refreshPromise;
 
   _refreshPromise = api
-    .post<{ accessToken: string }>('/auth/refresh', undefined, { _retried: true } as object)
+    .post<{ accessToken: string }>("/auth/refresh", undefined, { _retried: true } as object)
     .then((res) => {
       const { accessToken } = res.data;
       setAccessToken(accessToken);

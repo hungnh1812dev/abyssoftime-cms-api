@@ -1,12 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { FormProvider } from '../../FormProvider';
-import { FormField } from '../../FormField';
-import { TextInput } from '../TextInput';
-import { NumberInput } from '../NumberInput';
-import { BooleanInput } from '../BooleanInput';
+import { FormField } from "../../FormField";
+import { FormProvider } from "../../FormProvider";
+import { BooleanInput } from "../BooleanInput";
+import { NumberInput } from "../NumberInput";
+import { TextInput } from "../TextInput";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 
 function createClient() {
   return new QueryClient({
@@ -22,8 +22,8 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 // TextInput
 // ──────────────────────────────────────────────
 
-describe('TextInput', () => {
-  it('renders a text input', () => {
+describe("TextInput", () => {
+  it("renders a text input", () => {
     const mutationFn = vi.fn().mockResolvedValue(undefined);
     render(
       <Wrapper>
@@ -34,10 +34,10 @@ describe('TextInput', () => {
         </FormProvider>
       </Wrapper>,
     );
-    expect(screen.getByRole('textbox', { name: 'title' })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "title" })).toBeInTheDocument();
   });
 
-  it('accepts typed value and submits it', async () => {
+  it("accepts typed value and submits it", async () => {
     const user = userEvent.setup();
     const mutationFn = vi.fn().mockResolvedValue(undefined);
     render(
@@ -50,14 +50,14 @@ describe('TextInput', () => {
         </FormProvider>
       </Wrapper>,
     );
-    await user.type(screen.getByRole('textbox', { name: 'title' }), 'Hello world');
-    await user.click(screen.getByRole('button', { name: /submit/i }));
+    await user.type(screen.getByRole("textbox", { name: "title" }), "Hello world");
+    await user.click(screen.getByRole("button", { name: /submit/i }));
     await waitFor(() => {
-      expect(mutationFn.mock.calls[0][0]).toEqual({ title: 'Hello world' });
+      expect(mutationFn.mock.calls[0][0]).toEqual({ title: "Hello world" });
     });
   });
 
-  it('renders a textarea when multiline is true', () => {
+  it("renders a textarea when multiline is true", () => {
     const mutationFn = vi.fn().mockResolvedValue(undefined);
     render(
       <Wrapper>
@@ -68,10 +68,10 @@ describe('TextInput', () => {
         </FormProvider>
       </Wrapper>,
     );
-    expect(screen.getByRole('textbox', { name: 'body' })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "body" })).toBeInTheDocument();
     // Textarea has no type attribute — input does; distinguish via tagName
-    const el = screen.getByRole('textbox', { name: 'body' });
-    expect(el.tagName.toLowerCase()).toBe('textarea');
+    const el = screen.getByRole("textbox", { name: "body" });
+    expect(el.tagName.toLowerCase()).toBe("textarea");
   });
 });
 
@@ -79,8 +79,8 @@ describe('TextInput', () => {
 // NumberInput
 // ──────────────────────────────────────────────
 
-describe('NumberInput', () => {
-  it('renders a number input', () => {
+describe("NumberInput", () => {
+  it("renders a number input", () => {
     const mutationFn = vi.fn().mockResolvedValue(undefined);
     render(
       <Wrapper>
@@ -91,10 +91,10 @@ describe('NumberInput', () => {
         </FormProvider>
       </Wrapper>,
     );
-    expect(screen.getByRole('spinbutton', { name: 'count' })).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "count" })).toBeInTheDocument();
   });
 
-  it('passes step, min, max to the underlying input', () => {
+  it("passes step, min, max to the underlying input", () => {
     const mutationFn = vi.fn().mockResolvedValue(undefined);
     render(
       <Wrapper>
@@ -105,10 +105,10 @@ describe('NumberInput', () => {
         </FormProvider>
       </Wrapper>,
     );
-    const el = screen.getByRole('spinbutton', { name: 'price' });
-    expect(el).toHaveAttribute('step', '0.01');
-    expect(el).toHaveAttribute('min', '0');
-    expect(el).toHaveAttribute('max', '9999');
+    const el = screen.getByRole("spinbutton", { name: "price" });
+    expect(el).toHaveAttribute("step", "0.01");
+    expect(el).toHaveAttribute("min", "0");
+    expect(el).toHaveAttribute("max", "9999");
   });
 });
 
@@ -116,8 +116,8 @@ describe('NumberInput', () => {
 // BooleanInput
 // ──────────────────────────────────────────────
 
-describe('BooleanInput', () => {
-  it('renders a switch / checkbox', () => {
+describe("BooleanInput", () => {
+  it("renders a switch / checkbox", () => {
     const mutationFn = vi.fn().mockResolvedValue(undefined);
     render(
       <Wrapper>
@@ -129,10 +129,10 @@ describe('BooleanInput', () => {
       </Wrapper>,
     );
     // @base-ui Switch renders with role="switch"
-    expect(screen.getByRole('switch', { name: 'active' })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "active" })).toBeInTheDocument();
   });
 
-  it('toggles and submits boolean value', async () => {
+  it("toggles and submits boolean value", async () => {
     const user = userEvent.setup();
     const mutationFn = vi.fn().mockResolvedValue(undefined);
     render(
@@ -145,8 +145,8 @@ describe('BooleanInput', () => {
         </FormProvider>
       </Wrapper>,
     );
-    await user.click(screen.getByRole('switch', { name: 'active' }));
-    await user.click(screen.getByRole('button', { name: /submit/i }));
+    await user.click(screen.getByRole("switch", { name: "active" }));
+    await user.click(screen.getByRole("button", { name: /submit/i }));
     await waitFor(() => {
       expect(mutationFn.mock.calls[0][0]).toEqual({ active: true });
     });

@@ -1,50 +1,50 @@
-import { describe, it, expect } from 'vitest';
-import { renderHook } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { useBreadcrumbs } from '../useBreadcrumbs';
+import { useBreadcrumbs } from "../useBreadcrumbs";
+import { renderHook } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { describe, expect, it } from "vitest";
 
 function wrapper(path: string) {
   return ({ children }: { children: React.ReactNode }) => <MemoryRouter initialEntries={[path]}>{children}</MemoryRouter>;
 }
 
-describe('useBreadcrumbs', () => {
-  it('returns Home for /admin', () => {
-    const { result } = renderHook(() => useBreadcrumbs(), { wrapper: wrapper('/admin') });
-    expect(result.current).toEqual([{ label: 'Home', to: '/admin' }]);
+describe("useBreadcrumbs", () => {
+  it("returns Home for /admin", () => {
+    const { result } = renderHook(() => useBreadcrumbs(), { wrapper: wrapper("/admin") });
+    expect(result.current).toEqual([{ label: "Home", to: "/admin" }]);
   });
 
-  it('returns Content Manager > title-cased slug for single-type route', () => {
+  it("returns Content Manager > title-cased slug for single-type route", () => {
     const { result } = renderHook(() => useBreadcrumbs(), {
-      wrapper: wrapper('/admin/content-type/single-type/homepage'),
+      wrapper: wrapper("/admin/content-type/single-type/homepage"),
     });
-    expect(result.current).toEqual([{ label: 'Home', to: '/admin' }, { label: 'Content Manager' }, { label: 'Homepage' }]);
+    expect(result.current).toEqual([{ label: "Home", to: "/admin" }, { label: "Content Manager" }, { label: "Homepage" }]);
   });
 
-  it('returns Content Manager > title-cased slug for collection-type route', () => {
+  it("returns Content Manager > title-cased slug for collection-type route", () => {
     const { result } = renderHook(() => useBreadcrumbs(), {
-      wrapper: wrapper('/admin/content-type/collection-type/articles'),
+      wrapper: wrapper("/admin/content-type/collection-type/articles"),
     });
-    expect(result.current).toEqual([{ label: 'Home', to: '/admin' }, { label: 'Content Manager' }, { label: 'Articles' }]);
+    expect(result.current).toEqual([{ label: "Home", to: "/admin" }, { label: "Content Manager" }, { label: "Articles" }]);
   });
 
-  it('converts hyphenated slugs to title case', () => {
+  it("converts hyphenated slugs to title case", () => {
     const { result } = renderHook(() => useBreadcrumbs(), {
-      wrapper: wrapper('/admin/content-type/single-type/about-page'),
+      wrapper: wrapper("/admin/content-type/single-type/about-page"),
     });
-    expect(result.current).toEqual([{ label: 'Home', to: '/admin' }, { label: 'Content Manager' }, { label: 'About Page' }]);
+    expect(result.current).toEqual([{ label: "Home", to: "/admin" }, { label: "Content Manager" }, { label: "About Page" }]);
   });
 
-  it('returns Settings > page name for settings route', () => {
+  it("returns Settings > page name for settings route", () => {
     const { result } = renderHook(() => useBreadcrumbs(), {
-      wrapper: wrapper('/admin/settings/media'),
+      wrapper: wrapper("/admin/settings/media"),
     });
-    expect(result.current).toEqual([{ label: 'Home', to: '/admin' }, { label: 'Settings' }, { label: 'Media' }]);
+    expect(result.current).toEqual([{ label: "Home", to: "/admin" }, { label: "Settings" }, { label: "Media" }]);
   });
 
-  it('returns Settings > Users for settings/users', () => {
+  it("returns Settings > Users for settings/users", () => {
     const { result } = renderHook(() => useBreadcrumbs(), {
-      wrapper: wrapper('/admin/settings/users'),
+      wrapper: wrapper("/admin/settings/users"),
     });
-    expect(result.current).toEqual([{ label: 'Home', to: '/admin' }, { label: 'Settings' }, { label: 'Users' }]);
+    expect(result.current).toEqual([{ label: "Home", to: "/admin" }, { label: "Settings" }, { label: "Users" }]);
   });
 });

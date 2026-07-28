@@ -1,7 +1,7 @@
-import { type ReactElement } from 'react';
-import { render, type RenderOptions } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, type RenderOptions } from "@testing-library/react";
+import { type ReactElement } from "react";
+import { MemoryRouter } from "react-router-dom";
 
 function createTestQueryClient() {
   return new QueryClient({
@@ -9,7 +9,7 @@ function createTestQueryClient() {
   });
 }
 
-export function renderWithProviders(ui: ReactElement, { initialEntries = ['/'], ...options }: { initialEntries?: string[] } & RenderOptions = {}) {
+export function renderWithProviders(ui: ReactElement, { initialEntries = ["/"], ...options }: { initialEntries?: string[] } & RenderOptions = {}) {
   const queryClient = createTestQueryClient();
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
@@ -22,4 +22,4 @@ export function renderWithProviders(ui: ReactElement, { initialEntries = ['/'], 
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export * from '@testing-library/react';
+export * from "@testing-library/react";

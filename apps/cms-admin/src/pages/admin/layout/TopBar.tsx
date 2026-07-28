@@ -1,8 +1,9 @@
-import { Menu } from 'lucide-react';
-import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
-import { useSidebar } from '@/components/sidebar';
-import { Button } from '@/components/ui/button';
-import { Breadcrumb } from '@/components/ui/breadcrumb';
+import { Menu } from "lucide-react";
+
+import { useSidebar } from "@/components/sidebar";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
+import { useBreadcrumbs } from "@/hooks/useBreadcrumbs";
 
 export function TopBar() {
   const crumbs = useBreadcrumbs();

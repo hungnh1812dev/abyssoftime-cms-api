@@ -1,28 +1,21 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { AxiosError } from 'axios';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
-import type { Document, PaginatedResponse } from '@/types/cms';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AxiosError } from "axios";
+import { toast } from "sonner";
+
+import { api } from "@/lib/api";
+import type { Document, PaginatedResponse } from "@/types/cms";
 
 function onMutationError(error: unknown) {
-  const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Something went wrong';
+  const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Something went wrong";
   toast.error(message);
 }
 
 const KEYS = {
-  list: (slug: string) => ['documents', 'collection-type', slug] as const,
-  detail: (slug: string, id: string, locale: string) => ['documents', 'collection-type', 'detail', slug, id, locale] as const,
+  list: (slug: string) => ["documents", "collection-type", slug] as const,
+  detail: (slug: string, id: string, locale: string) => ["documents", "collection-type", "detail", slug, id, locale] as const,
 };
 
-export function useCollectionDocuments(
-  slug: string,
-  start: number,
-  size: number,
-  locale: string,
-  orderBy: string = 'id',
-  sortDir: 'asc' | 'desc' = 'desc',
-  search: string = '',
-) {
+export function useCollectionDocuments(slug: string, start: number, size: number, locale: string, orderBy: string = "id", sortDir: "asc" | "desc" = "desc", search: string = "") {
   return useQuery({
     queryKey: [...KEYS.list(slug), start, size, locale, orderBy, sortDir, search] as const,
     queryFn: () =>
@@ -100,9 +93,9 @@ export function useBulkDeleteCollectionDocuments() {
     onSuccess: (result, { contentTypeSlug }) => {
       queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) });
       if (result.failed.length === 0) {
-        toast.success(`Deleted ${result.deleted.length} document${result.deleted.length === 1 ? '' : 's'}`);
+        toast.success(`Deleted ${result.deleted.length} document${result.deleted.length === 1 ? "" : "s"}`);
       } else {
-        toast.error(`Deleted ${result.deleted.length} document${result.deleted.length === 1 ? '' : 's'}, ${result.failed.length} failed`);
+        toast.error(`Deleted ${result.deleted.length} document${result.deleted.length === 1 ? "" : "s"}, ${result.failed.length} failed`);
       }
     },
     onError: onMutationError,
@@ -126,7 +119,7 @@ export function usePublishCollectionDocument() {
       api.post<{ status: string }>(`/api/document-manager/collection-type/${contentTypeSlug}/${id}/publish`, undefined, { params: { locale } }).then((response) => response.data),
     onSuccess: (_, { contentTypeSlug, id, locale }) => {
       queryClient.invalidateQueries({
-        queryKey: KEYS.detail(contentTypeSlug, id, locale ?? ''),
+        queryKey: KEYS.detail(contentTypeSlug, id, locale ?? ""),
       });
       queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) });
     },
@@ -141,7 +134,7 @@ export function useUnpublishCollectionDocument() {
       api.post<{ status: string }>(`/api/document-manager/collection-type/${contentTypeSlug}/${id}/unpublish`, undefined, { params: { locale } }).then((response) => response.data),
     onSuccess: (_, { contentTypeSlug, id, locale }) => {
       queryClient.invalidateQueries({
-        queryKey: KEYS.detail(contentTypeSlug, id, locale ?? ''),
+        queryKey: KEYS.detail(contentTypeSlug, id, locale ?? ""),
       });
       queryClient.invalidateQueries({ queryKey: KEYS.list(contentTypeSlug) });
     },

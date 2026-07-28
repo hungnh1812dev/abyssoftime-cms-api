@@ -1,13 +1,14 @@
-import { useState } from 'react';
-import { useLocales } from '@/hooks/useLocales';
-import { useCreateLocale, useUpdateLocale, useDeleteLocale } from '@/hooks/useLocalesMutations';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Star, Pencil, Trash2 } from 'lucide-react';
-import type { Locale } from '@/types/cms';
+import { Pencil, Star, Trash2 } from "lucide-react";
+import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useLocales } from "@/hooks/useLocales";
+import { useCreateLocale, useDeleteLocale, useUpdateLocale } from "@/hooks/useLocalesMutations";
+import type { Locale } from "@/types/cms";
 
 export function InternationalizePage() {
   const { data: locales = [], isLoading } = useLocales();
@@ -19,14 +20,14 @@ export function InternationalizePage() {
   const [editingLocale, setEditingLocale] = useState<Locale | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Locale | null>(null);
 
-  const [formCode, setFormCode] = useState('');
-  const [formName, setFormName] = useState('');
+  const [formCode, setFormCode] = useState("");
+  const [formName, setFormName] = useState("");
   const [formIsDefault, setFormIsDefault] = useState(false);
 
   function openCreateDialog() {
     setEditingLocale(null);
-    setFormCode('');
-    setFormName('');
+    setFormCode("");
+    setFormName("");
     setFormIsDefault(false);
     setDialogOpen(true);
   }
@@ -74,7 +75,7 @@ export function InternationalizePage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingLocale ? 'Edit locale' : 'Add locale'}</DialogTitle>
+            <DialogTitle>{editingLocale ? "Edit locale" : "Add locale"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -103,7 +104,7 @@ export function InternationalizePage() {
             <DialogFooter>
               <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
               <Button type="submit" disabled={isSaving}>
-                {isSaving ? 'Saving…' : editingLocale ? 'Update' : 'Create'}
+                {isSaving ? "Saving…" : editingLocale ? "Update" : "Create"}
               </Button>
             </DialogFooter>
           </form>
@@ -125,7 +126,7 @@ export function InternationalizePage() {
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
             <Button variant="destructive" onClick={handleDelete} disabled={deleteLocale.isPending}>
-              {deleteLocale.isPending ? 'Deleting…' : 'Delete'}
+              {deleteLocale.isPending ? "Deleting…" : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

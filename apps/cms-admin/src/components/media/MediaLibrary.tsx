@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { Trash2 } from 'lucide-react';
-import { useMediaList, useUploadMedia, useDeleteMedia } from '@/hooks/useMedia';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import type { MediaAsset } from '@/types/cms';
+import { Trash2 } from "lucide-react";
+import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useDeleteMedia, useMediaList, useUploadMedia } from "@/hooks/useMedia";
+import type { MediaAsset } from "@/types/cms";
 
 interface MediaLibraryProps {
   isOpen: boolean;
@@ -77,11 +78,11 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
                 <polyline points="17 8 12 3 7 8" />
                 <line x1="12" x2="12" y1="3" y2="15" />
               </svg>
-              {stagedFiles.length > 0 ? `${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''} selected` : 'Choose files to upload'}
+              {stagedFiles.length > 0 ? `${stagedFiles.length} file${stagedFiles.length !== 1 ? "s" : ""} selected` : "Choose files to upload"}
               <input
                 type="file"
                 multiple
-                accept={ext ? ext.map((extension) => `.${extension}`).join(',') : 'image/*'}
+                accept={ext ? ext.map((extension) => `.${extension}`).join(",") : "image/*"}
                 onChange={(event) => setStagedFiles(Array.from(event.target.files ?? []))}
                 className="sr-only"
               />
@@ -120,7 +121,7 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
                   ))}
                 </div>
                 <Button size="sm" className="w-full" onClick={handleUpload} disabled={upload.isPending}>
-                  {upload.isPending ? 'Uploading…' : `Upload ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`}
+                  {upload.isPending ? "Uploading…" : `Upload ${stagedFiles.length} file${stagedFiles.length !== 1 ? "s" : ""}`}
                 </Button>
               </>
             )}
@@ -137,7 +138,7 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
                   <button
                     type="button"
                     className={`relative aspect-square w-full overflow-hidden rounded-lg border-2 transition-all ${
-                      ext && !ext.includes(asset.fileExt) ? 'border-muted opacity-40' : 'border-border hover:border-primary hover:ring-primary/20 hover:shadow-md hover:ring-2'
+                      ext && !ext.includes(asset.fileExt) ? "border-muted opacity-40" : "border-border hover:border-primary hover:ring-primary/20 hover:shadow-md hover:ring-2"
                     }`}
                     disabled={deleteMedia.isPending}
                     onClick={() => {
@@ -165,7 +166,7 @@ export function MediaLibrary({ isOpen, onClose, onSelect, ext }: MediaLibraryPro
 
         <div className="flex items-center justify-between border-t p-4">
           <span className="text-muted-foreground text-sm">
-            {total} asset{total !== 1 ? 's' : ''}
+            {total} asset{total !== 1 ? "s" : ""}
           </span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage - 1)} disabled={!hasPrev} aria-label="Previous page">

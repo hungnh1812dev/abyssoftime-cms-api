@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 interface SidebarContextValue {
   collapsed: boolean;
@@ -8,39 +8,39 @@ interface SidebarContextValue {
   setMobileOpen: (open: boolean) => void;
 }
 
-const STORAGE_KEY = 'sidebar-collapsed';
-const MOBILE_QUERY = '(max-width: 1023px)';
+const STORAGE_KEY = "sidebar-collapsed";
+const MOBILE_QUERY = "(max-width: 1023px)";
 
 const SidebarContext = createContext<SidebarContextValue | null>(null);
 
 function useSidebar(): SidebarContextValue {
   const context = useContext(SidebarContext);
-  if (!context) throw new Error('useSidebar must be used within SidebarProvider');
+  if (!context) throw new Error("useSidebar must be used within SidebarProvider");
   return context;
 }
 
 function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(() => {
     try {
-      return localStorage.getItem(STORAGE_KEY) === 'true';
+      return localStorage.getItem(STORAGE_KEY) === "true";
     } catch {
       return false;
     }
   });
 
   const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
     return window.matchMedia(MOBILE_QUERY).matches;
   });
 
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return;
+    if (typeof window.matchMedia !== "function") return;
     const mediaQuery = window.matchMedia(MOBILE_QUERY);
     const handler = (event: MediaQueryListEvent) => setIsMobile(event.matches);
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
+    mediaQuery.addEventListener("change", handler);
+    return () => mediaQuery.removeEventListener("change", handler);
   }, []);
 
   const toggle = useCallback(() => {

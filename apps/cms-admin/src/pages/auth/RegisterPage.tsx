@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, Navigate, Link } from 'react-router-dom';
-import { api } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { api } from "@/lib/api";
 
 interface RegisterFields {
   displayName: string;
@@ -19,8 +20,8 @@ export function RegisterPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const { data: setupData, isLoading: setupLoading } = useQuery({
-    queryKey: ['auth-setup'],
-    queryFn: () => api.get<{ adminExists: boolean }>('/auth/setup').then((response) => response.data),
+    queryKey: ["auth-setup"],
+    queryFn: () => api.get<{ adminExists: boolean }>("/auth/setup").then((response) => response.data),
     retry: false,
   });
 
@@ -33,13 +34,13 @@ export function RegisterPage() {
   } = useForm<RegisterFields>();
 
   const mutation = useMutation({
-    mutationFn: (data: RegisterFields) => api.post('/auth/register', data).then((response) => response.data),
+    mutationFn: (data: RegisterFields) => api.post("/auth/register", data).then((response) => response.data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auth-setup'] });
-      navigate('/login');
+      queryClient.invalidateQueries({ queryKey: ["auth-setup"] });
+      navigate("/login");
     },
     onError: () => {
-      setErrorMsg('Registration failed. The email may already be in use.');
+      setErrorMsg("Registration failed. The email may already be in use.");
     },
   });
 
@@ -59,9 +60,9 @@ export function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-sm space-y-6 px-4">
         <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-semibold">{adminExists ? 'Create guest account' : 'Set up admin account'}</h1>
+          <h1 className="text-2xl font-semibold">{adminExists ? "Create guest account" : "Set up admin account"}</h1>
           <p className="text-muted-foreground text-sm">
-            {adminExists ? 'Register a guest account to access the CMS' : 'No admin account exists yet — the first account will be an admin'}
+            {adminExists ? "Register a guest account to access the CMS" : "No admin account exists yet — the first account will be an admin"}
           </p>
         </div>
 
@@ -79,9 +80,9 @@ export function RegisterPage() {
               type="text"
               autoComplete="name"
               aria-invalid={!!errors.displayName}
-              {...register('displayName', {
-                required: 'Display name is required',
-                maxLength: { value: 100, message: 'Display name must be at most 100 characters' },
+              {...register("displayName", {
+                required: "Display name is required",
+                maxLength: { value: 100, message: "Display name must be at most 100 characters" },
               })}
             />
             {errors.displayName && <p className="text-destructive text-xs">{errors.displayName.message}</p>}
@@ -94,9 +95,9 @@ export function RegisterPage() {
               type="email"
               autoComplete="email"
               aria-invalid={!!errors.email}
-              {...register('email', {
-                required: 'Email is required',
-                pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email address' },
+              {...register("email", {
+                required: "Email is required",
+                pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Enter a valid email address" },
               })}
             />
             {errors.email && <p className="text-destructive text-xs">{errors.email.message}</p>}
@@ -109,21 +110,21 @@ export function RegisterPage() {
               type="password"
               autoComplete="new-password"
               aria-invalid={!!errors.password}
-              {...register('password', {
-                required: 'Password is required',
-                minLength: { value: 8, message: 'Password must be at least 8 characters' },
+              {...register("password", {
+                required: "Password is required",
+                minLength: { value: 8, message: "Password must be at least 8 characters" },
               })}
             />
             {errors.password && <p className="text-destructive text-xs">{errors.password.message}</p>}
           </div>
 
           <Button type="submit" className="w-full" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Creating account…' : adminExists ? 'Create guest account' : 'Create admin account'}
+            {mutation.isPending ? "Creating account…" : adminExists ? "Create guest account" : "Create admin account"}
           </Button>
         </form>
 
         <p className="text-muted-foreground text-center text-sm">
-          Already have an account?{' '}
+          Already have an account?{" "}
           <Link to="/login" className="text-primary underline-offset-4 hover:underline">
             Sign in
           </Link>

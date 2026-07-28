@@ -1,12 +1,13 @@
-import type { ReactNode } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Breadcrumb } from '@/components/ui/breadcrumb';
-import type { BreadcrumbItem } from '@/hooks/useBreadcrumbs';
+import type { ReactNode } from "react";
 
-const STATUS_VARIANT: Record<string, 'draft' | 'published' | 'modified'> = {
-  draft: 'draft',
-  published: 'published',
-  modified: 'modified',
+import { Badge } from "@/components/ui/badge";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
+import type { BreadcrumbItem } from "@/hooks/useBreadcrumbs";
+
+const STATUS_VARIANT: Record<string, "draft" | "published" | "modified"> = {
+  draft: "draft",
+  published: "published",
+  modified: "modified",
 };
 
 interface StickyActionBarProps {
@@ -24,7 +25,7 @@ export function StickyActionBar({ title, status, breadcrumbs, renderActions }: S
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold">{title}</h1>
           {status && (
-            <Badge data-testid="status-badge" variant={STATUS_VARIANT[status] ?? 'secondary'} className="capitalize">
+            <Badge data-testid="status-badge" variant={STATUS_VARIANT[status] ?? "secondary"} className="capitalize">
               {status}
             </Badge>
           )}

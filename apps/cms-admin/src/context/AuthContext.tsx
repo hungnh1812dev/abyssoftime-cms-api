@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import axios from 'axios';
-import { api, setAccessToken, onSessionExpired } from '@/lib/api';
+import axios from "axios";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
+
+import { api, onSessionExpired, setAccessToken } from "@/lib/api";
 
 // Delays between mount-time refresh retries on a transient failure (network
 // error, 5xx, 429) — not a definitive 401. Sized to ride out a Render
@@ -19,7 +20,7 @@ interface JwtPayload {
 }
 
 function decodeToken(token: string): JwtPayload {
-  const payload = token.split('.')[1];
+  const payload = token.split(".")[1];
   return JSON.parse(atob(payload)) as JwtPayload;
 }
 
@@ -59,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // usable (specs/access-token-auth-mismatch.md §13.6).
   const fetchPermissions = useCallback(async () => {
     try {
-      const response = await api.get<{ role: string; permissions: string[]; displayName: string }>('/auth/me');
+      const response = await api.get<{ role: string; permissions: string[]; displayName: string }>("/auth/me");
       if (!mountedRef.current) return;
       setState((previous) => (previous.token ? { ...previous, permissions: response.data.permissions, displayName: response.data.displayName } : previous));
     } catch {
@@ -89,14 +90,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function attemptMountRefresh() {
       for (let attempt = 0; mountedRef.current; attempt++) {
         try {
-          const response = await api.post<{ accessToken: string }>(
-            '/auth/refresh',
-            undefined,
-            {
-              _retried: true,
-              headers: { 'Cache-Control': 'no-cache, no-store' },
-            } as object,
-          );
+          const response = await api.post<{ accessToken: string }>("/auth/refresh", undefined, {
+            _retried: true,
+            headers: { "Cache-Control": "no-cache, no-store" },
+          } as object);
           if (!mountedRef.current) return;
           const { accessToken } = response.data;
           setAccessToken(accessToken);
@@ -140,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(null);
     setState(LOGGED_OUT_STATE);
     try {
-      await api.post('/auth/logout');
+      await api.post("/auth/logout");
     } catch {
       // cookie cleared server-side on best-effort basis
     }
@@ -152,6 +149,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 // eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used inside AuthProvider');
+  if (!context) throw new Error("useAuth must be used inside AuthProvider");
   return context;
 }

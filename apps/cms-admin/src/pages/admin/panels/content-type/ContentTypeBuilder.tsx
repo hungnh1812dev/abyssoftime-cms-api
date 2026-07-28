@@ -1,9 +1,11 @@
-import type { UseQueryOptions } from '@tanstack/react-query';
-import { FormProvider, useCmsFormState } from '@/components/form';
-import type { FieldDefinition } from '@/types/cms';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { renderSchemaField } from './renderSchemaField';
+import type { UseQueryOptions } from "@tanstack/react-query";
+
+import { FormProvider, useCmsFormState } from "@/components/form";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import type { FieldDefinition } from "@/types/cms";
+
+import { renderSchemaField } from "./renderSchemaField";
 
 interface ContentTypeBuilderProps {
   contentTypeSlug: string;
@@ -14,12 +16,12 @@ interface ContentTypeBuilderProps {
   onDirtyChange?: (isDirty: boolean) => void;
 }
 
-function FormActions({ renderActions }: { renderActions?: ContentTypeBuilderProps['renderActions'] }) {
+function FormActions({ renderActions }: { renderActions?: ContentTypeBuilderProps["renderActions"] }) {
   const { isDirty, submitting } = useCmsFormState();
 
   return (
     <div className="flex items-center gap-2">
-      <Button type="submit" variant={isDirty ? 'default' : 'secondary'} disabled={!isDirty || submitting} loading={submitting} loadingText="Saving...">
+      <Button type="submit" variant={isDirty ? "default" : "secondary"} disabled={!isDirty || submitting} loading={submitting} loadingText="Saving...">
         Save
       </Button>
       {renderActions?.({ isDirty, submitting })}
@@ -35,7 +37,7 @@ export function ContentTypeBuilder({ contentTypeSlug, schema, query, mutationFn,
         <FormActions renderActions={renderActions} />
         <Card>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">{schema.map((field, index) => renderSchemaField(field, '', keyPrefix, index))}</div>
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">{schema.map((field, index) => renderSchemaField(field, "", keyPrefix, index))}</div>
           </CardContent>
         </Card>
       </div>

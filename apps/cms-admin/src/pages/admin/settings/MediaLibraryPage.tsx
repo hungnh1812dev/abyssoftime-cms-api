@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { Trash2, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { useMediaList, useUploadMedia, useDeleteMedia } from '@/hooks/useMedia';
-import type { MediaAsset } from '@/types/cms';
+import { Trash2, X } from "lucide-react";
+import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useDeleteMedia, useMediaList, useUploadMedia } from "@/hooks/useMedia";
+import type { MediaAsset } from "@/types/cms";
 
 export function MediaLibraryPage() {
   const [page, setPage] = useState(1);
@@ -46,12 +47,12 @@ export function MediaLibraryPage() {
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" x2="12" y1="3" y2="15" />
             </svg>
-            {stagedFiles.length > 0 ? `${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''} selected` : 'Choose files'}
+            {stagedFiles.length > 0 ? `${stagedFiles.length} file${stagedFiles.length !== 1 ? "s" : ""} selected` : "Choose files"}
             <input type="file" multiple accept="image/*" onChange={(event) => setStagedFiles(Array.from(event.target.files ?? []))} className="sr-only" />
           </label>
           {stagedFiles.length > 0 && (
             <Button onClick={handleUpload} disabled={upload.isPending} size="sm">
-              {upload.isPending ? 'Uploading…' : `Upload ${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''}`}
+              {upload.isPending ? "Uploading…" : `Upload ${stagedFiles.length} file${stagedFiles.length !== 1 ? "s" : ""}`}
             </Button>
           )}
         </div>
@@ -109,7 +110,7 @@ export function MediaLibraryPage() {
 
       <div className="flex items-center justify-between">
         <span className="text-muted-foreground text-sm">
-          {total} asset{total !== 1 ? 's' : ''}
+          {total} asset{total !== 1 ? "s" : ""}
         </span>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage - 1)} disabled={!hasPrev}>

@@ -1,8 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AxiosError } from 'axios';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
-import type { MediaAsset } from '@/types/cms';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AxiosError } from "axios";
+import { toast } from "sonner";
+
+import { api } from "@/lib/api";
+import type { MediaAsset } from "@/types/cms";
 
 interface MediaListResponse {
   items: MediaAsset[];
@@ -17,7 +18,7 @@ interface UploadArgs {
 
 export function useMediaList(page: number, limit: number) {
   return useQuery<MediaListResponse>({
-    queryKey: ['media', 'list', page, limit],
+    queryKey: ["media", "list", page, limit],
     queryFn: () => api.get<MediaListResponse>(`/api/media?page=${page}&limit=${limit}`).then((response) => response.data),
   });
 }
@@ -27,14 +28,14 @@ export function useUploadMedia() {
   return useMutation({
     mutationFn: ({ file }: UploadArgs) => {
       const form = new FormData();
-      form.append('file', file, file.name);
-      return api.post<MediaAsset>('/api/media/upload', form).then((response) => response.data);
+      form.append("file", file, file.name);
+      return api.post<MediaAsset>("/api/media/upload", form).then((response) => response.data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['media', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ["media", "list"] });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Upload failed';
+      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Upload failed";
       toast.error(message);
     },
   });
@@ -45,10 +46,10 @@ export function useDeleteMedia() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/api/media/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['media', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ["media", "list"] });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Delete failed';
+      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Delete failed";
       toast.error(message);
     },
   });

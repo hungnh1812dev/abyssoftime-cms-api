@@ -1,7 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AxiosError } from 'axios';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AxiosError } from "axios";
+import { toast } from "sonner";
+
+import { api } from "@/lib/api";
 
 export interface AccessTokenItem {
   id: string;
@@ -31,8 +32,8 @@ interface CreateTokenResponse {
 }
 
 const KEYS = {
-  list: (page: number) => ['access-tokens', 'list', page] as const,
-  all: ['access-tokens'] as const,
+  list: (page: number) => ["access-tokens", "list", page] as const,
+  all: ["access-tokens"] as const,
 };
 
 export function useAccessTokenList(page: number) {
@@ -45,12 +46,12 @@ export function useAccessTokenList(page: number) {
 export function useCreateAccessToken() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { name: string; scopes: string[]; expiresIn?: string }) => api.post<CreateTokenResponse>('/api/access-tokens', data).then((response) => response.data),
+    mutationFn: (data: { name: string; scopes: string[]; expiresIn?: string }) => api.post<CreateTokenResponse>("/api/access-tokens", data).then((response) => response.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: KEYS.all });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to create token';
+      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to create token";
       toast.error(message);
     },
   });
@@ -64,7 +65,7 @@ export function useDeleteAccessToken() {
       queryClient.invalidateQueries({ queryKey: KEYS.all });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? 'Failed to delete token';
+      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to delete token";
       toast.error(message);
     },
   });

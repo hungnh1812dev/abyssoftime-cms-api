@@ -1,5 +1,5 @@
-import React from 'react';
-import { useFormContext, type FieldError } from 'react-hook-form';
+import React from "react";
+import { type FieldError, useFormContext } from "react-hook-form";
 
 interface FormFieldProps {
   name: string;
@@ -7,8 +7,8 @@ interface FormFieldProps {
 }
 
 function getNestedError(errors: Record<string, unknown>, path: string): FieldError | undefined {
-  return path.split('.').reduce((acc: unknown, key) => {
-    if (acc && typeof acc === 'object') return (acc as Record<string, unknown>)[key];
+  return path.split(".").reduce((acc: unknown, key) => {
+    if (acc && typeof acc === "object") return (acc as Record<string, unknown>)[key];
     return undefined;
   }, errors) as FieldError | undefined;
 }

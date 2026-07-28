@@ -1,19 +1,20 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { useAuth } from '@/context/AuthContext';
-import { roleLevel } from '@/lib/roles';
-import { useUserList, useUpdateUserRole, useDeleteUser } from '@/hooks/useUsers';
-import { useInviteList, useCreateInvite, useRevokeInvite } from '@/hooks/useInvites';
-import { useRoleList } from '@/hooks/useRoles';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useState } from "react";
+import { useForm } from "react-hook-form";
 
-const ALL_ROLES = ['super_admin', 'admin', 'editor', 'guest'] as const;
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useAuth } from "@/context/AuthContext";
+import { useCreateInvite, useInviteList, useRevokeInvite } from "@/hooks/useInvites";
+import { useRoleList } from "@/hooks/useRoles";
+import { useDeleteUser, useUpdateUserRole, useUserList } from "@/hooks/useUsers";
+import { roleLevel } from "@/lib/roles";
+
+const ALL_ROLES = ["super_admin", "admin", "editor", "guest"] as const;
 
 function rolesBelow(currentRole: string | null): string[] {
   const level = roleLevel(currentRole);
@@ -28,7 +29,7 @@ export function UsersPage() {
   const { role: myRole, userId } = useAuth();
   const [page, setPage] = useState(1);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [inviteRole, setInviteRole] = useState('');
+  const [inviteRole, setInviteRole] = useState("");
   const [inviteLink, setInviteLink] = useState<string | null>(null);
 
   const { data: usersData, isLoading } = useUserList(page);
@@ -57,7 +58,7 @@ export function UsersPage() {
         onSuccess: (response) => {
           setInviteLink(`${window.location.origin}/invite/${response.token}`);
           inviteForm.reset();
-          setInviteRole('');
+          setInviteRole("");
         },
       },
     );
@@ -84,7 +85,7 @@ export function UsersPage() {
           <DialogTrigger render={<Button size="sm" />}>Invite User</DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{inviteLink ? 'Invite Created' : 'Invite User'}</DialogTitle>
+              <DialogTitle>{inviteLink ? "Invite Created" : "Invite User"}</DialogTitle>
             </DialogHeader>
             {inviteLink ? (
               <div className="space-y-3">
@@ -100,11 +101,11 @@ export function UsersPage() {
               <form onSubmit={inviteForm.handleSubmit(handleInvite)} className="space-y-4">
                 <div className="space-y-1">
                   <Label htmlFor="invite-email">Email</Label>
-                  <Input id="invite-email" type="email" {...inviteForm.register('email', { required: 'Email is required' })} />
+                  <Input id="invite-email" type="email" {...inviteForm.register("email", { required: "Email is required" })} />
                 </div>
                 <div className="space-y-1">
                   <Label>Role</Label>
-                  <Select value={inviteRole} onValueChange={(value: string | null) => setInviteRole(value ?? '')}>
+                  <Select value={inviteRole} onValueChange={(value: string | null) => setInviteRole(value ?? "")}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
@@ -118,7 +119,7 @@ export function UsersPage() {
                   </Select>
                 </div>
                 <Button type="submit" className="w-full" disabled={createInvite.isPending || !inviteRole}>
-                  {createInvite.isPending ? 'Creating…' : 'Send Invite'}
+                  {createInvite.isPending ? "Creating…" : "Send Invite"}
                 </Button>
               </form>
             )}
@@ -143,7 +144,7 @@ export function UsersPage() {
               const isMe = user.id === userId;
               const canManage = !isMe && roleLevel(myRole) > roleLevel(user.role);
               return (
-                <TableRow key={user.id} className={isMe ? 'bg-accent/30' : undefined}>
+                <TableRow key={user.id} className={isMe ? "bg-accent/30" : undefined}>
                   <TableCell>
                     {user.email}
                     {isMe && <span className="text-muted-foreground ml-2 text-xs">(you)</span>}
@@ -192,7 +193,7 @@ export function UsersPage() {
 
       <div className="flex items-center justify-between">
         <span className="text-muted-foreground text-sm">
-          {total} user{total !== 1 ? 's' : ''}
+          {total} user{total !== 1 ? "s" : ""}
         </span>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage - 1)} disabled={!hasPrev}>
@@ -220,7 +221,7 @@ export function UsersPage() {
               {invites.map((invite) => {
                 const expired = new Date(invite.expiresAt) < now;
                 return (
-                  <TableRow key={invite.id} className={expired ? 'opacity-50' : undefined}>
+                  <TableRow key={invite.id} className={expired ? "opacity-50" : undefined}>
                     <TableCell>{invite.email}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">{invite.role}</Badge>

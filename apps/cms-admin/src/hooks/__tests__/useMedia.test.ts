@@ -1,11 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import MockAdapter from 'axios-mock-adapter';
-import type { ReactNode } from 'react';
-import { createElement } from 'react';
-import { api } from '@/lib/api';
-import { useMediaList } from '@/hooks/useMedia';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook, waitFor } from "@testing-library/react";
+import MockAdapter from "axios-mock-adapter";
+import type { ReactNode } from "react";
+import { createElement } from "react";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { useMediaList } from "@/hooks/useMedia";
+import { api } from "@/lib/api";
 
 let mock: MockAdapter;
 
@@ -26,34 +27,34 @@ function createWrapper() {
   };
 }
 
-describe('useMediaList', () => {
-  it('fetches paginated media from GET /api/media', async () => {
+describe("useMediaList", () => {
+  it("fetches paginated media from GET /api/media", async () => {
     const response = {
       items: [
         {
-          ID: 'a1',
-          url: 'https://cdn/a1.jpg',
-          thumbnailUrl: 'https://cdn/a1.jpg',
-          publicId: 'p1',
-          fileName: 'a1_abc123.jpg',
-          fileExt: 'jpg',
-          hash: 'abc123',
-          documentRef: '',
-          contentTypeId: '',
-          createdAt: '2024-01-01T00:00:00Z',
+          ID: "a1",
+          url: "https://cdn/a1.jpg",
+          thumbnailUrl: "https://cdn/a1.jpg",
+          publicId: "p1",
+          fileName: "a1_abc123.jpg",
+          fileExt: "jpg",
+          hash: "abc123",
+          documentRef: "",
+          contentTypeId: "",
+          createdAt: "2024-01-01T00:00:00Z",
         },
       ],
       total: 5,
       page: 1,
       limit: 20,
     };
-    mock.onGet('/api/media?page=1&limit=20').reply(200, response);
+    mock.onGet("/api/media?page=1&limit=20").reply(200, response);
 
     const { result } = renderHook(() => useMediaList(1, 20), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(result.current.data?.total).toBe(5);
     expect(result.current.data?.items).toHaveLength(1);
-    expect(result.current.data?.items[0].fileName).toBe('a1_abc123.jpg');
+    expect(result.current.data?.items[0].fileName).toBe("a1_abc123.jpg");
   });
 });

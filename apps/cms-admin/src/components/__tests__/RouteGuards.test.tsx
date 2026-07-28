@@ -1,21 +1,22 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
-import MockAdapter from 'axios-mock-adapter';
-import { api, setAccessToken } from '@/lib/api';
-import { renderWithProviders } from '@/test-utils';
-import { AuthProvider } from '@/context/AuthContext';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { AdminRoute } from '@/components/AdminRoute';
-import { Routes, Route } from 'react-router-dom';
+import { screen, waitFor } from "@testing-library/react";
+import MockAdapter from "axios-mock-adapter";
+import { Route, Routes } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { AdminRoute } from "@/components/AdminRoute";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AuthProvider } from "@/context/AuthContext";
+import { api, setAccessToken } from "@/lib/api";
+import { renderWithProviders } from "@/test-utils";
 
 function makeToken(payload: Record<string, unknown>) {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const body = btoa(JSON.stringify(payload));
   return `${header}.${body}.fakesig`;
 }
 
-const ADMIN_TOKEN = makeToken({ userId: 'u1', role: 'admin', exp: 9999999999 });
-const GUEST_TOKEN = makeToken({ userId: 'u2', role: 'guest', exp: 9999999999 });
+const ADMIN_TOKEN = makeToken({ userId: "u1", role: "admin", exp: 9999999999 });
+const GUEST_TOKEN = makeToken({ userId: "u2", role: "guest", exp: 9999999999 });
 
 let mock: MockAdapter;
 
@@ -28,7 +29,7 @@ afterEach(() => {
   mock.restore();
 });
 
-function wrap(ui: React.ReactNode, initialEntries = ['/']) {
+function wrap(ui: React.ReactNode, initialEntries = ["/"]) {
   return renderWithProviders(
     <AuthProvider>
       <Routes>
@@ -41,9 +42,9 @@ function wrap(ui: React.ReactNode, initialEntries = ['/']) {
   );
 }
 
-describe('ProtectedRoute', () => {
-  it('redirects to /login when not authenticated (mount-time cookie refresh fails)', async () => {
-    mock.onPost('/auth/refresh').reply(401);
+describe("ProtectedRoute", () => {
+  it("redirects to /login when not authenticated (mount-time cookie refresh fails)", async () => {
+    mock.onPost("/auth/refresh").reply(401);
 
     wrap(
       <Route
@@ -56,12 +57,12 @@ describe('ProtectedRoute', () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByText('Login page')).toBeInTheDocument());
-    expect(screen.queryByText('Secret content')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Login page")).toBeInTheDocument());
+    expect(screen.queryByText("Secret content")).not.toBeInTheDocument();
   });
 
-  it('renders children when authenticated', async () => {
-    mock.onPost('/auth/refresh').reply(200, { accessToken: ADMIN_TOKEN });
+  it("renders children when authenticated", async () => {
+    mock.onPost("/auth/refresh").reply(200, { accessToken: ADMIN_TOKEN });
 
     wrap(
       <Route
@@ -74,13 +75,13 @@ describe('ProtectedRoute', () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByText('Secret content')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Secret content")).toBeInTheDocument());
   });
 });
 
-describe('AdminRoute', () => {
-  it('redirects to /login when not authenticated (mount-time cookie refresh fails)', async () => {
-    mock.onPost('/auth/refresh').reply(401);
+describe("AdminRoute", () => {
+  it("redirects to /login when not authenticated (mount-time cookie refresh fails)", async () => {
+    mock.onPost("/auth/refresh").reply(401);
 
     wrap(
       <Route
@@ -93,11 +94,11 @@ describe('AdminRoute', () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByText('Login page')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Login page")).toBeInTheDocument());
   });
 
-  it('shows 403 when role is not admin', async () => {
-    mock.onPost('/auth/refresh').reply(200, { accessToken: GUEST_TOKEN });
+  it("shows 403 when role is not admin", async () => {
+    mock.onPost("/auth/refresh").reply(200, { accessToken: GUEST_TOKEN });
 
     wrap(
       <Route
@@ -110,12 +111,12 @@ describe('AdminRoute', () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByText('403 Forbidden')).toBeInTheDocument());
-    expect(screen.queryByText('Admin content')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("403 Forbidden")).toBeInTheDocument());
+    expect(screen.queryByText("Admin content")).not.toBeInTheDocument();
   });
 
-  it('renders children when role is admin', async () => {
-    mock.onPost('/auth/refresh').reply(200, { accessToken: ADMIN_TOKEN });
+  it("renders children when role is admin", async () => {
+    mock.onPost("/auth/refresh").reply(200, { accessToken: ADMIN_TOKEN });
 
     wrap(
       <Route
@@ -128,6 +129,6 @@ describe('AdminRoute', () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByText('Admin content')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Admin content")).toBeInTheDocument());
   });
 });

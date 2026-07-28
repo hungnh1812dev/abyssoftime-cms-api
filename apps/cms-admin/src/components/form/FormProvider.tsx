@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
-import { useForm, FormProvider as RHFFormProvider } from 'react-hook-form';
-import { useQuery, useMutation, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
-import type { AxiosError } from 'axios';
-import { toast } from 'sonner';
-import { FormStateContext } from './FormStateContext';
+import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from "@tanstack/react-query";
+import type { AxiosError } from "axios";
+import { useEffect } from "react";
+import { FormProvider as RHFFormProvider, useForm } from "react-hook-form";
+import { toast } from "sonner";
+
+import { FormStateContext } from "./FormStateContext";
 
 interface CmsFormProviderProps {
   query?: UseQueryOptions;
@@ -17,7 +18,7 @@ interface CmsFormProviderProps {
 export function FormProvider({ query, values: externalValues, mutationFn, onSuccess, onDirtyChange, children }: CmsFormProviderProps) {
   const queryClient = useQueryClient();
 
-  const { data: queryData, isFetching } = useQuery(query ?? { queryKey: ['__noop__'], queryFn: () => null, enabled: false });
+  const { data: queryData, isFetching } = useQuery(query ?? { queryKey: ["__noop__"], queryFn: () => null, enabled: false });
 
   const methods = useForm({
     values: externalValues ?? (queryData as Record<string, unknown>) ?? {},
@@ -32,7 +33,7 @@ export function FormProvider({ query, values: externalValues, mutationFn, onSucc
   const { mutate, isPending } = useMutation({
     mutationFn,
     onSuccess: () => {
-      toast.success('Saved');
+      toast.success("Saved");
       methods.reset(methods.getValues());
       if (query?.queryKey) {
         queryClient.invalidateQueries({ queryKey: query.queryKey as readonly unknown[] });
@@ -40,7 +41,7 @@ export function FormProvider({ query, values: externalValues, mutationFn, onSucc
       onSuccess?.();
     },
     onError: (err: unknown) => {
-      const msg = (err as AxiosError<{ error: string }>).response?.data?.error ?? 'Something went wrong';
+      const msg = (err as AxiosError<{ error: string }>).response?.data?.error ?? "Something went wrong";
       toast.error(msg);
     },
   });

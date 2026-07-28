@@ -1,7 +1,8 @@
-import { type ComponentProps } from 'react';
-import { Input } from '@/components/ui/input';
+import { type ComponentProps } from "react";
 
-interface NumberInputProps extends Omit<ComponentProps<'input'>, 'type'> {
+import { Input } from "@/components/ui/input";
+
+interface NumberInputProps extends Omit<ComponentProps<"input">, "type"> {
   step?: number;
   min?: number;
   max?: number;

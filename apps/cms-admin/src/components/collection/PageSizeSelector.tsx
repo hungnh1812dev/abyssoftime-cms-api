@@ -1,5 +1,5 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PAGE_SIZE_OPTIONS } from '@/lib/pageSize';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PAGE_SIZE_OPTIONS } from "@/lib/pageSize";
 
 interface PageSizeSelectorProps {
   value: number;
