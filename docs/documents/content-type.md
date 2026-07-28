@@ -1,6 +1,6 @@
 # Content Type Module
 
-`src/modules/content-type/**` — schema-as-code engine for the CMS's dynamic content model. Content types are defined as JSON files under `content-types/*.json` at the repo root (`CONTENT_TYPES_DIR`, default `content-types`) and reconciled against Postgres on every boot by `ContentTypeSyncService` (`OnApplicationBootstrap`). This module owns the `ContentType` entity, its repository, the schema loader/validator, the diff-based sync engine, and the two read-only REST routes. It has **no write route** — content-type structure is edited only by changing a JSON file and rebooting. Depended on by [`document`](document.md) (`GetContentTypeService` + `CONTENT_TYPE_REPOSITORY` are exported for it) — the module arrow is strictly one-way, `document → content-type`, never the reverse.
+`src/modules/content-type/**` — schema-as-code engine for the CMS's dynamic content model. Content types are defined as JSON files under `content-types/*.json` at the repo root (`CONTENT_TYPES_DIR`, default `content-types`) and reconciled against Postgres on every boot by `ContentTypeSyncService` (`OnApplicationBootstrap`). This module owns the `ContentType` entity, its repository, the schema loader/validator, the diff-based sync engine, and the REST routes. Schema itself (`fields`/`kind`/`draftToPublish`) is **read-only by design** — edited only by changing a JSON file and rebooting; the sync engine reconciles it. `listFields` is the one admin-mutable exception (see [Admin-mutable `listFields`](#admin-mutable-listfields) below) — a `PATCH` route lets a `content_type:manager` caller override the list view's columns without touching the JSON file or the sync-owned column. Depended on by [`document`](document.md) (`GetContentTypeService` + `CONTENT_TYPE_REPOSITORY` are exported for it) — the module arrow is strictly one-way, `document → content-type`, never the reverse.
 
 ## Deviations from the source docs
 
@@ -33,6 +33,8 @@ Two Go-derived design docs (content-type + component) describe the original Go/G
 
 Maps 1:1 to the `ContentType` Prisma model (`prisma/postgresql/schema.prisma`, `@@map("content_types")`, migration `20260727072526_add_content_types`); `fields`/`listFields` are stored as `Json` columns. `ContentTypeSummary` (`{ slug, name, kind, draftToPublish }`) is the projection returned by the list route.
 
+The entity's `listFields` is not a 1:1 column read — see [Admin-mutable `listFields`](#admin-mutable-listfields) immediately below for the separate `listFieldsOverride` column merged into it at read time.
+
 `domain/entities/field-definition.ts` — the recursive shape every content type's `fields` array is built from:
 
 ```ts
@@ -57,7 +59,8 @@ interface FieldDefinition {
 `domain/repositories/content-type.repository.ts` — interface `IContentTypeRepository`, DI token `CONTENT_TYPE_REPOSITORY` (exported to `document`):
 
 - `create(data: UpsertContentTypeData): Promise<ContentTypeEntity>`
-- `update(slug, data: UpsertContentTypeData): Promise<ContentTypeEntity>` — full replace of `name`/`kind`/`draftToPublish`/`fields`/`listFields`.
+- `update(slug, data: UpsertContentTypeData): Promise<ContentTypeEntity>` — full replace of `name`/`kind`/`draftToPublish`/`fields`/`listFields`. **`ContentTypeSyncService` is the only caller** — this is the sync-owned write path, never routed through admin input.
+- `updateListFields(slug, listFields: string[]): Promise<ContentTypeEntity>` — narrow method, writes only the `listFieldsOverride` column, never touches `fields`/`kind`/`draftToPublish`/the sync-owned `listFields` column. The admin-facing write path; see [Admin-mutable `listFields`](#admin-mutable-listfields) below.
 - `delete(slug): Promise<void>`
 - `findBySlug(slug): Promise<ContentTypeEntity | null>`
 - `findAll(): Promise<ContentTypeEntity[]>`
@@ -133,6 +136,19 @@ The 53-char limit on slugs/field names (not 63) leaves headroom for the `documen
    - For each existing `ContentType` whose slug is no longer desired: `syncDeletion` — drop every component table (deepest path first, `sort((a, b) => b.length - a.length)`, so a child table never outlives its parent) and the document table, then delete the `ContentType` row.
 3. **Never a `DROP TABLE` for a field-level change** — only `syncDeletion` (whole content type removed) issues drops; see [Deviations](#deviations-from-the-source-docs) item 3.
 
+## Admin-mutable `listFields`
+
+The one write route this module has: `PATCH content-types/:slug/list-fields`, gated on `content_type:manager` (`super_admin` only — see [Permissions catalog additions](#permissions-catalog-additions) below).
+
+**Why a separate column, not the sync-owned `listFields`.** `ContentTypeSyncService.syncOne()` recomputes `listFields` from the JSON schema and writes it back to the DB unconditionally on **every app boot** (see [Sync engine](#sync-engine) above) — a PATCH that wrote the existing `listFields` column would be silently reverted on the very next deploy. Resolution: `listFieldsOverride Json? @map("list_fields_override")` on the `ContentType` Prisma model (migration `20260728134343_add_content_type_list_fields_override`), a column `ContentTypeSyncService` never reads or writes. `PrismaContentTypeRepository.toEntity()` is the single merge point — `listFields = record.listFieldsOverride ?? record.listFields` — so every existing consumer (`GetContentTypeService`, `SchemaResolverService` → `ListDocumentsService`, `ContentTypeSyncService`'s own diffing) sees the effective value with zero changes to their own code. Proven by construction: `content-type-sync.service.spec.ts` passes with zero edits to `content-type-sync.service.ts` itself.
+
+**Validation** (`application/services/update-list-fields.service.ts`, `UpdateListFieldsService`): `404` (`ContentTypeNotFoundError` → `NotFoundException`) on an unknown slug; every entry in the request's `listFields` array must either be a `LISTABLE_SYSTEM_COLUMNS` name or match a `fields` entry whose `type` is in `LISTABLE_FIELD_TYPES`, else `400`. Both constants live in `domain/entities/field-definition.ts`:
+
+- `LISTABLE_FIELD_TYPES: ReadonlySet<FieldType>` = `{"text", "number", "boolean"}` — relocated here from `document/infrastructure/persistence/sql/where-builder.ts`'s `SORTABLE_FIELD_TYPES` (same values), since `content-type` must not import from `document` (the module arrow is strictly one-way, `document → content-type` — see the module header above). `where-builder.ts`'s `sortableColumnsFor` now imports `LISTABLE_FIELD_TYPES` from here instead of defining its own copy — a pure refactor, `where-builder.spec.ts`'s existing tests pass unmodified.
+- `LISTABLE_SYSTEM_COLUMNS: readonly string[]` = `["documentId", "status", "createdAt", "updatedAt", "publishedAt", "updatedBy"]` — response-DTO-facing names (camelCase), distinct from `where-builder.ts`'s SQL-column-facing `SYSTEM_SORTABLE_COLUMNS` (snake_case, untouched by this feature). Consumed by `document`'s `ListDocumentsService` to source these names from resolved row values instead of `row.fields` — see `document.md`'s [Resolved `updatedBy`](document.md#resolved-updatedby) section.
+
+`UpdateListFieldsDto { listFields: string[] }` — `@IsArray() @ArrayNotEmpty() @IsString({ each: true })`; the empty-array case is rejected by the DTO's global `ValidationPipe` before the service ever runs, so `listFields: []` never reaches `UpdateListFieldsService`.
+
 ## Services
 
 `application/services/list-content-type.service.ts` — `ListContentTypeService.execute()`: thin passthrough to `findAllSummaries()`.
@@ -141,26 +157,29 @@ The 53-char limit on slugs/field names (not 63) leaves headroom for the `documen
 
 ## Endpoints
 
-`presentation/content-type.controller.ts`, `@Controller("/api/v1/content-types")`, per-route `@UseGuards(JwtAuthGuard, PermissionsGuard)` + `@RequirePermissions("content_type:read")` — **read-only, no write route of any kind**:
+`presentation/content-type.controller.ts`, `@Controller("/api/v1/content-types")`, per-route `@UseGuards(JwtAuthGuard, PermissionsGuard)`:
 
-| Method | Path | Service | Notes |
-| --- | --- | --- | --- |
-| `GET` | `/api/v1/content-types` | `ListContentTypeService` | Returns `ContentTypeSummary[]`. |
-| `GET` | `/api/v1/content-types/:slug` | `GetContentTypeService` | Full `ContentTypeEntity`; `400 BadRequestException` for an unsafe slug (caught `UnsafeSqlIdentifierError`, translated at the controller — same pattern `document`'s `validate-params.ts` reuses), `404` if no content type has that slug. |
+| Method | Path | Permission | Service | Notes |
+| --- | --- | --- | --- | --- |
+| `GET` | `/api/v1/content-types` | `content_type:read` | `ListContentTypeService` | Returns `ContentTypeSummary[]`. |
+| `GET` | `/api/v1/content-types/:slug` | `content_type:read` | `GetContentTypeService` | Full `ContentTypeEntity`; `400 BadRequestException` for an unsafe slug (caught `UnsafeSqlIdentifierError`, translated at the controller — same pattern `document`'s `validate-params.ts` reuses), `404` if no content type has that slug. |
+| `PATCH` | `/api/v1/content-types/:slug/list-fields` | `content_type:manager` | `UpdateListFieldsService` | `200 ContentTypeResponseDto`, `listFields` reflects the new override. `400` (empty array, unknown field name, or a field kind not in `LISTABLE_FIELD_TYPES`), `404` (unknown slug). See [Admin-mutable `listFields`](#admin-mutable-listfields) above. |
 
 ## Module wiring
 
-`content-type.module.ts` registers `ContentTypeController`; providers `SchemaLoaderService`, `ContentTypeSyncService`, `ListContentTypeService`, `GetContentTypeService`, and binds `CONTENT_TYPE_REPOSITORY → PrismaContentTypeRepository` / `SCHEMA_TABLE_REPOSITORY → PrismaSchemaTableRepository`. `exports: [GetContentTypeService, CONTENT_TYPE_REPOSITORY]` — exactly what `document.module.ts` imports and injects, nothing more (`SchemaLoaderService`/`ContentTypeSyncService`/`SCHEMA_TABLE_REPOSITORY` stay module-private in normal DI resolution, though NestJS's non-strict `app.get()` can still reach them directly — used by the e2e suite, see `document.md`). Registered in `src/app.module.ts` before `DocumentModule`.
+`content-type.module.ts` registers `ContentTypeController`; providers `SchemaLoaderService`, `ContentTypeSyncService`, `ListContentTypeService`, `GetContentTypeService`, `UpdateListFieldsService`, and binds `CONTENT_TYPE_REPOSITORY → PrismaContentTypeRepository` / `SCHEMA_TABLE_REPOSITORY → PrismaSchemaTableRepository`. `exports: [GetContentTypeService, CONTENT_TYPE_REPOSITORY]` — exactly what `document.module.ts` imports and injects, nothing more (`SchemaLoaderService`/`ContentTypeSyncService`/`SCHEMA_TABLE_REPOSITORY` stay module-private in normal DI resolution, though NestJS's non-strict `app.get()` can still reach them directly — used by the e2e suite, see `document.md`). Registered in `src/app.module.ts` before `DocumentModule`.
 
 ## Permissions catalog additions
 
 `src/bootstrap/seed-default-data.service.ts` — one new slug, `content_type:read`, added to `DEFAULT_PERMISSIONS` and granted to both `super_admin` and `admin` in `DEFAULT_ROLES` (the remaining 6 new slugs this feature cycle adds are `document:*`, documented in `document.md`). Same additive, `findBySlug`-guarded seeding pattern as every prior module — **an existing dev/prod DB's `super_admin`/`admin` role predating this change will not retroactively gain the slug** without a manual `PUT /api/v1/roles/:id` or a fresh DB (see `document.md`'s e2e notes for how the test suite handles this gap).
 
+**A later cycle** (Configure-Columns backend, `PATCH .../list-fields`) added `content_type:manager` ("Edit a content type's list-view columns"), granted to `super_admin` only — matching every other `*:manager` permission (`user`, `role`, `permission`, `api_token`, `media`), all `super_admin`-only today; `admin` only ever holds `*:read` variants. Same seeding caveat applies: a pre-existing `super_admin` role predating this addition needs a manual grant.
+
 ## Tests
 
 Unit tests (Jest, mocked repositories/adapters via `Test.createTestingModule` + `useValue`, or plain `new` construction) live next to each source file:
 
-- `field-definition.spec.ts` — `isComponentField` true/false.
+- `field-definition.spec.ts` — `isComponentField` true/false; `LISTABLE_FIELD_TYPES` contains exactly `text`/`number`/`boolean`; `LISTABLE_SYSTEM_COLUMNS` contains exactly the 6 response-DTO-facing names.
 - `sql-identifier.spec.ts` — slug/field-name/identifier acceptance and rejection at every boundary (length, case, hyphen position, unicode, embedded quote, injection attempt).
 - `table-naming.spec.ts` — `documentTableName`/`componentTableName` derivation for both real seeds' shapes; deterministic hash-truncation for an overlong path, stable across repeated calls; `indexName`'s simple-concatenation vs. hash-truncated paths (the latter using the real `en-it-vocab` `phonetic.syllablePart` case that originally surfaced the bug).
 - `field-type-mapping.spec.ts` — every `FieldType` → column-type mapping, `null` for `component`.
@@ -168,11 +187,13 @@ Unit tests (Jest, mocked repositories/adapters via `Test.createTestingModule` + 
 - `schema-loader.service.spec.ts` — valid JSON loads with `listFields` defaulted to the first 3 field names, or kept as explicitly specified; malformed JSON, structural-validation failure, and a missing directory all throw; non-JSON files in the directory are ignored; `load()` resolves the directory from `CONTENT_TYPES_DIR` relative to `process.cwd()`.
 - `schema-differ.spec.ts` — column add/drop/retype-with-safe-cast/drop-and-add-on-incompatible-retype, system columns never touched, component fields produce no column ops, an identical schema produces an empty plan; component-table add/drop-path planning, 3-level path collection for both real seeds' shapes, an empty plan when the component shape is unchanged.
 - `content-type-sync.service.spec.ts` — new file creates the document table + every component table + the `ContentType` row; changed file alters against live columns + updates the row; deleted file deletes the row and drops every table; a malformed definition throws loudly instead of silently syncing; `onApplicationBootstrap()` loads via `SchemaLoaderService` and calls `sync()`; the definition's `kind` is passed through to `ensureDocumentTable` for both `single` and `collection`.
-- `prisma-content-type.repository.spec.ts` — every CRUD method's field pass-through and mapping; `P2025` → `ContentTypeNotFoundError` translation on `update`/`delete`; unrelated errors rethrow; `findAllSummaries()` selects only the 4 projected fields.
+- `prisma-content-type.repository.spec.ts` — every CRUD method's field pass-through and mapping; `P2025` → `ContentTypeNotFoundError` translation on `update`/`delete`/`updateListFields`; unrelated errors rethrow; `findAllSummaries()` selects only the 4 projected fields; `toEntity()`'s override merge — `listFieldsOverride` present wins over `listFields`, `null` falls back to it; `updateListFields()` writes only the `listFieldsOverride` column.
 - `prisma-schema-table.repository.spec.ts` — every DDL statement is asserted to have every identifier quoted and no unquoted interpolation (`CREATE TABLE IF NOT EXISTS`, indexes, `ALTER TABLE` add/drop/retype clauses, `DROP TABLE IF EXISTS`, for both document and component tables); an unsafe slug is rejected before touching the database; `information_schema.columns` introspection uses a bound parameter, never string interpolation; a `single`-kind content type's table gets the extra `UNIQUE (version)` constraint, a `collection`-kind one doesn't.
+- `update-list-fields.service.spec.ts` — 404 on an unknown slug; a listable system column and an eligible-kind field both accepted; a name matching neither a system column nor an eligible field → 400; every ineligible kind (`richtext`/`media`/`json`/`component`) → 400, parameterized over all four.
 - `get-content-type.service.spec.ts` / `list-content-type.service.spec.ts` — passthrough + 404 translation.
-- `content-type.controller.spec.ts` — `list()`/`getBySlug()` delegate to the corresponding service; an invalid slug throws `BadRequestException` without touching the service.
-- `content-type.module.spec.ts` — registers the controller, every provider (incl. both repository token bindings), and exports exactly `GetContentTypeService` + `CONTENT_TYPE_REPOSITORY`.
+- `content-type.controller.spec.ts` — `list()`/`getBySlug()` delegate to the corresponding service; an invalid slug throws `BadRequestException` without touching the service; `updateListFields()` delegates to `UpdateListFieldsService`.
+- `content-type.module.spec.ts` — registers the controller, every provider (incl. `UpdateListFieldsService` and both repository token bindings), and exports exactly `GetContentTypeService` + `CONTENT_TYPE_REPOSITORY`.
+- `seed-default-data.service.spec.ts` (`src/bootstrap/`) — 19 permissions / 4 roles seeded from empty; `content_type:manager` created in `super_admin`'s grant list only, absent from `admin`/`editor`/`guest`.
 
 `test/content-engine.e2e-spec.ts` (shared with `document`, real Postgres) covers this module's boot-sync materialization and the schema-edit re-sync path end-to-end — see `document.md`'s Tests section for the full e2e breakdown.
 

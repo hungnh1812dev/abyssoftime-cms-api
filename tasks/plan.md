@@ -131,16 +131,16 @@ Tasks 1, 2, 3 have no dependencies on each other. Task 7 is the integration poin
 
 ### Phase 5 — Docs
 
-- [ ] `SPEC.md` — trim back to a one-line pointer (this repo's established convention).
-- [ ] `docs/documents/content-type.md` — new PATCH route, `listFieldsOverride`, `content_type:manager`
+- [x] `SPEC.md` — trim back to a one-line pointer (this repo's established convention).
+- [x] `docs/documents/content-type.md` — new PATCH route, `listFieldsOverride`, `content_type:manager`
       permission; correct the "read-only by design" framing (schema is read-only; `listFields` is now
       admin-mutable).
-- [ ] `docs/documents/document.md` — `updatedBy` on responses.
-- [ ] `docs/documents/users.md` — `findByIds`.
-- [ ] `docs/cms-admin-integration.md` — both new/changed contracts.
-- [ ] New `docs/documents/content-type-list-fields-techstack.md` — override-column-vs-alternatives comparison
+- [x] `docs/documents/document.md` — `updatedBy` on responses.
+- [x] `docs/documents/users.md` — `findByIds`.
+- [x] `docs/cms-admin-integration.md` — both new/changed contracts.
+- [x] New `docs/documents/content-type-list-fields-techstack.md` — override-column-vs-alternatives comparison
       table (workflow.md's "Decision rationale" rule).
-- [ ] **Checkpoint 4:** doc read-through, no stale "read-only"/"no updatedBy" mentions — commit.
+- [x] **Checkpoint 4:** doc read-through, no stale "read-only"/"no updatedBy" mentions — commit.
 
 ### Phase 6 — Five-axis review + close-out
 
