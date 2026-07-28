@@ -1,4 +1,5 @@
 import cookieParser from "cookie-parser";
+import { type Request } from "express";
 
 import { ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -8,6 +9,20 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { type EnvironmentVariables } from "@/config/env.validation";
 
 const API_VERSION = "0.0.1";
+
+// setGlobalPrefix only rewrites controller route strings — CORS middleware runs ahead of the Nest
+// router and always sees the raw, prefixed path.
+const PUBLIC_DOCUMENTS_PATH_PREFIX = "/api/v1/public/documents/";
+
+// NestExpressApplication#enableCors is typed `options?: any`, so these mirror the `cors` package's
+// delegate/options shape (Nest's own CorsOptionsDelegate/CorsOptionsCallback aren't exported from
+// @nestjs/common's public API) purely for our own type safety.
+interface CorsResponseOptions {
+  origin: boolean | string[];
+  credentials: boolean;
+}
+
+type CorsOptionsCallback = (error: Error | null, options: CorsResponseOptions) => void;
 
 export function parseTrustProxy(raw: string): boolean | number | string {
   if (raw === "true") return true;
@@ -21,6 +36,20 @@ export function parseCorsOrigins(raw: string): string[] {
     .split(",")
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
+}
+
+function configureCors(app: NestExpressApplication, configService: ConfigService<EnvironmentVariables, true>): void {
+  const allowedOrigins = parseCorsOrigins(configService.get("CORS_ORIGINS", { infer: true }));
+
+  function delegate(req: Request, callback: CorsOptionsCallback): void {
+    if (req.path.startsWith(PUBLIC_DOCUMENTS_PATH_PREFIX)) {
+      callback(null, { origin: true, credentials: false });
+      return;
+    }
+    callback(null, { origin: allowedOrigins, credentials: true });
+  }
+
+  app.enableCors(delegate);
 }
 
 function configureSwagger(app: NestExpressApplication): void {
@@ -48,6 +77,8 @@ export function configureApp(app: NestExpressApplication): void {
   const configService: ConfigService<EnvironmentVariables, true> = app.get(ConfigService);
   const trustProxy = configService.get("TRUST_PROXY", { infer: true });
   app.set("trust proxy", parseTrustProxy(trustProxy));
+
+  configureCors(app, configService);
 
   app.setGlobalPrefix("api/v1", { exclude: ["health"] });
 

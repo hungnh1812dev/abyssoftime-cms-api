@@ -67,7 +67,16 @@ describe("configureApp", () => {
         { provide: CreatePermissionService, useValue: { execute: jest.fn().mockResolvedValue(permission) } },
         { provide: UpdatePermissionService, useValue: { execute: jest.fn() } },
         { provide: DeletePermissionService, useValue: { execute: jest.fn() } },
-        { provide: ConfigService, useValue: { get: jest.fn((key: string) => (key === "TRUST_PROXY" ? "1" : undefined)) } },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              if (key === "TRUST_PROXY") return "1";
+              if (key === "CORS_ORIGINS") return "http://localhost:3000";
+              return undefined;
+            }),
+          },
+        },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -138,7 +147,18 @@ describe("configureApp query parser", () => {
   beforeEach(async () => {
     const module = await Test.createTestingModule({
       controllers: [QueryEchoController],
-      providers: [{ provide: ConfigService, useValue: { get: jest.fn((key: string) => (key === "TRUST_PROXY" ? "1" : undefined)) } }],
+      providers: [
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              if (key === "TRUST_PROXY") return "1";
+              if (key === "CORS_ORIGINS") return "http://localhost:3000";
+              return undefined;
+            }),
+          },
+        },
+      ],
     }).compile();
 
     app = module.createNestApplication<NestExpressApplication>();
@@ -157,5 +177,72 @@ describe("configureApp query parser", () => {
       .expect(200);
 
     expect(response.body).toEqual({ filters: { position: { $contains: "hello" } } });
+  });
+});
+
+@Controller("public/documents")
+class PublicDocumentsEchoController {
+  @Get("single-type/:id")
+  echo(): unknown {
+    return { ok: true };
+  }
+}
+
+describe("configureApp CORS", () => {
+  const ALLOWED_ORIGIN = "http://localhost:3000";
+  let app: NestExpressApplication;
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      controllers: [QueryEchoController, PublicDocumentsEchoController],
+      providers: [
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              if (key === "TRUST_PROXY") return "1";
+              if (key === "CORS_ORIGINS") return ALLOWED_ORIGIN;
+              return undefined;
+            }),
+          },
+        },
+      ],
+    }).compile();
+
+    app = module.createNestApplication<NestExpressApplication>();
+    configureApp(app);
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it("returns credentialed CORS headers for an allowed origin on /api/v1/*", async () => {
+    const response = await request(app.getHttpServer()).get("/api/v1/query-echo").set("Origin", ALLOWED_ORIGIN).expect(200);
+
+    expect(response.headers["access-control-allow-origin"]).toBe(ALLOWED_ORIGIN);
+    expect(response.headers["access-control-allow-credentials"]).toBe("true");
+  });
+
+  it("does not return a matching Access-Control-Allow-Origin for a disallowed origin on /api/v1/*", async () => {
+    const response = await request(app.getHttpServer()).get("/api/v1/query-echo").set("Origin", "http://evil.example.com").expect(200);
+
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("reflects any origin with no credentials header on /api/v1/public/documents/*", async () => {
+    const arbitraryOrigin = "http://anything.example.com";
+    const response = await request(app.getHttpServer()).get("/api/v1/public/documents/single-type/x").set("Origin", arbitraryOrigin).expect(200);
+
+    expect(response.headers["access-control-allow-origin"]).toBe(arbitraryOrigin);
+    expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
+  });
+
+  it("responds 2xx to an OPTIONS preflight from an allowed origin with the right headers", async () => {
+    const response = await request(app.getHttpServer()).options("/api/v1/query-echo").set("Origin", ALLOWED_ORIGIN).set("Access-Control-Request-Method", "GET").expect(204);
+
+    expect(response.headers["access-control-allow-origin"]).toBe(ALLOWED_ORIGIN);
+    expect(response.headers["access-control-allow-credentials"]).toBe("true");
   });
 });
