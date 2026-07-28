@@ -93,12 +93,14 @@ See `tasks/plan.md` for full context, approach, and confirmed decisions.
          change — verified safe/backward-compatible by re-running the full suite (674 unit tests,
          22 e2e tests, build, lint) with no other regressions, since "extended" is a superset of
          "simple" for every existing flat (non-bracketed) query param already in use.
-- [ ] `docs/documents/document.md` — extend the "List query parsing" section with the new `filters`
+- [x] `docs/documents/document.md` — extend the "List query parsing" section with the new `filters`
       mechanism (operators, value classes, 400 cases), mirroring how `search`/`orderBy` are
       documented there
-- [ ] `docs/documents/swagger.md` — check whether the new query param needs a mention (not a new
-      endpoint, so likely no change beyond a path/operation-count bump if one is tracked there;
-      confirm during execution)
+- [x] `docs/documents/swagger.md` — checked: no update needed. `filters` is a new field on the
+      existing `ListQueryDto`/existing collection-type list route — no new path or operation, so the
+      documented "36 paths, 47 operations" count is unchanged. The param itself is already
+      documented via `ListQueryDto`'s own `@ApiPropertyOptional` (visible in the generated
+      `/api-docs-json`), which is the mechanism this file describes rather than duplicates.
 - [ ] **Checkpoint 3 (final):** `bun run build && bun run test:cov && bun run test:e2e && bun run
       lint` all green; five-axis code review (`agent-skills:code-reviewer`) over the full diff — fix
       or explicitly defer findings with reasoning; `SPEC.md` trimmed to a one-line pointer at
