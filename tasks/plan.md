@@ -73,10 +73,10 @@ This plan follows that precedent; Task 1 fixes `SPEC.md` to match.
       cookie → 401. Automatically-verifiable parts (lint/test/build) → commit here; manual check can trail.
 
 ### Phase 3 — Docs
-- [ ] `docs/documents/auth.md` — add the new endpoint to its existing route table/section
-- [ ] `docs/cms-admin-integration.md` — remove "no GET /auth/me" from known gaps; add to per-module endpoint
+- [x] `docs/documents/auth.md` — add the new endpoint to its existing route table/section
+- [x] `docs/cms-admin-integration.md` — remove "no GET /auth/me" from known gaps; add to per-module endpoint
       reference
-- [ ] **Checkpoint 3:** doc read-through, no stale "no /auth/me" mentions — commit
+- [x] **Checkpoint 3:** doc read-through, no stale "no /auth/me" mentions — commit
 
 ### Phase 4 — Five-axis review + close-out
 - [ ] Five-axis review (correctness / readability / architecture / security / performance)

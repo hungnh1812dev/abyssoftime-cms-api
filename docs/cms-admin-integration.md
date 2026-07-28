@@ -72,16 +72,51 @@ onboarding flow, that doesn't exist server-side yet — flag it rather than buil
 | `POST /auth/logout` | none required | no | — | `200 MessageResponseDto`, clears both cookies | Always succeeds even if not logged in. |
 | `POST /auth/forgot-password` | none | yes | `{ email }` | `200 MessageResponseDto` | Always returns success regardless of whether the email exists (enumeration prevention) — don't render "email not found" in the UI, just show a generic "check your inbox" message. |
 | `POST /auth/reset-password` | none | yes | `{ token, newPassword }` | `200 MessageResponseDto` | `token` is the plaintext value emailed by forgot-password, 1-hour expiry. `400` if invalid/expired. |
+| `GET /auth/me` | `access_token` cookie (`JwtAuthGuard`) | no | — | `200 MeResponseDto` | Resolves the session cookie into the caller's own identity + resolved `role` (with `permissions`), in one call — see §2.3. `401` if the cookie is missing/invalid/expired, or if the account was deleted after the token was issued. `404` if the user's `roleId` doesn't resolve to an existing role (should not happen in normal operation). No permission requirement. |
 
 **`RegisterDto` fields** (all required): `email` (string), `name` (string, display name), `username`
 (3–32 chars: letters/numbers/underscore/dot/hyphen), `password` (min 8 chars), `accountType` (boolean).
 
-**Session lifecycle for the frontend**: on app load, don't assume a session exists — call any authenticated
-endpoint (or add a lightweight `whoami`-style check once one exists; there currently is **no `GET /auth/me`**
-route, see §7) and redirect to login on `401`. On any `401` from *any* authenticated call, attempt
+**Session lifecycle for the frontend**: on app load, don't assume a session exists — call `GET /auth/me`
+(see §2.3) and redirect to login on `401`. On any `401` from *any* authenticated call, attempt
 `POST /auth/refresh` once; if that also 401s, clear local UI state and redirect to `/login`. There's no
 built-in "silent refresh on a timer" — the access cookie just expires and the next request will 401, which is
 the trigger to refresh.
+
+### 2.3 `GET /auth/me` response shape
+
+Call this once on login-success and once on app-mount to resolve the session cookie into "who is logged in
+and what can they do," instead of `GET /users` + `GET /roles` with a client-side email match (which breaks on
+cold reload and requires permissions the caller may not hold just to identify themselves).
+
+```json
+{
+  "documentId": "…",
+  "email": "user@example.com",
+  "name": "Jane Doe",
+  "username": "janedoe",
+  "accountType": false,
+  "verified": true,
+  "roleId": "…",
+  "role": {
+    "documentId": "…",
+    "name": "Editor",
+    "slug": "editor",
+    "level": 20,
+    "isDefault": false,
+    "permissions": ["document:read", "document:update"],
+    "createdAt": "…",
+    "updatedAt": "…",
+    "updatedBy": null
+  },
+  "createdAt": "…",
+  "updatedAt": "…"
+}
+```
+
+`role` is `null` if `roleId` is `null` (no role assigned yet). `role.permissions`/`level`/`slug` are read fresh
+from the database on every call, not cached from the JWT — a role edit can take up to the access token's
+~15-minute TTL to show up here, matching how long it takes `PermissionsGuard` itself to pick up the change.
 
 ## 3. Error shape
 
@@ -322,9 +357,6 @@ don't expect to render a full detail view from list data; fetch the single docum
 Things you may expect from a typical admin-panel API that **don't exist yet** in this backend — worth flagging
 to the backend team rather than working around client-side:
 
-- **No `GET /auth/me`** — no single endpoint to fetch "who am I / what can I do" after login. The admin shell
-  will need to derive current-user state from the login response's absence of error + a subsequent
-  `GET /users` self-lookup, or ask backend to add one.
 - **No pagination on `GET /users` or `GET /media`** — fine for now, but a growing user/media table will need
   server-side paging eventually; don't build the admin table component assuming every list endpoint paginates
   the same way as documents.
@@ -341,6 +373,7 @@ curl -s http://localhost:8080/health
 curl -s http://localhost:8080/api/v1/auth/has-users
 curl -s -c cookies.txt -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" -d '{"email":"...","password":"..."}'
+curl -s -b cookies.txt http://localhost:8080/api/v1/auth/me
 curl -s -b cookies.txt http://localhost:8080/api/v1/users
 curl -s -b cookies.txt http://localhost:8080/api/v1/content-types
 ```
