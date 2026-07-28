@@ -16,7 +16,7 @@ const permissionsResponse = [
 
 beforeEach(() => {
   mock = new MockAdapter(api);
-  mock.onGet("/api/permissions").reply(200, permissionsResponse);
+  mock.onGet("/permissions").reply(200, permissionsResponse);
 });
 
 afterEach(() => {
@@ -36,7 +36,7 @@ describe("PermissionsPage", () => {
   });
 
   it("shows an error state when the catalog fails to load", async () => {
-    mock.onGet("/api/permissions").reply(500);
+    mock.onGet("/permissions").reply(500);
     renderWithProviders(<PermissionsPage />);
     await waitFor(() => expect(screen.getByText(/failed to load permissions/i)).toBeInTheDocument());
   });
@@ -69,7 +69,7 @@ describe("PermissionsPage", () => {
   });
 
   it("submits a new permission on Create", async () => {
-    mock.onPost("/api/permissions").reply(201, { documentId: "p3", slug: "reports:generate", name: "Generate Reports", description: "" });
+    mock.onPost("/permissions").reply(201, { documentId: "p3", slug: "reports:generate", name: "Generate Reports", description: "" });
     const user = userEvent.setup();
     renderWithProviders(<PermissionsPage />);
     await waitFor(() => screen.getByText("Create Permission"));
@@ -100,7 +100,7 @@ describe("PermissionsPage", () => {
   });
 
   it("submits a name/description change on Save, not the slug", async () => {
-    mock.onPut("/api/permissions/p1").reply(200, { documentId: "p1", slug: "document:read", name: "Read Docs (renamed)", description: "View documents" });
+    mock.onPut("/permissions/p1").reply(200, { documentId: "p1", slug: "document:read", name: "Read Docs (renamed)", description: "View documents" });
     const user = userEvent.setup();
     renderWithProviders(<PermissionsPage />);
     await waitFor(() => screen.getByText("document:read"));
@@ -119,8 +119,8 @@ describe("PermissionsPage", () => {
     expect(JSON.parse(mock.history.put[0].data)).toEqual({ name: "Read Docs (renamed)", description: "View documents" });
   });
 
-  it("shows an inline error when deleting a referenced permission is blocked (409)", async () => {
-    mock.onDelete("/api/permissions/p1").reply(409, { error: 'permission "document:read" is used by 2 role(s) and 0 token(s)' });
+  it("shows an inline error with role/token counts when deleting a referenced permission is blocked (409)", async () => {
+    mock.onDelete("/permissions/p1").reply(409, { message: "Permission is still referenced", roleCount: 2, accessTokenCount: 0 });
     const user = userEvent.setup();
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderWithProviders(<PermissionsPage />);
@@ -129,12 +129,12 @@ describe("PermissionsPage", () => {
     const row = screen.getByText("document:read").closest("tr") as HTMLElement;
     await user.click(within(row).getByText("Delete"));
 
-    await waitFor(() => expect(screen.getByText(/used by 2 role/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/2 role\(s\) and 0 access token\(s\)/i)).toBeInTheDocument());
     confirmSpy.mockRestore();
   });
 
   it("deletes an unreferenced permission without error", async () => {
-    mock.onDelete("/api/permissions/p2").reply(204);
+    mock.onDelete("/permissions/p2").reply(204);
     const user = userEvent.setup();
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderWithProviders(<PermissionsPage />);

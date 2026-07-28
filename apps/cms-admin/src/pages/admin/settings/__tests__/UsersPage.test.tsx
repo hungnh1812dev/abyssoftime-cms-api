@@ -1,5 +1,6 @@
 import { UsersPage } from "../UsersPage";
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import MockAdapter from "axios-mock-adapter";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,27 +14,21 @@ vi.mock("@/context/AuthContext", () => ({
 
 let mock: MockAdapter;
 
-const emptyInviteList = { items: [] };
-const usersResponse = {
-  items: [
-    { id: "u1", email: "alice@example.com", displayName: "Alice Admin", role: "super_admin" },
-    { id: "u2", email: "bob@example.com", displayName: "Bob Editor", role: "editor" },
-  ],
-  total: 2,
-  page: 1,
-  limit: 20,
-};
-const rolesResponse = [
-  { documentId: "r1", name: "Super Admin", slug: "super_admin", permissions: [], level: 100, isDefault: true },
-  { documentId: "r2", name: "Editor", slug: "editor", permissions: [], level: 60, isDefault: true },
+const superAdminRole = { documentId: "r1", name: "Super Admin", slug: "super_admin", permissions: [], level: 100, isDefault: true };
+const editorRole = { documentId: "r2", name: "Editor", slug: "editor", permissions: [], level: 60, isDefault: true };
+const guestRole = { documentId: "r3", name: "Guest", slug: "guest", permissions: [], level: 0, isDefault: true };
+const rolesResponse = [superAdminRole, editorRole, guestRole];
+
+const usersResponse = [
+  { documentId: "u1", email: "alice@example.com", name: "Alice Admin", username: "alice", accountType: true, verified: true, roleId: "r1", createdAt: "", updatedAt: "" },
+  { documentId: "u2", email: "bob@example.com", name: "Bob Editor", username: "bob", accountType: true, verified: true, roleId: "r2", createdAt: "", updatedAt: "" },
 ];
 
 beforeEach(() => {
-  mockUseAuth.mockReturnValue({ role: "super_admin", permissions: [], token: "x", userId: "u1", loading: false, login: vi.fn(), logout: vi.fn() });
+  mockUseAuth.mockReturnValue({ role: superAdminRole, permissions: [], userId: "u1", loading: false, login: vi.fn(), logout: vi.fn() });
   mock = new MockAdapter(api);
-  mock.onGet("/api/users?page=1&limit=20").reply(200, usersResponse);
-  mock.onGet("/api/invites").reply(200, emptyInviteList);
-  mock.onGet("/api/roles").reply(200, rolesResponse);
+  mock.onGet("/users").reply(200, usersResponse);
+  mock.onGet("/roles").reply(200, rolesResponse);
 });
 
 afterEach(() => {
@@ -47,7 +42,7 @@ describe("UsersPage — Display Name column", () => {
     await waitFor(() => expect(screen.getByText("Display Name")).toBeInTheDocument());
   });
 
-  it("renders each user’s display name in its row", async () => {
+  it("renders each user's display name in its row", async () => {
     renderWithProviders(<UsersPage />);
     await waitFor(() => {
       expect(screen.getByText("Alice Admin")).toBeInTheDocument();
@@ -69,5 +64,60 @@ describe("UsersPage — Role column shows the role name, not the slug", () => {
     renderWithProviders(<UsersPage />);
     await waitFor(() => expect(screen.getByText("Super Admin")).toBeInTheDocument());
     expect(screen.queryByText("super_admin")).not.toBeInTheDocument();
+  });
+});
+
+describe("UsersPage — dynamic role hierarchy (canManage gating)", () => {
+  it("shows manage controls for a row whose role level is below the caller's", async () => {
+    renderWithProviders(<UsersPage />);
+    await waitFor(() => expect(screen.getByText("Bob Editor")).toBeInTheDocument());
+    const bobRow = screen.getByText("Bob Editor").closest("tr");
+    expect(bobRow).not.toBeNull();
+    expect(bobRow!.querySelector("button")).not.toBeNull();
+  });
+
+  it("hides manage controls for the caller's own row", async () => {
+    renderWithProviders(<UsersPage />);
+    await waitFor(() => expect(screen.getByText("Alice Admin")).toBeInTheDocument());
+    const aliceRow = screen.getByText("Alice Admin").closest("tr");
+    expect(aliceRow!.querySelector("button")).toBeNull();
+  });
+
+  it("hides manage controls for a peer/higher role level than the caller", async () => {
+    mockUseAuth.mockReturnValue({ role: editorRole, permissions: [], userId: "u2", loading: false, login: vi.fn(), logout: vi.fn() });
+    renderWithProviders(<UsersPage />);
+    await waitFor(() => expect(screen.getByText("Alice Admin")).toBeInTheDocument());
+    const aliceRow = screen.getByText("Alice Admin").closest("tr");
+    expect(aliceRow!.querySelector("button")).toBeNull();
+  });
+
+  it("only offers roles below the caller's own level in the role-change dropdown", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<UsersPage />);
+    await waitFor(() => expect(screen.getByText("Bob Editor")).toBeInTheDocument());
+
+    const bobRow = screen.getByText("Bob Editor").closest("tr")!;
+    await user.click(bobRow.querySelector("[role='combobox']")!);
+
+    expect(screen.getByRole("option", { name: "Editor" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Guest" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Super Admin" })).not.toBeInTheDocument();
+  });
+
+  it("sends PATCH /users/:id/role with the selected roleId on role change", async () => {
+    const user = userEvent.setup();
+    let capturedBody: unknown;
+    mock.onPatch("/users/u2/role").reply((config) => {
+      capturedBody = JSON.parse(config.data);
+      return [200, { ...usersResponse[1], roleId: "r3" }];
+    });
+    renderWithProviders(<UsersPage />);
+    await waitFor(() => expect(screen.getByText("Bob Editor")).toBeInTheDocument());
+
+    const bobRow = screen.getByText("Bob Editor").closest("tr")!;
+    await user.click(bobRow.querySelector("[role='combobox']")!);
+    await user.click(screen.getByRole("option", { name: "Guest" }));
+
+    await waitFor(() => expect(capturedBody).toEqual({ roleId: "r3" }));
   });
 });

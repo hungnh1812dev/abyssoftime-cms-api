@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AxiosError } from "axios";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/errors";
 
 export interface PermissionItem {
   documentId: string;
@@ -18,20 +18,19 @@ const KEYS = {
 export function usePermissions() {
   return useQuery<PermissionItem[]>({
     queryKey: KEYS.all,
-    queryFn: () => api.get<PermissionItem[]>("/api/permissions").then((response) => response.data),
+    queryFn: () => api.get<PermissionItem[]>("/permissions").then((response) => response.data),
   });
 }
 
 export function useCreatePermission() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { slug: string; name: string; description?: string }) => api.post<PermissionItem>("/api/permissions", data).then((response) => response.data),
+    mutationFn: (data: { slug: string; name: string; description?: string }) => api.post<PermissionItem>("/permissions", data).then((response) => response.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: KEYS.all });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to create permission";
-      toast.error(message);
+      toast.error(apiErrorMessage(error, "Failed to create permission"));
     },
   });
 }
@@ -40,13 +39,12 @@ export function useUpdatePermission() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ documentId, data }: { documentId: string; data: { name?: string; description?: string } }) =>
-      api.put<PermissionItem>(`/api/permissions/${documentId}`, data).then((response) => response.data),
+      api.put<PermissionItem>(`/permissions/${documentId}`, data).then((response) => response.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: KEYS.all });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to update permission";
-      toast.error(message);
+      toast.error(apiErrorMessage(error, "Failed to update permission"));
     },
   });
 }
@@ -54,13 +52,12 @@ export function useUpdatePermission() {
 export function useDeletePermission() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (documentId: string) => api.delete(`/api/permissions/${documentId}`),
+    mutationFn: (documentId: string) => api.delete(`/permissions/${documentId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: KEYS.all });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to delete permission";
-      toast.error(message);
+      toast.error(apiErrorMessage(error, "Failed to delete permission"));
     },
   });
 }

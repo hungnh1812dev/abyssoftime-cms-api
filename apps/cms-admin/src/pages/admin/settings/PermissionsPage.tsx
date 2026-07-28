@@ -1,3 +1,4 @@
+import type { AxiosError } from "axios";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -6,15 +7,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { type PermissionItem, useCreatePermission, useDeletePermission, usePermissions, useUpdatePermission } from "@/hooks/usePermissions";
+import { apiErrorMessage } from "@/lib/errors";
 
 const SLUG_PATTERN = /^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/;
 
-function extractErrorMessage(error: unknown): string | undefined {
-  if (typeof error === "object" && error !== null && "response" in error) {
-    const response = (error as { response?: { data?: { error?: string } } }).response;
-    return response?.data?.error;
+interface DeleteConflictData {
+  message?: string;
+  roleCount?: number;
+  accessTokenCount?: number;
+}
+
+function extractErrorMessage(error: unknown): string {
+  const data = (error as AxiosError<DeleteConflictData>).response?.data;
+  if (data && (data.roleCount !== undefined || data.accessTokenCount !== undefined)) {
+    return `Still referenced by ${data.roleCount ?? 0} role(s) and ${data.accessTokenCount ?? 0} access token(s) — remove those references first.`;
   }
-  return undefined;
+  return apiErrorMessage(error, "Failed to delete permission");
 }
 
 interface PermissionDialogProps {
@@ -104,8 +112,7 @@ export function PermissionsPage() {
     setDeleteErrors((prev) => ({ ...prev, [permission.slug]: "" }));
     deletePermission.mutate(permission.documentId, {
       onError: (error: unknown) => {
-        const message = extractErrorMessage(error) ?? "Failed to delete permission";
-        setDeleteErrors((prev) => ({ ...prev, [permission.slug]: message }));
+        setDeleteErrors((prev) => ({ ...prev, [permission.slug]: extractErrorMessage(error) }));
       },
     });
   }

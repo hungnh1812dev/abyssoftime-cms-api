@@ -22,8 +22,8 @@ const rolesResponse = [
 
 beforeEach(() => {
   mock = new MockAdapter(api);
-  mock.onGet("/api/roles").reply(200, rolesResponse);
-  mock.onGet("/api/permissions").reply(200, permissionsResponse);
+  mock.onGet("/roles").reply(200, rolesResponse);
+  mock.onGet("/permissions").reply(200, permissionsResponse);
 });
 
 afterEach(() => {
@@ -42,7 +42,7 @@ describe("RolesPage", () => {
   });
 
   it("shows an error state when the role list fails to load", async () => {
-    mock.onGet("/api/roles").reply(500);
+    mock.onGet("/roles").reply(500);
     renderWithProviders(<RolesPage />);
     await waitFor(() => expect(screen.getByText(/failed to load roles/i)).toBeInTheDocument());
   });
@@ -131,7 +131,7 @@ describe("RolesPage", () => {
   });
 
   it("submits the tree-driven permissions payload on Create Role", async () => {
-    mock.onPost("/api/roles").reply(201, { documentId: "r3", name: "New Role", slug: "new-role", permissions: ["document:read"], level: 40, isDefault: false });
+    mock.onPost("/roles").reply(201, { documentId: "r3", name: "New Role", slug: "new-role", permissions: ["document:read"], level: 40, isDefault: false });
     const user = userEvent.setup();
     renderWithProviders(<RolesPage />);
     await waitFor(() => screen.getByText("Create Role"));
@@ -147,8 +147,8 @@ describe("RolesPage", () => {
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "Create Role" }));
 
-    await waitFor(() => expect(mock.history.post.filter((r) => r.url === "/api/roles")).toHaveLength(1));
-    const body = JSON.parse(mock.history.post.filter((r) => r.url === "/api/roles")[0].data);
+    await waitFor(() => expect(mock.history.post.filter((r) => r.url === "/roles")).toHaveLength(1));
+    const body = JSON.parse(mock.history.post.filter((r) => r.url === "/roles")[0].data);
     expect(body).toEqual({ name: "New Role", slug: "new-role", permissions: ["document:read"], level: 50 });
   });
 });
