@@ -66,6 +66,15 @@ function PanelFallback() {
   return <div className="text-muted-foreground p-4">Loading…</div>;
 }
 
+// Floor thresholds for ProtectedRoute's minLevel gate, matching this API's
+// seeded roles' level values. Roles are a fully dynamic catalog (any custom
+// role can exist at any level 0-100) — these are just the well-known floors
+// this app's own settings routes gate on, not an exhaustive role list.
+const ROLE_LEVEL = {
+  ADMIN: 50,
+  SUPER_ADMIN: 100,
+} as const;
+
 export function AppRouter() {
   return (
     <Routes>
@@ -139,7 +148,7 @@ export function AppRouter() {
         <Route
           path="settings/users"
           element={
-            <ProtectedRoute minRole="admin">
+            <ProtectedRoute minLevel={ROLE_LEVEL.ADMIN}>
               <Suspense fallback={<PanelFallback />}>
                 <UsersPage />
               </Suspense>
@@ -149,7 +158,7 @@ export function AppRouter() {
         <Route
           path="settings/access-tokens"
           element={
-            <ProtectedRoute minRole="super_admin">
+            <ProtectedRoute minLevel={ROLE_LEVEL.SUPER_ADMIN}>
               <Suspense fallback={<PanelFallback />}>
                 <AccessTokensPage />
               </Suspense>
@@ -159,7 +168,7 @@ export function AppRouter() {
         <Route
           path="settings/roles"
           element={
-            <ProtectedRoute minRole="super_admin">
+            <ProtectedRoute minLevel={ROLE_LEVEL.SUPER_ADMIN}>
               <Suspense fallback={<PanelFallback />}>
                 <RolesPage />
               </Suspense>
@@ -169,7 +178,7 @@ export function AppRouter() {
         <Route
           path="settings/permissions"
           element={
-            <ProtectedRoute minRole="super_admin">
+            <ProtectedRoute minLevel={ROLE_LEVEL.SUPER_ADMIN}>
               <Suspense fallback={<PanelFallback />}>
                 <PermissionsPage />
               </Suspense>
@@ -179,7 +188,7 @@ export function AppRouter() {
         <Route
           path="settings/internationalize"
           element={
-            <ProtectedRoute minRole="super_admin">
+            <ProtectedRoute minLevel={ROLE_LEVEL.SUPER_ADMIN}>
               <Suspense fallback={<PanelFallback />}>
                 <InternationalizePage />
               </Suspense>

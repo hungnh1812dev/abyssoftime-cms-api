@@ -5,19 +5,34 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SidebarProvider, SidebarShell } from "@/components/sidebar";
 import { AuthProvider } from "@/context/AuthContext";
-import { api, getAccessToken, setAccessToken } from "@/lib/api";
+import type { MeUser } from "@/context/AuthContext";
+import { api } from "@/lib/api";
 import { TopBar } from "@/pages/admin/layout/TopBar";
 import { renderWithProviders } from "@/test-utils";
 import type { ContentType } from "@/types/cms";
 
-function makeToken(payload: Record<string, unknown>) {
-  const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const body = btoa(JSON.stringify(payload));
-  return `${header}.${body}.fakesig`;
+function makeMeUser(overrides: Partial<MeUser> = {}): MeUser {
+  return {
+    documentId: "u1",
+    email: "admin@example.com",
+    name: "Jane Admin",
+    username: "admin",
+    accountType: true,
+    verified: true,
+    roleId: "r1",
+    role: {
+      documentId: "r1",
+      name: "Super Admin",
+      slug: "super_admin",
+      permissions: ["media:read", "user:read", "api_token:manager", "role:manager", "permission:manager"],
+      level: 100,
+      isDefault: true,
+    },
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
 }
-
-const ADMIN_TOKEN = makeToken({ userId: "u1", role: "admin", exp: 9999999999 });
-const SUPER_ADMIN_TOKEN = makeToken({ userId: "u1", role: "super_admin", exp: 9999999999 });
 
 const contentTypes: ContentType[] = [
   { ID: "1", DocumentID: "d1", Name: "Blog", Slug: "blog", Kind: "collection", CreatedAt: "", UpdatedAt: "" },
@@ -28,7 +43,6 @@ let mock: MockAdapter;
 
 beforeEach(() => {
   mock = new MockAdapter(api);
-  setAccessToken(null);
 });
 
 afterEach(() => {
@@ -36,11 +50,9 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function renderSidebar(token = SUPER_ADMIN_TOKEN) {
-  mock.onPost("/auth/refresh").reply(200, { accessToken: token });
-  mock
-    .onGet("/auth/me")
-    .reply(200, { role: "super_admin", permissions: ["media:read", "users:read", "access_token:manager", "roles:manage", "permissions:manage", "locales:manager"] });
+function renderSidebar(user: MeUser = makeMeUser()) {
+  mock.onPost("/auth/refresh").reply(200, { message: "Refresh successful" });
+  mock.onGet("/auth/me").reply(200, user);
   return renderWithProviders(
     <AuthProvider>
       <SidebarProvider>
@@ -114,20 +126,21 @@ describe("Sidebar", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /logout/i })).toBeInTheDocument());
   });
 
-  it("clears the access token when Logout is clicked", async () => {
+  it("calls POST /auth/logout when Logout is clicked", async () => {
     mock.onGet("/api/content-types").reply(200, []);
-    mock.onPost("/auth/logout").reply(200);
+    mock.onPost("/auth/logout").reply(200, { message: "Logged out" });
     const user = userEvent.setup();
     renderSidebar();
     await waitFor(() => expect(screen.getByRole("button", { name: /logout/i })).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /logout/i }));
-    expect(getAccessToken()).toBeNull();
+    await waitFor(() => expect(mock.history.post.some((request) => request.url === "/auth/logout")).toBe(true));
   });
 });
 
 describe("TopBar", () => {
   it("renders breadcrumbs", async () => {
-    mock.onPost("/auth/refresh").reply(200, { accessToken: ADMIN_TOKEN });
+    mock.onPost("/auth/refresh").reply(200, { message: "Refresh successful" });
+    mock.onGet("/auth/me").reply(200, makeMeUser());
     renderWithProviders(
       <AuthProvider>
         <SidebarProvider>

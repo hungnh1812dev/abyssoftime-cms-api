@@ -4,24 +4,16 @@ import MockAdapter from "axios-mock-adapter";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/context/AuthContext";
-import { api, getAccessToken, setAccessToken } from "@/lib/api";
+import { api } from "@/lib/api";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { renderWithProviders } from "@/test-utils";
-
-function makeToken(payload: Record<string, unknown>) {
-  const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const body = btoa(JSON.stringify(payload));
-  return `${header}.${body}.fakesig`;
-}
-
-const ADMIN_TOKEN = makeToken({ userId: "u1", role: "admin", exp: 9999999999 });
 
 let mock: MockAdapter;
 
 beforeEach(() => {
   mock = new MockAdapter(api);
-  setAccessToken(null);
   mock.onPost("/auth/refresh").reply(401);
+  mock.onGet("/auth/has-users").reply(200, { hasUsers: true });
 });
 
 afterEach(() => {
@@ -43,6 +35,12 @@ describe("LoginPage", () => {
     await waitFor(() => expect(screen.getByLabelText(/email/i)).toBeInTheDocument());
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
+  });
+
+  it("links to /forgot-password", async () => {
+    renderLogin();
+    await waitFor(() => expect(screen.getByText(/forgot password/i)).toBeInTheDocument());
+    expect(screen.getByText(/forgot password/i).closest("a")).toHaveAttribute("href", "/forgot-password");
   });
 
   it("shows validation error for invalid email", async () => {
@@ -73,9 +71,22 @@ describe("LoginPage", () => {
     });
   });
 
-  it("calls POST /auth/login and stores the access token on success", async () => {
+  it("calls POST /auth/login and navigates to /admin on success", async () => {
     const user = userEvent.setup();
-    mock.onPost("/auth/login").reply(200, { accessToken: ADMIN_TOKEN });
+    mock.onPost("/auth/login").reply(200, { message: "Login successful" });
+    mock.onGet("/auth/me").reply(200, {
+      documentId: "u1",
+      email: "user@example.com",
+      name: "User",
+      username: "user",
+      accountType: true,
+      verified: true,
+      roleId: null,
+      role: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
     renderLogin();
 
     await waitFor(() => expect(screen.getByLabelText(/email/i)).toBeInTheDocument());
@@ -84,11 +95,11 @@ describe("LoginPage", () => {
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(getAccessToken()).toBe(ADMIN_TOKEN);
+      expect(mock.history.post.some((request) => request.url === "/auth/login")).toBe(true);
     });
   });
 
-  it("shows error message when login fails", async () => {
+  it("shows a generic invalid-credentials message on 401", async () => {
     const user = userEvent.setup();
     mock.onPost("/auth/login").reply(401, { message: "Invalid credentials" });
     renderLogin();
@@ -99,7 +110,22 @@ describe("LoginPage", () => {
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent(/invalid email or password/i);
+    });
+  });
+
+  it("shows a not-verified message on 403", async () => {
+    const user = userEvent.setup();
+    mock.onPost("/auth/login").reply(403, { message: "Email not verified" });
+    renderLogin();
+
+    await waitFor(() => expect(screen.getByLabelText(/email/i)).toBeInTheDocument());
+    await user.type(screen.getByLabelText(/email/i), "user@example.com");
+    await user.type(screen.getByLabelText(/password/i), "password123");
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(/verification code/i);
     });
   });
 });

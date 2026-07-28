@@ -2,19 +2,25 @@ import { act, screen, waitFor } from "@testing-library/react";
 import MockAdapter from "axios-mock-adapter";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AuthProvider, MOUNT_REFRESH_RETRY_DELAYS_MS, useAuth } from "@/context/AuthContext";
-import { api, getAccessToken, setAccessToken } from "@/lib/api";
+import { AuthProvider, MOUNT_REFRESH_RETRY_DELAYS_MS, type MeUser, useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api";
 import { renderWithProviders } from "@/test-utils";
 
-/** Builds a structurally valid JWT whose payload can be decoded client-side. */
-function makeToken(payload: Record<string, unknown>) {
-  const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const body = btoa(JSON.stringify(payload));
-  return `${header}.${body}.fakesig`;
+function makeMeUser(overrides: Partial<MeUser> = {}): MeUser {
+  return {
+    documentId: "u1",
+    email: "admin@example.com",
+    name: "Admin",
+    username: "admin",
+    accountType: true,
+    verified: true,
+    roleId: "r1",
+    role: { documentId: "r1", name: "Admin", slug: "admin", permissions: ["document:read", "document:create"], level: 50, isDefault: true },
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
 }
-
-const ADMIN_TOKEN = makeToken({ userId: "u1", role: "admin", exp: 9999999999 });
-const GUEST_TOKEN = makeToken({ userId: "u2", role: "guest", exp: 9999999999 });
 
 let mock: MockAdapter;
 
@@ -25,7 +31,6 @@ const PROD_RETRY_DELAYS_MS = [...MOUNT_REFRESH_RETRY_DELAYS_MS];
 
 beforeEach(() => {
   mock = new MockAdapter(api);
-  setAccessToken(null);
   MOUNT_REFRESH_RETRY_DELAYS_MS.splice(0, MOUNT_REFRESH_RETRY_DELAYS_MS.length, 5, 5, 5);
 });
 
@@ -37,19 +42,18 @@ afterEach(() => {
 
 // Helper component to inspect auth context values
 function AuthDisplay() {
-  const { token, role, userId, permissions, loading } = useAuth();
+  const { userId, role, permissions, loading } = useAuth();
   if (loading) return <span data-testid="loading">loading</span>;
   return (
     <div>
-      <span data-testid="token">{token ?? "none"}</span>
-      <span data-testid="role">{role ?? "none"}</span>
       <span data-testid="userId">{userId ?? "none"}</span>
+      <span data-testid="role">{role?.slug ?? "none"}</span>
       <span data-testid="permissions">{permissions.length > 0 ? permissions.join(",") : "none"}</span>
     </div>
   );
 }
 
-describe("AuthProvider", () => {
+describe("AuthProvider — mount-time session hydration", () => {
   it("resolves as unauthenticated when the mount-time cookie refresh fails", async () => {
     mock.onPost("/auth/refresh").reply(401);
 
@@ -59,11 +63,11 @@ describe("AuthProvider", () => {
       </AuthProvider>,
     );
 
-    await waitFor(() => expect(screen.getByTestId("token")).toHaveTextContent("none"));
+    await waitFor(() => expect(screen.getByTestId("userId")).toHaveTextContent("none"));
     expect(screen.getByTestId("role")).toHaveTextContent("none");
   });
 
-  it("starts in loading state then resolves once the mount-time refresh settles", async () => {
+  it("starts in loading state then resolves once mount-time session hydration settles", async () => {
     mock.onPost("/auth/refresh").reply(401);
 
     renderWithProviders(
@@ -73,16 +77,16 @@ describe("AuthProvider", () => {
     );
 
     expect(screen.getByTestId("loading")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId("token")).toHaveTextContent("none"));
-    expect(screen.getByTestId("role")).toHaveTextContent("none");
+    await waitFor(() => expect(screen.getByTestId("userId")).toHaveTextContent("none"));
   });
 
   it("retries a transient mount-time refresh failure (e.g. a cold-start 503) and hydrates once it succeeds", async () => {
     let callCount = 0;
     mock.onPost("/auth/refresh").reply(() => {
       callCount += 1;
-      return callCount === 1 ? [503] : [200, { accessToken: ADMIN_TOKEN }];
+      return callCount === 1 ? [503] : [200, { message: "Refresh successful" }];
     });
+    mock.onGet("/auth/me").reply(200, makeMeUser());
 
     renderWithProviders(
       <AuthProvider>
@@ -107,12 +111,13 @@ describe("AuthProvider", () => {
       </AuthProvider>,
     );
 
-    await waitFor(() => expect(screen.getByTestId("token")).toHaveTextContent("none"));
+    await waitFor(() => expect(screen.getByTestId("userId")).toHaveTextContent("none"));
     expect(callCount).toBe(MOUNT_REFRESH_RETRY_DELAYS_MS.length + 1);
   });
 
-  it("hydrates token + role from a valid session cookie on mount", async () => {
-    mock.onPost("/auth/refresh").reply(200, { accessToken: ADMIN_TOKEN });
+  it("hydrates identity + role + permissions from GET /auth/me after a successful mount-time refresh", async () => {
+    mock.onPost("/auth/refresh").reply(200, { message: "Refresh successful" });
+    mock.onGet("/auth/me").reply(200, makeMeUser());
 
     renderWithProviders(
       <AuthProvider>
@@ -122,18 +127,34 @@ describe("AuthProvider", () => {
 
     await waitFor(() => expect(screen.getByTestId("role")).toHaveTextContent("admin"));
     expect(screen.getByTestId("userId")).toHaveTextContent("u1");
-    expect(getAccessToken()).toBe(ADMIN_TOKEN);
+    expect(screen.getByTestId("permissions")).toHaveTextContent("document:read,document:create");
   });
 
-  it("login() updates context and sets the in-memory access token", async () => {
+  it("logs out if GET /auth/me fails even after a successful refresh (no separable identity source)", async () => {
+    mock.onPost("/auth/refresh").reply(200, { message: "Refresh successful" });
+    mock.onGet("/auth/me").reply(401);
+
+    renderWithProviders(
+      <AuthProvider>
+        <AuthDisplay />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("userId")).toHaveTextContent("none"));
+  });
+});
+
+describe("AuthProvider — login()/logout()", () => {
+  it("login() fetches GET /auth/me and updates context", async () => {
     mock.onPost("/auth/refresh").reply(401);
+    mock.onGet("/auth/me").reply(200, makeMeUser({ documentId: "u2", role: { documentId: "r2", name: "Guest", slug: "guest", permissions: [], level: 0, isDefault: true } }));
 
     function LoginTrigger() {
-      const { login, token } = useAuth();
+      const { login, userId } = useAuth();
       return (
         <div>
-          <span data-testid="token">{token ?? "none"}</span>
-          <button onClick={() => login(ADMIN_TOKEN)}>login</button>
+          <span data-testid="userId">{userId ?? "none"}</span>
+          <button onClick={() => void login()}>login</button>
         </div>
       );
     }
@@ -147,24 +168,24 @@ describe("AuthProvider", () => {
     await waitFor(() => expect(screen.queryByTestId("loading")).not.toBeInTheDocument());
     await act(async () => getByRole("button", { name: "login" }).click());
 
-    expect(screen.getByTestId("token")).toHaveTextContent(ADMIN_TOKEN);
-    expect(getAccessToken()).toBe(ADMIN_TOKEN);
+    expect(screen.getByTestId("userId")).toHaveTextContent("u2");
   });
 
   it("logout() clears context and calls POST /auth/logout", async () => {
-    mock.onPost("/auth/refresh").reply(200, { accessToken: ADMIN_TOKEN });
+    mock.onPost("/auth/refresh").reply(200, { message: "Refresh successful" });
+    mock.onGet("/auth/me").reply(200, makeMeUser());
     let logoutCalled = false;
     mock.onPost("/auth/logout").reply(() => {
       logoutCalled = true;
-      return [200, {}];
+      return [200, { message: "Logged out" }];
     });
 
     function LogoutTrigger() {
-      const { logout, token } = useAuth();
+      const { logout, userId } = useAuth();
       return (
         <div>
-          <span data-testid="token">{token ?? "none"}</span>
-          <button onClick={() => logout()}>logout</button>
+          <span data-testid="userId">{userId ?? "none"}</span>
+          <button onClick={() => void logout()}>logout</button>
         </div>
       );
     }
@@ -175,19 +196,16 @@ describe("AuthProvider", () => {
       </AuthProvider>,
     );
 
-    await waitFor(() => expect(screen.getByTestId("token")).not.toHaveTextContent("none"));
+    await waitFor(() => expect(screen.getByTestId("userId")).not.toHaveTextContent("none"));
     await act(async () => getByRole("button", { name: "logout" }).click());
 
-    await waitFor(() => expect(screen.getByTestId("token")).toHaveTextContent("none"));
+    await waitFor(() => expect(screen.getByTestId("userId")).toHaveTextContent("none"));
     expect(logoutCalled).toBe(true);
-    expect(getAccessToken()).toBeNull();
   });
-});
 
-describe("AuthProvider — permissions (CATALOG-T10)", () => {
-  it("populates permissions from GET /auth/me after a successful mount-time refresh", async () => {
-    mock.onPost("/auth/refresh").reply(200, { accessToken: ADMIN_TOKEN });
-    mock.onGet("/auth/me").reply(200, { role: "admin", permissions: ["document:read", "document:create"] });
+  it("clears context when onSessionExpired fires mid-session", async () => {
+    mock.onPost("/auth/refresh").reply(200, { message: "Refresh successful" });
+    mock.onGet("/auth/me").reply(200, makeMeUser());
 
     renderWithProviders(
       <AuthProvider>
@@ -196,88 +214,12 @@ describe("AuthProvider — permissions (CATALOG-T10)", () => {
     );
 
     await waitFor(() => expect(screen.getByTestId("role")).toHaveTextContent("admin"));
-    await waitFor(() => expect(screen.getByTestId("permissions")).toHaveTextContent("document:read,document:create"));
-  });
 
-  it("populates permissions after login()", async () => {
+    // Simulate a mid-session 401 that api.ts's interceptor can't recover from.
+    mock.onGet("/protected").reply(401);
     mock.onPost("/auth/refresh").reply(401);
-    mock.onGet("/auth/me").reply(200, { role: "admin", permissions: ["users:read"] });
+    await expect(api.get("/protected")).rejects.toBeTruthy();
 
-    function LoginTrigger() {
-      const { login, permissions } = useAuth();
-      return (
-        <div>
-          <span data-testid="permissions">{permissions.length > 0 ? permissions.join(",") : "none"}</span>
-          <button onClick={() => login(ADMIN_TOKEN)}>login</button>
-        </div>
-      );
-    }
-
-    const { getByRole } = renderWithProviders(
-      <AuthProvider>
-        <LoginTrigger />
-      </AuthProvider>,
-    );
-
-    await waitFor(() => expect(screen.queryByTestId("loading")).not.toBeInTheDocument());
-    await act(async () => getByRole("button", { name: "login" }).click());
-
-    await waitFor(() => expect(screen.getByTestId("permissions")).toHaveTextContent("users:read"));
-  });
-
-  it("clears permissions on logout", async () => {
-    mock.onPost("/auth/refresh").reply(200, { accessToken: ADMIN_TOKEN });
-    mock.onGet("/auth/me").reply(200, { role: "admin", permissions: ["document:read"] });
-    mock.onPost("/auth/logout").reply(200, {});
-
-    function LogoutTrigger() {
-      const { logout, permissions } = useAuth();
-      return (
-        <div>
-          <span data-testid="permissions">{permissions.length > 0 ? permissions.join(",") : "none"}</span>
-          <button onClick={() => logout()}>logout</button>
-        </div>
-      );
-    }
-
-    const { getByRole } = renderWithProviders(
-      <AuthProvider>
-        <LogoutTrigger />
-      </AuthProvider>,
-    );
-
-    await waitFor(() => expect(screen.getByTestId("permissions")).toHaveTextContent("document:read"));
-    await act(async () => getByRole("button", { name: "logout" }).click());
-
-    await waitFor(() => expect(screen.getByTestId("permissions")).toHaveTextContent("none"));
-  });
-
-  it("does not crash the session when GET /auth/me fails — permissions just stay empty", async () => {
-    mock.onPost("/auth/refresh").reply(200, { accessToken: ADMIN_TOKEN });
-    mock.onGet("/auth/me").reply(500);
-
-    renderWithProviders(
-      <AuthProvider>
-        <AuthDisplay />
-      </AuthProvider>,
-    );
-
-    await waitFor(() => expect(screen.getByTestId("role")).toHaveTextContent("admin"));
-    expect(screen.getByTestId("permissions")).toHaveTextContent("none");
-    expect(screen.getByTestId("token")).toHaveTextContent(ADMIN_TOKEN);
-  });
-});
-
-describe("useAuth (context access)", () => {
-  it("provides correct role from token", async () => {
-    mock.onPost("/auth/refresh").reply(200, { accessToken: GUEST_TOKEN });
-
-    renderWithProviders(
-      <AuthProvider>
-        <AuthDisplay />
-      </AuthProvider>,
-    );
-
-    await waitFor(() => expect(screen.getByTestId("role")).toHaveTextContent("guest"));
+    await waitFor(() => expect(screen.getByTestId("userId")).toHaveTextContent("none"));
   });
 });

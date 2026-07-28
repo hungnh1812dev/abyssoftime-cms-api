@@ -4,14 +4,14 @@ Full detail/acceptance-criteria/verification per task lives in `tasks/plan.md`. 
 each task completes.
 
 ## Phase 0 — Environment & Live Smoke Test
-- [ ] 0.1 Confirm backend reachability; seed first super_admin via real register→verify→login
+- [x] 0.1 Confirm backend reachability; seed first super_admin via real register→verify→login
 
 ## Phase 1 — Auth & Session Rewrite
-- [ ] 1.1 Rewrite `lib/api.ts` for cookie-session auth
-- [ ] 1.2 Rewrite `AuthContext` around `GET /auth/me`
-- [ ] 1.3 `ProtectedRoute` → `minLevel`; delete dead `AdminRoute.tsx`
-- [ ] 1.4 `LoginPage` + `router.tsx` role-level constants
-- [ ] **Checkpoint 1** — test/lint/build green; live login check; commit
+- [x] 1.1 Rewrite `lib/api.ts` for cookie-session auth
+- [x] 1.2 Rewrite `AuthContext` around `GET /auth/me`
+- [x] 1.3 `ProtectedRoute` → `minLevel`; delete dead `AdminRoute.tsx`
+- [x] 1.4 `LoginPage` + `router.tsx` role-level constants
+- [x] **Checkpoint 1** — test/lint/build green; curl-verified against real backend (no browser tool available in this environment — see summary); commit
 - [ ] 1.5 `RegisterPage` (+ username/accountType) + new `VerifyOtpPage`
 - [ ] 1.6 New `ForgotPasswordPage` + `ResetPasswordPage`
 - [ ] 1.7 Remove invite flow entirely (delete files + strip UsersPage block)

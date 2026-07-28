@@ -15,7 +15,7 @@ vi.mock("@/hooks/useContentTypes", () => ({
   }),
 }));
 
-const ALL_SETTINGS_PERMISSIONS = ["media:read", "users:read", "access_token:manager", "roles:manage", "permissions:manage", "locales:manager"];
+const ALL_SETTINGS_PERMISSIONS = ["media:read", "user:read", "api_token:manager", "role:manager", "permission:manager", "locales:manager"];
 
 const mockUseAuth = vi.fn(() => ({
   role: "super_admin",
@@ -142,7 +142,7 @@ describe("Sidebar — permission-based gating (CATALOG-T11)", () => {
   });
 
   it("shows only the links matching the granted permissions", () => {
-    mockUseAuth.mockReturnValue({ role: "editor", permissions: ["media:read", "users:read"], token: "x", userId: "1", loading: false, login: vi.fn(), logout: vi.fn() });
+    mockUseAuth.mockReturnValue({ role: "editor", permissions: ["media:read", "user:read"], token: "x", userId: "1", loading: false, login: vi.fn(), logout: vi.fn() });
     renderSidebar();
 
     expect(screen.getByText("Media Library")).toBeInTheDocument();
@@ -153,8 +153,8 @@ describe("Sidebar — permission-based gating (CATALOG-T11)", () => {
     expect(screen.queryByText("Internationalize")).not.toBeInTheDocument();
   });
 
-  it("shows the Permissions link only when permissions:manage is granted, independent of roles:manage", () => {
-    mockUseAuth.mockReturnValue({ role: "role_manager_only", permissions: ["roles:manage"], token: "x", userId: "1", loading: false, login: vi.fn(), logout: vi.fn() });
+  it("shows the Roles link only when role:manager is granted, independent of permission:manager", () => {
+    mockUseAuth.mockReturnValue({ role: "role_manager_only", permissions: ["role:manager"], token: "x", userId: "1", loading: false, login: vi.fn(), logout: vi.fn() });
     renderSidebar();
 
     expect(screen.getByText("Roles")).toBeInTheDocument();

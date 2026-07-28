@@ -55,10 +55,10 @@ export function Sidebar() {
 
         <SidebarGroup icon={Settings} label="Settings" storageKey="settings" defaultOpen>
           {hasPermission("media:read") && <SidebarItem to="/admin/settings/media">Media Library</SidebarItem>}
-          {hasPermission("users:read") && <SidebarItem to="/admin/settings/users">Users</SidebarItem>}
-          {hasPermission("access_token:manager") && <SidebarItem to="/admin/settings/access-tokens">Access Tokens</SidebarItem>}
-          {hasPermission("roles:manage") && <SidebarItem to="/admin/settings/roles">Roles</SidebarItem>}
-          {hasPermission("permissions:manage") && <SidebarItem to="/admin/settings/permissions">Permissions</SidebarItem>}
+          {hasPermission("user:read") && <SidebarItem to="/admin/settings/users">Users</SidebarItem>}
+          {hasPermission("api_token:manager") && <SidebarItem to="/admin/settings/access-tokens">Access Tokens</SidebarItem>}
+          {hasPermission("role:manager") && <SidebarItem to="/admin/settings/roles">Roles</SidebarItem>}
+          {hasPermission("permission:manager") && <SidebarItem to="/admin/settings/permissions">Permissions</SidebarItem>}
           {hasPermission("locales:manager") && <SidebarItem to="/admin/settings/internationalize">Internationalize</SidebarItem>}
         </SidebarGroup>
       </nav>
