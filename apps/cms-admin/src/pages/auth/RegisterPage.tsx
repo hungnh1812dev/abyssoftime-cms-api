@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate } from "react-router-dom";
@@ -9,23 +9,23 @@ import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
 
 interface RegisterFields {
-  displayName: string;
+  name: string;
   email: string;
+  username: string;
   password: string;
 }
 
 export function RegisterPage() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const { data: setupData, isLoading: setupLoading } = useQuery({
-    queryKey: ["auth-setup"],
-    queryFn: () => api.get<{ adminExists: boolean }>("/auth/setup").then((response) => response.data),
+  const { data: hasUsersData, isLoading: hasUsersLoading } = useQuery({
+    queryKey: ["auth-has-users"],
+    queryFn: () => api.get<{ hasUsers: boolean }>("/auth/has-users").then((response) => response.data),
     retry: false,
   });
 
-  const adminExists = setupData?.adminExists ?? false;
+  const hasUsers = hasUsersData?.hasUsers ?? false;
 
   const {
     register,
@@ -34,17 +34,20 @@ export function RegisterPage() {
   } = useForm<RegisterFields>();
 
   const mutation = useMutation({
-    mutationFn: (data: RegisterFields) => api.post("/auth/register", data).then((response) => response.data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["auth-setup"] });
-      navigate("/login");
+    mutationFn: (data: RegisterFields) =>
+      // accountType isn't surfaced in the UI — its semantics aren't documented
+      // (the first registrant becomes admin regardless of its value, per the
+      // API's own onboarding rules), so it's sent as a fixed true.
+      api.post("/auth/register", { ...data, accountType: true }),
+    onSuccess: (_response, variables) => {
+      navigate("/verify-otp", { state: { email: variables.email } });
     },
     onError: () => {
-      setErrorMsg("Registration failed. The email may already be in use.");
+      setErrorMsg("Registration failed. The email or username may already be in use.");
     },
   });
 
-  if (setupLoading) {
+  if (hasUsersLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-muted-foreground text-sm">Loading…</p>
@@ -52,7 +55,7 @@ export function RegisterPage() {
     );
   }
 
-  if (adminExists) {
+  if (hasUsers) {
     return <Navigate to="/login" replace />;
   }
 
@@ -60,10 +63,8 @@ export function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-sm space-y-6 px-4">
         <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-semibold">{adminExists ? "Create guest account" : "Set up admin account"}</h1>
-          <p className="text-muted-foreground text-sm">
-            {adminExists ? "Register a guest account to access the CMS" : "No admin account exists yet — the first account will be an admin"}
-          </p>
+          <h1 className="text-2xl font-semibold">Set up admin account</h1>
+          <p className="text-muted-foreground text-sm">No admin account exists yet — the first account will be an admin</p>
         </div>
 
         {errorMsg && (
@@ -74,18 +75,35 @@ export function RegisterPage() {
 
         <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-4" noValidate>
           <div className="space-y-1">
-            <Label htmlFor="displayName">Display Name</Label>
+            <Label htmlFor="name">Display Name</Label>
             <Input
-              id="displayName"
+              id="name"
               type="text"
               autoComplete="name"
-              aria-invalid={!!errors.displayName}
-              {...register("displayName", {
+              aria-invalid={!!errors.name}
+              {...register("name", {
                 required: "Display name is required",
                 maxLength: { value: 100, message: "Display name must be at most 100 characters" },
               })}
             />
-            {errors.displayName && <p className="text-destructive text-xs">{errors.displayName.message}</p>}
+            {errors.name && <p className="text-destructive text-xs">{errors.name.message}</p>}
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="username">Username</Label>
+            <Input
+              id="username"
+              type="text"
+              autoComplete="username"
+              aria-invalid={!!errors.username}
+              {...register("username", {
+                required: "Username is required",
+                pattern: { value: /^[a-zA-Z0-9_.-]+$/, message: "Only letters, numbers, underscore, dot, and hyphen are allowed" },
+                minLength: { value: 3, message: "Username must be at least 3 characters" },
+                maxLength: { value: 32, message: "Username must be at most 32 characters" },
+              })}
+            />
+            {errors.username && <p className="text-destructive text-xs">{errors.username.message}</p>}
           </div>
 
           <div className="space-y-1">
@@ -119,7 +137,7 @@ export function RegisterPage() {
           </div>
 
           <Button type="submit" className="w-full" disabled={mutation.isPending}>
-            {mutation.isPending ? "Creating account…" : adminExists ? "Create guest account" : "Create admin account"}
+            {mutation.isPending ? "Creating account…" : "Create admin account"}
           </Button>
         </form>
 
