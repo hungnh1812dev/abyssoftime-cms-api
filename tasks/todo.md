@@ -1,39 +1,35 @@
-# Todo — Integrate `@nestjs/passport` as the auth-strategy framework (`[CAREFUL]`)
+# Todo — `[CAREFUL]` Integrate CORS check
 
 See `tasks/plan.md` for full context and rationale.
 
-## Phase 1 — Install + JWT half (`JwtStrategy` + `JwtAuthGuard` conversion)
-- [x] `bun add @nestjs/passport passport passport-jwt passport-local && bun add -d @types/passport-jwt @types/passport-local`
-- [x] `jwt.strategy.ts` — `JwtStrategy extends PassportStrategy(Strategy, "jwt")`, custom cookie extractor, pass-through `validate`
-- [x] `jwt.strategy.spec.ts` — cookie extractor (present → token / absent → null) + `validate` pass-through
-- [x] `jwt-auth.guard.ts` — rewrite to `extends AuthGuard("jwt")` + `handleRequest` (two exact 401 messages); keep `ACCESS_TOKEN_COOKIE` export here
-- [x] `jwt-auth.guard.spec.ts` — rewrite: test `handleRequest` in isolation (all three branches)
-- [x] `auth.module.ts` — add `PassportModule.register({ defaultStrategy: "jwt" })` + `JwtStrategy` provider (partial wiring)
-- [x] `auth.module.spec.ts` — imports length 3→4 + positional PassportModule check; add `JwtStrategy` to providers array
-- [x] **Checkpoint 1:** `bun run build` / `bunx tsc --noEmit` / `bun run lint` / `bun run test:cov` green — commit (still-green intermediate: JWT routes on Passport, login unchanged)
+## Phase 1 — Env validation + pure parse function
+- [x] `env.validation.ts` — add required `CORS_ORIGINS!: string` (no default)
+- [x] `env.validation.spec.ts` — add `CORS_ORIGINS` to shared `requiredConfig`; one rejection test (empty value throws)
+- [x] `configure-app.ts` — add `parseCorsOrigins(raw): string[]` (comma-split, trim, drop empty segments)
+- [x] `configure-app.spec.ts` — `describe("parseCorsOrigins", ...)` block (single origin; multi with whitespace; empty segment ignored)
+- [x] **Checkpoint 1:** `bun run lint && bun run build && bun test src/config/env.validation.spec.ts src/bootstrap/configure-app.spec.ts` green — commit
 
-## Phase 2 — Login half (`LocalStrategy` + shrunk `LoginService` + `AuthController.login` + remaining wiring)
-- [x] `local.strategy.ts` — `LocalStrategy` (`usernameField: "email"`), credential logic moved verbatim, returns `{ user, role }`; export `ValidatedLoginUser`
-- [x] `local.strategy.spec.ts` — all five credential cases moved from `login.service.spec.ts`
-- [x] `login.service.ts` — shrink to synchronous `execute(ValidatedLoginUser): LoginResult`, token-signing only
-- [x] `login.service.spec.ts` — rewrite: token-signing only, no repository mocks
-- [x] `auth.controller.ts` — login route: `@UseGuards(RateLimitGuard, AuthGuard("local"))`, read `req.user`; checked `eslint.config.mjs` — no `argsIgnorePattern`/unused-param rule fires, `_dto` rename not needed (confirmed via `bun run lint`, not guessed)
-- [x] `auth.controller.spec.ts` — update login-route test to `req.user` → `loginService.execute(req.user)`; assert cookies set
-- [x] `auth.module.ts` — add `LocalStrategy` provider
-- [x] `auth.module.spec.ts` — add `LocalStrategy` to providers array
-- [x] **Checkpoint 2:** `bun run build` / `bunx tsc --noEmit` / `bun run lint` / `bun run test:cov` green — commit (last code phase; not held open for Phase 5 manual verification)
+## Phase 2 — `configureCors` wiring + test coverage
+- [ ] `docs/documents/bootstrap-cors-techstack.md` (new) — single-delegate vs. two-middleware comparison table + `cors`-source evidence + `/health` fallthrough note
+- [ ] `configure-app.ts` — `configureCors(app, configService)`: single `CorsOptionsDelegate<Request>` branching on `req.path.startsWith("/api/v1/public/documents/")` → open/no-credentials, else → strict allowlist/credentials; wired into `configureApp` after `trust proxy` line
+- [ ] `configure-app.spec.ts` sub-step 1 (do first): update `ConfigService` mock in both existing describe blocks to return `CORS_ORIGINS` — breaks every existing test otherwise
+- [ ] `configure-app.spec.ts` sub-step 2: synthesized `PublicDocumentsEchoController` + new `describe("configureApp CORS", ...)` — 4 cases (allowed origin credentialed; disallowed origin rejected; public-docs open+no-credentials; OPTIONS preflight)
+- [ ] **Checkpoint 2:** `bun run lint && bun run build && bun test` (full suite) green, no regression — commit
 
-## Phase 3 — Docs (`auth.md`)
-- [x] `docs/documents/auth.md` — Passport-based guard/login, two strategies, module wiring, updated Tests section; cross-link `auth-passport-techstack.md`
-- [x] **Checkpoint 3:** doc read-through — no section still describes the old hand-rolled guard/login — commit
+## Phase 3 — Docs
+- [ ] `.env.example` — comment documenting `CORS_ORIGINS` format, example `http://localhost:3000`
+- [ ] `docs/documents/cors.md` (new) — two policies, single-delegate mechanism + why, `/health` note, env contract
+- [ ] `docs/ENTRYPOINT.md` — add bullet for `docs/documents/cors.md`
+- [ ] `docs/cms-admin-integration.md` — §1 real policy + how to get an origin added; §7 remove resolved gap
+- [ ] **Checkpoint 3:** doc read-through, no stale "CORS not configured" mentions — commit
 
 ## Phase 4 — Five-axis review (Opus) + fixes + `SPEC.md` trim + close-out
-- [x] Run the review on **Opus** (`[CAREFUL]` requires it — don't run on Sonnet)
-- [x] Five-axis review over the full cycle diff (message parity, timing mitigation, `req.user` shape, `TokenModule` untouched)
-- [x] Fix Important/correctness findings; re-verify build/test/lint; record findings + resolutions — fixed the guards-before-pipes `LocalStrategy` input-validation gap (see `tasks/plan.md`)
-- [x] `SPEC.md` — trim to a one-line pointer at `docs/documents/auth.md` (+ techstack doc)
-- [x] **Checkpoint 4 (final):** automated checks green after fixes; `SPEC.md` reduced to pointer — commit
+- [ ] Run the review on **Opus** (`[CAREFUL]` requires it)
+- [ ] Five-axis review — focus: no request can hit both policy branches, `credentials:false` always paired with open origin, no empty-array-as-wildcard footgun
+- [ ] Fix Important/correctness findings; re-verify build/test/lint; record findings + resolutions
+- [ ] `SPEC.md` — trim to pointer at `docs/documents/cors.md` (+ techstack doc); delete `specs/cors.md`
+- [ ] **Checkpoint 4 (final):** automated checks green after fixes; `SPEC.md` reduced to pointer — commit
 
-## Phase 5 — Manual verification (non-blocking for the Phase 2 commit)
-- [ ] User runs `bun run start:dev` against a real DB: login success (cookies set), wrong-password (401), unverified-user (403), one JWT-guarded route with/without a valid `access_token` cookie (200 vs 401 "Missing access token")
+## Phase 5 — Manual verification (non-blocking for earlier commits)
+- [ ] User runs `bun run start:dev`; curl-verifies allowed-origin credentialed headers on `/api/v1/permissions` and reflected-origin/no-credentials headers on `/api/v1/public/documents/single-type/x`
 - [ ] Tracked open until the user confirms — required before the feature is fully done

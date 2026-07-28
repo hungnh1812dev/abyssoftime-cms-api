@@ -16,6 +16,13 @@ export function parseTrustProxy(raw: string): boolean | number | string {
   return Number.isFinite(asNumber) && raw.trim() !== "" ? asNumber : raw;
 }
 
+export function parseCorsOrigins(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
 function configureSwagger(app: NestExpressApplication): void {
   const config = new DocumentBuilder()
     .setTitle("Abyssoftime CMS API")

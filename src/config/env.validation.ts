@@ -49,6 +49,11 @@ export class EnvironmentVariables {
   @IsIn(["lax", "strict", "none"])
   COOKIE_SAMESITE!: "lax" | "strict" | "none";
 
+  // CORS — comma-separated exact origins allowed to make credentialed requests. See docs/documents/cors.md.
+  @IsString()
+  @MinLength(1)
+  CORS_ORIGINS!: string;
+
   // RATE LIMIT
   @Transform(({ value }: { value: unknown }) => (value === undefined ? 5 : Number(value)))
   @IsInt()
