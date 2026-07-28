@@ -78,7 +78,9 @@ export class CollectionTypeDocumentController {
       dto.items.map((item) => item.data),
       req.user.sub,
     );
-    const items = await Promise.all(documents.map(async (document) => toDocumentResponse(document, "published", await this.resolveUpdatedBy(document.updatedBy))));
+    // Every document in the batch is stamped with the same caller id, so one lookup covers the whole page.
+    const updatedBy = await this.resolveUpdatedBy(req.user.sub);
+    const items = documents.map((document) => toDocumentResponse(document, "published", updatedBy));
     return { items };
   }
 

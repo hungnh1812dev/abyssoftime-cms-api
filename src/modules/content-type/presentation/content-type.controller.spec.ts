@@ -69,4 +69,11 @@ describe("ContentTypeController", () => {
     expect(updateListFieldsService.execute).toHaveBeenCalledWith("cv-page", ["position", "updatedAt"]);
     expect(result).toBe(entity);
   });
+
+  it("updateListFields() throws BadRequestException for an invalid slug, without touching the service", async () => {
+    const dto: UpdateListFieldsDto = { listFields: ["position"] };
+
+    await expect(controller.updateListFields("Bad Slug!", dto)).rejects.toThrow(BadRequestException);
+    expect(updateListFieldsService.execute).not.toHaveBeenCalled();
+  });
 });

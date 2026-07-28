@@ -144,9 +144,9 @@ Tasks 1, 2, 3 have no dependencies on each other. Task 7 is the integration poin
 
 ### Phase 6 — Five-axis review + close-out
 
-- [ ] Five-axis review (correctness / readability / architecture / security / performance).
-- [ ] Address findings.
-- [ ] **Checkpoint 5 (final):** all checks green after any fixes — commit.
+- [x] Five-axis review (correctness / readability / architecture / security / performance).
+- [x] Address findings.
+- [x] **Checkpoint 5 (final):** all checks green after any fixes — commit.
 
 ## Verification (end-to-end)
 
