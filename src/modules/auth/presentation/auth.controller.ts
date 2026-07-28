@@ -5,6 +5,7 @@ import { ResendOtpDto } from "../application/dto/resend-otp.dto";
 import { ResetPasswordDto } from "../application/dto/reset-password.dto";
 import { VerifyOtpDto } from "../application/dto/verify-otp.dto";
 import { ForgotPasswordService } from "../application/services/forgot-password.service";
+import { GetMeService } from "../application/services/get-me.service";
 import { HasUsersService } from "../application/services/has-users.service";
 import { LoginService } from "../application/services/login.service";
 import { RefreshTokenService } from "../application/services/refresh-token.service";
@@ -17,21 +18,24 @@ import { type Request, type Response } from "express";
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AuthGuard } from "@nestjs/passport";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
-import { ACCESS_TOKEN_COOKIE } from "@/common/guards/jwt-auth.guard";
+import { ACCESS_TOKEN_COOKIE, JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
 import { RateLimitGuard } from "@/common/guards/rate-limit.guard";
 import { type ValidatedLoginUser } from "@/common/strategies/local.strategy";
+import { type AuthenticatedRequest } from "@/common/types/authenticated-request";
 import { type EnvironmentVariables } from "@/config/env.validation";
 
 import { HasUsersResponseDto, MessageResponseDto } from "./dto/auth-response.dto";
+import { MeResponseDto } from "./dto/me-response.dto";
 
 export const REFRESH_TOKEN_COOKIE = "refresh_token";
 const ACCESS_TOKEN_MAX_AGE_MS = 15 * 60 * 1000;
 const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-// Every route here is public by design (this module establishes identity) — no @ApiCookieAuth
-// anywhere. login/refresh set the access_token/refresh_token httpOnly cookies; logout clears them.
+// Every route here is public by design (this module establishes identity), except `me` — the one
+// route that reads an existing session back. login/refresh set the access_token/refresh_token
+// httpOnly cookies; logout clears them.
 @ApiTags("auth")
 @Controller("auth")
 export class AuthController {
@@ -44,6 +48,7 @@ export class AuthController {
     private readonly refreshTokenService: RefreshTokenService,
     private readonly forgotPasswordService: ForgotPasswordService,
     private readonly resetPasswordService: ResetPasswordService,
+    private readonly getMeService: GetMeService,
     private readonly configService: ConfigService<EnvironmentVariables, true>,
   ) {}
 
@@ -130,6 +135,18 @@ export class AuthController {
     res.clearCookie(ACCESS_TOKEN_COOKIE);
     res.clearCookie(REFRESH_TOKEN_COOKIE);
     return { message: "Logged out." };
+  }
+
+  @Get("me")
+  @UseGuards(JwtAuthGuard)
+  @ApiCookieAuth()
+  @ApiOperation({ summary: "Resolve the caller's own identity and role/permissions from the session cookie" })
+  @ApiResponse({ status: 200, type: MeResponseDto })
+  @ApiResponse({ status: 401, description: "Missing/invalid/expired access token, or the account was deleted after the token was issued" })
+  @ApiResponse({ status: 404, description: "The user's roleId does not resolve to an existing role" })
+  async me(@Req() req: AuthenticatedRequest): Promise<MeResponseDto> {
+    const { user, role } = await this.getMeService.execute(req.user.sub);
+    return MeResponseDto.fromEntities(user, role);
   }
 
   @Post("forgot-password")

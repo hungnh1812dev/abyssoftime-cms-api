@@ -10,6 +10,7 @@ import { RoleModule } from "@/modules/roles/role.module";
 import { UserModule } from "@/modules/users/user.module";
 
 import { ForgotPasswordService } from "./application/services/forgot-password.service";
+import { GetMeService } from "./application/services/get-me.service";
 import { HasUsersService } from "./application/services/has-users.service";
 import { LoginService } from "./application/services/login.service";
 import { RefreshTokenService } from "./application/services/refresh-token.service";
@@ -55,6 +56,7 @@ describe("AuthModule", () => {
       RefreshTokenService,
       ForgotPasswordService,
       ResetPasswordService,
+      GetMeService,
       JwtStrategy,
       LocalStrategy,
       { provide: EMAIL_TEMPLATE_RENDERER, useClass: HandlebarsEmailTemplateRenderer },

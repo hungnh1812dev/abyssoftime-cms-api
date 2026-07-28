@@ -8,13 +8,13 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 1:** `bun run build` succeeds
 
 ## Phase 2 — Service + controller (vertical slice)
-- [ ] `get-me.service.ts` (new) — `execute(sub)`: missing user → 401; `roleId: null` → `role: null`; missing
+- [x] `get-me.service.ts` (new) — `execute(sub)`: missing user → 401; `roleId: null` → `role: null`; missing
       role → 404; else `{ user, role }`
-- [ ] `get-me.service.spec.ts` (new) — happy path, null-role path, 401 path, 404 path
-- [ ] `auth.controller.ts` — add `GET auth/me` (`JwtAuthGuard` only, `@ApiCookieAuth()` on this method only)
-- [ ] `auth.controller.spec.ts` — new route test
-- [ ] `auth.module.ts` — register `GetMeService`
-- [ ] **Checkpoint 2:** `bun run lint && bunx jest src/modules/auth && bun run build` green; manual
+- [x] `get-me.service.spec.ts` (new) — happy path, null-role path, 401 path, 404 path
+- [x] `auth.controller.ts` — add `GET auth/me` (`JwtAuthGuard` only, `@ApiCookieAuth()` on this method only)
+- [x] `auth.controller.spec.ts` — new route test
+- [x] `auth.module.ts` — register `GetMeService`
+- [x] **Checkpoint 2:** `bun run lint && bunx jest src/modules/auth && bun run build` green; manual
       login → `/auth/me` check against `bun run start:dev` — commit
 
 ## Phase 3 — Docs
