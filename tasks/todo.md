@@ -18,9 +18,9 @@ See `tasks/plan.md` for full context and rationale.
       login → `/auth/me` check against `bun run start:dev` — commit
 
 ## Phase 3 — Docs
-- [ ] `docs/documents/auth.md` — add the new endpoint
-- [ ] `docs/cms-admin-integration.md` — remove "no GET /auth/me" gap, add endpoint reference
-- [ ] **Checkpoint 3:** doc read-through — commit
+- [x] `docs/documents/auth.md` — add the new endpoint
+- [x] `docs/cms-admin-integration.md` — remove "no GET /auth/me" gap, add endpoint reference
+- [x] **Checkpoint 3:** doc read-through — commit
 
 ## Phase 4 — Five-axis review + close-out
 - [ ] Five-axis review (correctness / readability / architecture / security / performance)
