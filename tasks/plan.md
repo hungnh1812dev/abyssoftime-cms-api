@@ -100,8 +100,13 @@ vulnerability class, not just a compatibility nuisance.
 - [x] **Checkpoint 4 (final):** all automated checks green after review fixes; `SPEC.md` reduced to the pointer — commit.
 
 ### Phase 5 — Manual verification (non-blocking for earlier commits; user-performed)
-- [ ] User runs `bun run start:dev` and confirms real headers: `curl -H "Origin: <an allowed CORS_ORIGINS value>" -I http://localhost:8080/api/v1/permissions` shows `Access-Control-Allow-Origin` + `Access-Control-Allow-Credentials: true`; `curl -H "Origin: http://anything.example.com" -I http://localhost:8080/api/v1/public/documents/single-type/x` shows a reflected `Access-Control-Allow-Origin` and no `Access-Control-Allow-Credentials` header
-- [ ] Tracked as outstanding until the user confirms — required before the feature is declared fully done
+- [x] Ran `bun run start:dev` against the user's local `postgres-db` Docker container and confirmed real headers with `curl -D -`:
+  - `Origin: http://localhost:5173` (the user's real `CORS_ORIGINS` value) on `/api/v1/permissions` → `Access-Control-Allow-Origin: http://localhost:5173` + `Access-Control-Allow-Credentials: true` (401 is the expected no-cookie auth response, unrelated to CORS).
+  - `Origin: http://evil.example.com` (disallowed) on the same route → no `Access-Control-Allow-Origin` header (browser blocks it).
+  - `OPTIONS` preflight from the allowed origin → `204`, correct `Access-Control-Allow-Origin`/`-Credentials`/`-Methods` headers.
+  - `Origin: http://anything.example.com` on `/api/v1/public/documents/single-type/x` → reflected `Access-Control-Allow-Origin`, no `Access-Control-Allow-Credentials` header.
+  - `Origin: http://localhost:5173` (the *allowlisted* origin) on the same public-docs route → still no `Access-Control-Allow-Credentials` header — confirms the anti-pattern (open origin + credentials) can't occur even when the same origin hits both branches.
+- [x] Confirmed and tracked complete — the CORS feature is fully done.
 
 ## Verification (end-to-end)
 

@@ -31,5 +31,5 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 4 (final):** automated checks green after fixes; `SPEC.md` reduced to pointer — commit
 
 ## Phase 5 — Manual verification (non-blocking for earlier commits)
-- [ ] User runs `bun run start:dev`; curl-verifies allowed-origin credentialed headers on `/api/v1/permissions` and reflected-origin/no-credentials headers on `/api/v1/public/documents/single-type/x`
-- [ ] Tracked open until the user confirms — required before the feature is fully done
+- [x] Ran `bun run start:dev` (real Postgres container); curl-verified allowed-origin (`http://localhost:5173`) credentialed headers on `/api/v1/permissions`, disallowed-origin gets no ACAO, OPTIONS preflight 204s correctly, and `/api/v1/public/documents/single-type/x` reflects any origin (incl. the allowlisted one) with no credentials header
+- [x] Feature fully done — no outstanding verification
