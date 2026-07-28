@@ -65,7 +65,7 @@ Tasks 1, 2, 3 have no dependencies on each other. Task 7 is the integration poin
       Update `where-builder.ts` to import `LISTABLE_FIELD_TYPES` instead of defining its own copy.
       - Verify: `where-builder.spec.ts`'s existing `sortableColumnsFor` tests pass unmodified (pure refactor).
         New coverage for the relocated/added constants in `field-definition.spec.ts`.
-- [ ] **Task 2:** Add `findByIds(ids: string[]): Promise<UserEntity[]>` to `IUserRepository` +
+- [x] **Task 2:** Add `findByIds(ids: string[]): Promise<UserEntity[]>` to `IUserRepository` +
       `PrismaUserRepository` (`prisma.user.findMany({ where: { documentId: { in: ids } } })`). Empty input →
       `[]`, no query.
       - Verify: empty-input short-circuit, partial matches, no assumed result ordering.

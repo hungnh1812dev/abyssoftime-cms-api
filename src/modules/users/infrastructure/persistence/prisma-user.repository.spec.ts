@@ -455,4 +455,30 @@ describe("PrismaUserRepository", () => {
     await expect(repository.completeVerification("user-1", { firstVerifiedRoleId: "role-super", otherwiseRoleId: "role-guest" })).rejects.toThrow(otherError);
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
+
+  it("findByIds() returns [] without querying prisma when given an empty array", async () => {
+    const result = await repository.findByIds([]);
+
+    expect(prisma.user.findMany).not.toHaveBeenCalled();
+    expect(result).toEqual([]);
+  });
+
+  it("findByIds() looks up by documentId via findMany and maps every record", async () => {
+    prisma.user.findMany.mockResolvedValue([record]);
+
+    const result = await repository.findByIds(["user-1", "user-2"]);
+
+    expect(prisma.user.findMany).toHaveBeenCalledWith({ where: { documentId: { in: ["user-1", "user-2"] } } });
+    expect(result).toHaveLength(1);
+    expectMappedEntity(result[0]);
+  });
+
+  it("findByIds() returns only the matched subset when some ids don't exist", async () => {
+    prisma.user.findMany.mockResolvedValue([record]);
+
+    const result = await repository.findByIds(["user-1", "missing"]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].documentId).toBe("user-1");
+  });
 });
