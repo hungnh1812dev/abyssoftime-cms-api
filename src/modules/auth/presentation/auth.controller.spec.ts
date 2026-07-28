@@ -5,6 +5,7 @@ import { ResendOtpDto } from "../application/dto/resend-otp.dto";
 import { ResetPasswordDto } from "../application/dto/reset-password.dto";
 import { VerifyOtpDto } from "../application/dto/verify-otp.dto";
 import { ForgotPasswordService } from "../application/services/forgot-password.service";
+import { GetMeService } from "../application/services/get-me.service";
 import { HasUsersService } from "../application/services/has-users.service";
 import { LoginService } from "../application/services/login.service";
 import { RefreshTokenService } from "../application/services/refresh-token.service";
@@ -20,6 +21,9 @@ import { Test } from "@nestjs/testing";
 
 import { ACCESS_TOKEN_COOKIE } from "@/common/guards/jwt-auth.guard";
 import { type ValidatedLoginUser } from "@/common/strategies/local.strategy";
+import { type AuthenticatedRequest } from "@/common/types/authenticated-request";
+import { RoleEntity } from "@/modules/roles/domain/entities/role.entiry";
+import { UserEntity } from "@/modules/users/domain/entities/user.entity";
 
 import { AuthController, REFRESH_TOKEN_COOKIE } from "./auth.controller";
 
@@ -33,6 +37,7 @@ describe("AuthController", () => {
   let refreshTokenService: jest.Mocked<RefreshTokenService>;
   let forgotPasswordService: jest.Mocked<ForgotPasswordService>;
   let resetPasswordService: jest.Mocked<ResetPasswordService>;
+  let getMeService: jest.Mocked<GetMeService>;
   let res: jest.Mocked<Pick<Response, "cookie" | "clearCookie">>;
 
   const configValues: Record<string, unknown> = { COOKIE_SECURE: true, COOKIE_SAMESITE: "lax" };
@@ -51,6 +56,7 @@ describe("AuthController", () => {
         { provide: RefreshTokenService, useValue: { execute: jest.fn() } },
         { provide: ForgotPasswordService, useValue: { execute: jest.fn() } },
         { provide: ResetPasswordService, useValue: { execute: jest.fn() } },
+        { provide: GetMeService, useValue: { execute: jest.fn() } },
         { provide: ConfigService, useValue: { get: jest.fn((key: string) => configValues[key]) } },
       ],
     }).compile();
@@ -64,6 +70,7 @@ describe("AuthController", () => {
     refreshTokenService = module.get(RefreshTokenService);
     forgotPasswordService = module.get(ForgotPasswordService);
     resetPasswordService = module.get(ResetPasswordService);
+    getMeService = module.get(GetMeService);
   });
 
   it("register() delegates to RegisterService", async () => {
@@ -152,6 +159,20 @@ describe("AuthController", () => {
     expect(res.clearCookie).toHaveBeenCalledWith(ACCESS_TOKEN_COOKIE);
     expect(res.clearCookie).toHaveBeenCalledWith(REFRESH_TOKEN_COOKIE);
     expect(result).toEqual({ message: "Logged out." });
+  });
+
+  it("me() delegates to GetMeService with the caller's sub and returns the mapped DTO", async () => {
+    const user = new UserEntity("user-1", "jane@example.com", "Jane Doe", "janedoe", "secret", true, true, "role-1", new Date(), new Date());
+    const role = new RoleEntity("role-1", "Editor", "editor", ["document:read"], 20, false, new Date(), new Date(), null);
+    const req = { user: { sub: "user-1", roleSlug: "editor", level: 20, permissions: ["document:read"] } } as unknown as AuthenticatedRequest;
+    getMeService.execute.mockResolvedValue({ user, role });
+
+    const result = await controller.me(req);
+
+    expect(getMeService.execute).toHaveBeenCalledWith("user-1");
+    expect(result.documentId).toBe("user-1");
+    expect(result.roleId).toBe("role-1");
+    expect(result.role?.documentId).toBe("role-1");
   });
 
   it("forgotPassword() delegates to ForgotPasswordService", async () => {

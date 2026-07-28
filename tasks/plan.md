@@ -58,17 +58,17 @@ This plan follows that precedent; Task 1 fixes `SPEC.md` to match.
       `RoleResponseDto`'s own precedent)
 
 ### Phase 2 — Service + controller (vertical slice)
-- [ ] `src/modules/auth/application/services/get-me.service.ts` (new) — `GetMeService.execute(sub)`:
+- [x] `src/modules/auth/application/services/get-me.service.ts` (new) — `GetMeService.execute(sub)`:
       `findById(sub)` → 401 if missing; `roleId === null` → `role: null`; else `roles.findById(roleId)` → 404
       if missing; return `{ user, role }`
-- [ ] `get-me.service.spec.ts` (new) — mocked `IUserRepository`/`IRoleRepository` (same shape as
+- [x] `get-me.service.spec.ts` (new) — mocked `IUserRepository`/`IRoleRepository` (same shape as
       `list-user.service.spec.ts`): happy path, `roleId: null` path, missing-user → 401, missing-role → 404
-- [ ] `auth.controller.ts` — add `GET auth/me` (`@UseGuards(JwtAuthGuard)`, `@ApiCookieAuth()` on this method
+- [x] `auth.controller.ts` — add `GET auth/me` (`@UseGuards(JwtAuthGuard)`, `@ApiCookieAuth()` on this method
       only, calls `GetMeService.execute(req.user.sub)`, maps via `MeResponseDto.fromEntities`)
-- [ ] `auth.controller.spec.ts` — new test asserting the route calls `GetMeService` with `req.user.sub` and
+- [x] `auth.controller.spec.ts` — new test asserting the route calls `GetMeService` with `req.user.sub` and
       returns the mapped DTO, same style as this file's other tests
-- [ ] `auth.module.ts` — register `GetMeService` as a provider
-- [ ] **Checkpoint 2:** `bun run lint && bunx jest src/modules/auth && bun run build` all green. Manual check
+- [x] `auth.module.ts` — register `GetMeService` as a provider
+- [x] **Checkpoint 2:** `bun run lint && bunx jest src/modules/auth && bun run build` all green. Manual check
       against `bun run start:dev`: login → cookies set → `GET /api/v1/auth/me` → 200 expected shape; no
       cookie → 401. Automatically-verifiable parts (lint/test/build) → commit here; manual check can trail.
 
