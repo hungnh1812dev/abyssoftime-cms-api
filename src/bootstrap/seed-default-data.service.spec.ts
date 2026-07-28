@@ -36,7 +36,7 @@ describe("SeedDefaultDataService", () => {
     service = new SeedDefaultDataService(permissions, roles);
   });
 
-  it("creates all 18 permissions and 4 roles when nothing exists yet", async () => {
+  it("creates all 19 permissions and 4 roles when nothing exists yet", async () => {
     permissions.findBySlug.mockResolvedValue(null);
     roles.findBySlug.mockResolvedValue(null as unknown as RoleEntity);
     permissions.create.mockResolvedValue(permissionEntity("stub"));
@@ -44,7 +44,7 @@ describe("SeedDefaultDataService", () => {
 
     await service.onApplicationBootstrap();
 
-    expect(permissions.create).toHaveBeenCalledTimes(18);
+    expect(permissions.create).toHaveBeenCalledTimes(19);
     expect(roles.create).toHaveBeenCalledTimes(4);
 
     const createdSlugs = permissions.create.mock.calls.map(([data]) => data.slug);
@@ -60,6 +60,7 @@ describe("SeedDefaultDataService", () => {
       "api_token:read",
       "media:manager",
       "media:read",
+      "content_type:manager",
       "content_type:read",
       "document:read",
       "document:create",
@@ -81,11 +82,11 @@ describe("SeedDefaultDataService", () => {
 
     await service.onApplicationBootstrap();
 
-    expect(permissions.create).toHaveBeenCalledTimes(17);
+    expect(permissions.create).toHaveBeenCalledTimes(18);
     expect(roles.create).toHaveBeenCalledTimes(3);
   });
 
-  it("creates nothing when all 18 permissions and 4 roles already exist", async () => {
+  it("creates nothing when all 19 permissions and 4 roles already exist", async () => {
     permissions.findBySlug.mockImplementation((slug) => Promise.resolve(permissionEntity(slug)));
     roles.findBySlug.mockImplementation((slug) => Promise.resolve(roleEntity(slug)));
 
@@ -95,7 +96,7 @@ describe("SeedDefaultDataService", () => {
     expect(roles.create).not.toHaveBeenCalled();
   });
 
-  it("seeds super_admin with all manager permissions plus content-type/document permissions, and admin with all read permissions plus content_type:read/document:read", async () => {
+  it("seeds super_admin with all manager permissions plus content_type:manager/content-type/document permissions, and admin with all read permissions plus content_type:read/document:read", async () => {
     permissions.findBySlug.mockResolvedValue(null);
     roles.findBySlug.mockResolvedValue(null as unknown as RoleEntity);
     permissions.create.mockResolvedValue(permissionEntity("stub"));
@@ -115,6 +116,7 @@ describe("SeedDefaultDataService", () => {
       "permission:manager",
       "api_token:manager",
       "media:manager",
+      "content_type:manager",
       "content_type:read",
       "document:read",
       "document:create",

@@ -82,7 +82,7 @@ Tasks 1, 2, 3 have no dependencies on each other. Task 7 is the integration poin
 
 ### Phase 2 — Feature A: `PATCH content-types/:slug/list-fields`
 
-- [ ] **Task 4:** `UpdateListFieldsDto` (`{ listFields: string[] }`, `@IsArray() @ArrayNotEmpty() @IsString({ each: true })`).
+- [x] **Task 4:** `UpdateListFieldsDto` (`{ listFields: string[] }`, `@IsArray() @ArrayNotEmpty() @IsString({ each: true })`).
       `UpdateListFieldsService` — 404 on unknown slug; validate every entry is in `LISTABLE_SYSTEM_COLUMNS` or
       matches a `fields` entry with an eligible `LISTABLE_FIELD_TYPES` kind, else `400`; calls
       `contentTypes.updateListFields(...)`. `content-type.controller.ts` — new
@@ -91,7 +91,7 @@ Tasks 1, 2, 3 have no dependencies on each other. Task 7 is the integration poin
       `seed-default-data.service.ts` — add `content_type:manager` permission, grant to `super_admin` only.
       - Verify: valid PATCH → 200, persists across restart (override column); unknown field/disallowed
         kind/empty array → 400; unknown slug → 404; non-super_admin caller → 403.
-- [ ] **Checkpoint 1 (Feature A core):** `bun run build && bun run lint && bunx jest src/modules/content-type src/bootstrap/seed-default-data.service.spec.ts`
+- [x] **Checkpoint 1 (Feature A core):** `bun run build && bun run lint && bunx jest src/modules/content-type src/bootstrap/seed-default-data.service.spec.ts`
       green. Manual: `bun run start:dev`, PATCH a real content type, restart, confirm `GET` still reflects
       the override. **Commit here** (automated checks pass; this is a full vertical slice of Feature A).
 

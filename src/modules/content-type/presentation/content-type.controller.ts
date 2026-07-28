@@ -1,9 +1,11 @@
+import { UpdateListFieldsDto } from "../application/dto/update-list-fields.dto";
 import { assertSafeSlug, UnsafeSqlIdentifierError } from "../application/schema/sql-identifier";
 import { GetContentTypeService } from "../application/services/get-content-type.service";
 import { ListContentTypeService } from "../application/services/list-content-type.service";
+import { UpdateListFieldsService } from "../application/services/update-list-fields.service";
 import { ContentTypeEntity, ContentTypeSummary } from "../domain/entities/content-type.entity";
 
-import { BadRequestException, Controller, Get, Param, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Patch, UseGuards } from "@nestjs/common";
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
@@ -12,8 +14,9 @@ import { PermissionsGuard } from "@/common/guards/permissions.guard";
 
 import { ContentTypeResponseDto, ContentTypeSummaryResponseDto } from "./dto/content-type-response.dto";
 
-// Read-only by design — content-type structure is edited only by changing a content-types/*.json
-// file and rebooting (the sync engine reconciles it), never via a write route.
+// Schema (fields/kind/draftToPublish) is read-only by design — edited only by changing a
+// content-types/*.json file and rebooting (the sync engine reconciles it). listFields is the one
+// admin-mutable exception, via PATCH :slug/list-fields (content_type:manager only).
 @ApiTags("content-types")
 @ApiCookieAuth()
 @Controller("content-types")
@@ -21,6 +24,7 @@ export class ContentTypeController {
   constructor(
     private readonly listContentTypeService: ListContentTypeService,
     private readonly getContentTypeService: GetContentTypeService,
+    private readonly updateListFieldsService: UpdateListFieldsService,
   ) {}
 
   @Get()
@@ -50,5 +54,16 @@ export class ContentTypeController {
     }
 
     return this.getContentTypeService.execute(slug);
+  }
+
+  @Patch(":slug/list-fields")
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("content_type:manager")
+  @ApiOperation({ summary: "Set the columns shown by default in a content type's list view" })
+  @ApiResponse({ status: 200, type: ContentTypeResponseDto })
+  @ApiResponse({ status: 400, description: "Empty array, or an entry that isn't a listable system column or eligible field" })
+  @ApiResponse({ status: 404, description: "No content type with that slug" })
+  async updateListFields(@Param("slug") slug: string, @Body() dto: UpdateListFieldsDto): Promise<ContentTypeEntity> {
+    return this.updateListFieldsService.execute(slug, dto.listFields);
   }
 }

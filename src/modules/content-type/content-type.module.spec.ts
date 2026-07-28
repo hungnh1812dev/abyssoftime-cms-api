@@ -3,6 +3,7 @@ import { MODULE_METADATA } from "@nestjs/common/constants";
 import { SchemaLoaderService } from "./application/schema/schema-loader.service";
 import { GetContentTypeService } from "./application/services/get-content-type.service";
 import { ListContentTypeService } from "./application/services/list-content-type.service";
+import { UpdateListFieldsService } from "./application/services/update-list-fields.service";
 import { ContentTypeSyncService } from "./application/sync/content-type-sync.service";
 import { ContentTypeModule } from "./content-type.module";
 import { CONTENT_TYPE_REPOSITORY } from "./domain/repositories/content-type.repository";
@@ -25,6 +26,7 @@ describe("ContentTypeModule", () => {
         ContentTypeSyncService,
         ListContentTypeService,
         GetContentTypeService,
+        UpdateListFieldsService,
         { provide: CONTENT_TYPE_REPOSITORY, useClass: PrismaContentTypeRepository },
         { provide: SCHEMA_TABLE_REPOSITORY, useClass: PrismaSchemaTableRepository },
       ]),

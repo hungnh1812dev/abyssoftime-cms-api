@@ -9,8 +9,8 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 1:** build/lint/test green
 
 ## Phase 2 — Feature A: `PATCH .../list-fields`
-- [ ] Task 4 — DTO + `UpdateListFieldsService` (validation) + controller route + `content_type:manager` permission (super_admin only)
-- [ ] **Checkpoint 1 (Feature A core):** build/lint/test green; manual restart-survives-override check — commit
+- [x] Task 4 — DTO + `UpdateListFieldsService` (validation) + controller route + `content_type:manager` permission (super_admin only)
+- [x] **Checkpoint 1 (Feature A core):** build/lint/test green; manual restart-survives-override check — commit
 
 ## Phase 3 — Feature B: `updatedBy`
 - [ ] Task 5 — detail responses: `UserModule` import, mapper param, DTO field, both controllers resolve via `findById`, public controller untouched
