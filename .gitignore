@@ -1,59 +1,59 @@
 # compiled output
-/dist
-/node_modules
-/build
+/apps/cms-api/dist
+/apps/cms-api/node_modules
+/apps/cms-api/build
 
 # generated Prisma client (regenerated via postinstall)
-/src/prisma/application/client
+/apps/cms-api/src/prisma/application/client
 
 # Logs
-logs
-*.log
-npm-debug.log*
-pnpm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
+/apps/cms-api/logs
+/apps/cms-api/*.log
+/apps/cms-api/npm-debug.log*
+/apps/cms-api/pnpm-debug.log*
+/apps/cms-api/yarn-debug.log*
+/apps/cms-api/yarn-error.log*
+/apps/cms-api/lerna-debug.log*
 
 # OS
-.DS_Store
+/apps/cms-api.DS_Store
 
 # Tests
-/coverage
-/.nyc_output
+/apps/cms-api/coverage
+/apps/cms-api/.nyc_output
 
 # IDEs and editors
-/.idea
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
+/apps/cms-api//.idea
+/apps/cms-api/.project
+/apps/cms-api/.classpath
+/apps/cms-api/.c9/
+/apps/cms-api/*.launch
+/apps/cms-api/.settings/
+/apps/cms-api/*.sublime-workspace
 
 # IDE - VSCode
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+/apps/cms-api/.vscode/*
+/apps/cms-api/!.vscode/settings.json
+/apps/cms-api/!.vscode/tasks.json
+/apps/cms-api/!.vscode/launch.json
+/apps/cms-api/!.vscode/extensions.json
 
 # dotenv environment variable files
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
+/apps/cms-api.env
+/apps/cms-api.env.development.local
+/apps/cms-api.env.test.local
+/apps/cms-api.env.production.local
+/apps/cms-api.env.local
 
 # temp directory
-.temp
-.tmp
+/apps/cms-api.temp
+/apps/cms-api.tmp
 
 # Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
+/apps/cms-api/pids
+/apps/cms-api/*.pid
+/apps/cms-api/*.seed
+/apps/cms-api/*.pid.lock
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
-report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+/apps/cms-api/report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
