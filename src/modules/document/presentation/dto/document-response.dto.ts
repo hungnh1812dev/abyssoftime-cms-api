@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 // Swagger response shapes only — the controller keeps returning the real DocumentResponse/
 // ListDocumentsResult plain-object shapes at runtime (document-response.mapper.ts,
@@ -6,6 +6,14 @@ import { ApiProperty } from "@nestjs/swagger";
 // Every property beyond the four below is a content-type field, spread directly alongside them
 // (shape depends on the content type's own schema) — Swagger can't type an open index signature,
 // so those extra fields won't show individually, only these fixed ones.
+export class UpdatedByResponseDto {
+  @ApiProperty()
+  documentId!: string;
+
+  @ApiProperty()
+  name!: string;
+}
+
 export class DocumentDataResponseDto {
   @ApiProperty()
   documentId!: string;
@@ -18,6 +26,9 @@ export class DocumentDataResponseDto {
 
   @ApiProperty()
   updatedAt!: Date;
+
+  @ApiPropertyOptional({ type: UpdatedByResponseDto, nullable: true })
+  updatedBy?: UpdatedByResponseDto | null;
 }
 
 export class DocumentResponseDto {

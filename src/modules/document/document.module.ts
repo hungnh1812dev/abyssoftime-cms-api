@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { ContentTypeModule } from "@/modules/content-type/content-type.module";
+import { UserModule } from "@/modules/users/user.module";
 
 import { BulkCreateAndPublishService } from "./application/services/bulk-create-publish.service";
 import { BulkDeleteService } from "./application/services/bulk-delete.service";
@@ -28,7 +29,7 @@ import { PublicDocumentController } from "./presentation/public-document.control
 import { SingleTypeDocumentController } from "./presentation/single-type-document.controller";
 
 @Module({
-  imports: [ContentTypeModule],
+  imports: [ContentTypeModule, UserModule],
   controllers: [SingleTypeDocumentController, CollectionTypeDocumentController, PublicDocumentController],
   providers: [
     SchemaResolverService,

@@ -3,15 +3,16 @@ import { PublishSingleTypeService } from "../application/services/publish-single
 import { SaveSingleTypeService } from "../application/services/save-single-type.service";
 import { UnpublishSingleTypeService } from "../application/services/unpublish-single-type.service";
 
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Put, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, Post, Put, Req, UseGuards } from "@nestjs/common";
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "@/common/guards/permissions.guard";
 import { type AuthenticatedRequest } from "@/common/types/authenticated-request";
+import { type IUserRepository, USER_REPOSITORY } from "@/modules/users/domain/repositories/user.repository";
 
-import { type DocumentResponse, toDocumentResponse } from "./document-response.mapper";
+import { type DocumentResponse, type ResolvedUpdatedBy, toDocumentResponse } from "./document-response.mapper";
 import { DocumentResponseDto, PublishStatusResponseDto } from "./dto/document-response.dto";
 import { SaveDocumentDto } from "./dto/save-document.dto";
 import { validateSlugParam } from "./validate-params";
@@ -26,6 +27,7 @@ export class SingleTypeDocumentController {
     private readonly saveSingleType: SaveSingleTypeService,
     private readonly publishSingleType: PublishSingleTypeService,
     private readonly unpublishSingleType: UnpublishSingleTypeService,
+    @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
   ) {}
 
   @Get(":slug")
@@ -38,7 +40,8 @@ export class SingleTypeDocumentController {
     validateSlugParam(slug);
 
     const { document, status } = await this.getSingleType.execute(slug);
-    return toDocumentResponse(document, status);
+    const updatedBy = await this.resolveUpdatedBy(document.updatedBy);
+    return toDocumentResponse(document, status, updatedBy);
   }
 
   @Put(":slug")
@@ -51,7 +54,8 @@ export class SingleTypeDocumentController {
 
     await this.saveSingleType.execute(slug, dto.data, req.user.sub);
     const { document, status } = await this.getSingleType.execute(slug);
-    return toDocumentResponse(document, status);
+    const updatedBy = await this.resolveUpdatedBy(document.updatedBy);
+    return toDocumentResponse(document, status, updatedBy);
   }
 
   @Post(":slug/publish")
@@ -80,5 +84,13 @@ export class SingleTypeDocumentController {
 
     await this.unpublishSingleType.execute(slug);
     return { status: "draft" };
+  }
+
+  private async resolveUpdatedBy(userId: string | null): Promise<ResolvedUpdatedBy | null> {
+    if (!userId) {
+      return null;
+    }
+    const user = await this.users.findById(userId);
+    return user ? { documentId: user.documentId, name: user.name } : null;
   }
 }

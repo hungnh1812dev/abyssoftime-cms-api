@@ -9,15 +9,16 @@ import { SaveDocumentService } from "../application/services/save-document.servi
 import { UnpublishDocumentService } from "../application/services/unpublish-document.service";
 import { DocumentEntity, DocumentStatus } from "../domain/entities/document.entity";
 
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Inject, Param, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "@/common/guards/permissions.guard";
 import { type AuthenticatedRequest } from "@/common/types/authenticated-request";
+import { type IUserRepository, USER_REPOSITORY } from "@/modules/users/domain/repositories/user.repository";
 
-import { type DocumentResponse, toDocumentResponse } from "./document-response.mapper";
+import { type DocumentResponse, type ResolvedUpdatedBy, toDocumentResponse } from "./document-response.mapper";
 import { BulkCreateDto } from "./dto/bulk-create.dto";
 import { BulkDeleteDto } from "./dto/bulk-delete.dto";
 import { BulkCreateResponseDto, BulkDeleteResponseDto, DocumentResponseDto, ListDocumentsResponseDto, PublishStatusResponseDto } from "./dto/document-response.dto";
@@ -48,6 +49,7 @@ export class CollectionTypeDocumentController {
     private readonly duplicateDocument: DuplicateDocumentService,
     private readonly bulkCreateAndPublishService: BulkCreateAndPublishService,
     private readonly bulkDeleteService: BulkDeleteService,
+    @Inject(USER_REPOSITORY) private readonly users: IUserRepository,
   ) {}
 
   @Get(":slug")
@@ -76,7 +78,8 @@ export class CollectionTypeDocumentController {
       dto.items.map((item) => item.data),
       req.user.sub,
     );
-    return { items: documents.map((document) => toDocumentResponse(document, "published")) };
+    const items = await Promise.all(documents.map(async (document) => toDocumentResponse(document, "published", await this.resolveUpdatedBy(document.updatedBy))));
+    return { items };
   }
 
   @Delete(":slug/bulk")
@@ -103,7 +106,8 @@ export class CollectionTypeDocumentController {
     validateSlugParam(slug);
 
     const document = await this.saveDocument.execute(slug, dto.data, undefined, req.user.sub);
-    return toDocumentResponse(document, statusOfFreshDocument(document));
+    const updatedBy = await this.resolveUpdatedBy(document.updatedBy);
+    return toDocumentResponse(document, statusOfFreshDocument(document), updatedBy);
   }
 
   @Get(":slug/:documentId")
@@ -117,7 +121,8 @@ export class CollectionTypeDocumentController {
     validateDocumentIdParam(documentId);
 
     const { document, status } = await this.getDocumentForEdit.execute(slug, documentId);
-    return toDocumentResponse(document, status);
+    const updatedBy = await this.resolveUpdatedBy(document.updatedBy);
+    return toDocumentResponse(document, status, updatedBy);
   }
 
   @Put(":slug/:documentId")
@@ -131,7 +136,8 @@ export class CollectionTypeDocumentController {
 
     await this.saveDocument.execute(slug, dto.data, documentId, req.user.sub);
     const { document, status } = await this.getDocumentForEdit.execute(slug, documentId);
-    return toDocumentResponse(document, status);
+    const updatedBy = await this.resolveUpdatedBy(document.updatedBy);
+    return toDocumentResponse(document, status, updatedBy);
   }
 
   @Delete(":slug/:documentId")
@@ -189,7 +195,16 @@ export class CollectionTypeDocumentController {
     validateDocumentIdParam(documentId);
 
     const document = await this.duplicateDocument.execute(slug, documentId, req.user.sub);
-    return toDocumentResponse(document, statusOfFreshDocument(document));
+    const updatedBy = await this.resolveUpdatedBy(document.updatedBy);
+    return toDocumentResponse(document, statusOfFreshDocument(document), updatedBy);
+  }
+
+  private async resolveUpdatedBy(userId: string | null): Promise<ResolvedUpdatedBy | null> {
+    if (!userId) {
+      return null;
+    }
+    const user = await this.users.findById(userId);
+    return user ? { documentId: user.documentId, name: user.name } : null;
   }
 }
 
