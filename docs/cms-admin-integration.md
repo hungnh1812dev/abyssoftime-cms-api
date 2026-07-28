@@ -238,14 +238,21 @@ array skips slug validation entirely (treated as "no scoped permissions").
 must show it in a copy-to-clipboard modal immediately and warn it won't be shown again — there's no "reveal
 token" affordance to fall back on.
 
-### 5.5 Content Types — `/content-types` (read-only)
+### 5.5 Content Types — `/content-types`
 
-Content types are defined as schema-as-code on the backend (JSON files), not created/edited through the API.
+Schema itself (`fields`/`kind`/`draftToPublish`) is defined as schema-as-code on the backend (JSON files), not
+created/edited through the API. `listFields` — the "Configure columns" list-view projection — is the one
+admin-mutable exception, via the `PATCH .../list-fields` route below.
 
-| Method & path | Permission | Response |
-|---|---|---|
-| `GET /content-types` | `content_type:read` | `200 ContentTypeSummaryResponseDto[]` — `{ slug, name, kind: "single"\|"collection", draftToPublish }` |
-| `GET /content-types/:slug` | `content_type:read` | `200 ContentTypeResponseDto` — adds `documentId, fields: FieldDefinitionResponseDto[], listFields, createdAt, updatedAt`; `404` if slug unknown |
+| Method & path | Permission | Body | Response |
+|---|---|---|---|
+| `GET /content-types` | `content_type:read` | — | `200 ContentTypeSummaryResponseDto[]` — `{ slug, name, kind: "single"\|"collection", draftToPublish }` |
+| `GET /content-types/:slug` | `content_type:read` | — | `200 ContentTypeResponseDto` — adds `documentId, fields: FieldDefinitionResponseDto[], listFields, createdAt, updatedAt`; `404` if slug unknown |
+| `PATCH /content-types/:slug/list-fields` | `content_type:manager` | `{ listFields: string[] }` | `200 ContentTypeResponseDto` — same shape as `GET :slug`, `listFields` reflects the new value; `400` if the array is empty or any entry isn't a listable system column (`documentId`, `status`, `createdAt`, `updatedAt`, `publishedAt`, `updatedBy`) or an eligible field (`text`/`number`/`boolean` kind only — `richtext`/`media`/`json`/`component` fields aren't listable); `404` if slug unknown |
+
+`content_type:manager` is granted to `super_admin` only today — expect `403` for every other role, including
+`admin`. The PATCH persists across a backend restart/redeploy (it's stored separately from the schema-sync
+process that re-derives `fields`/`kind`/`draftToPublish` from the JSON files on every boot).
 
 `FieldDefinitionResponseDto`: `{ name, type: "text"|"richtext"|"number"|"boolean"|"media"|"json"|"component",
 width?, header?, component?, repeatable?, fields? }` — `component`/`repeatable`/`fields` are only present when
@@ -253,7 +260,9 @@ width?, header?, component?, repeatable?, fields? }` — `component`/`repeatable
 
 **Drive your document-editor form generation off this response** — field `type` picks the input widget,
 `header: true` marks which fields show as list-table columns by default, `listFields` on the content type is
-the actual configured projection for `GET .../collection-type/:slug` list responses.
+the actual configured projection for `GET .../collection-type/:slug` list responses. `listFields` entries that
+name a system column (`documentId`, `status`, `createdAt`, `updatedAt`, `publishedAt`, `updatedBy`) now render
+real values in list `data` — see §5.7 and §6 below.
 
 `draftToPublish` matters for the publish/unpublish buttons: when `false` ("Mode B" content types), publish and
 unpublish routes will `400` — hide or disable those buttons for that content type rather than letting the user
@@ -292,9 +301,14 @@ Note the bulk create/delete asymmetry (all-or-nothing vs. partial-success/no-rol
 handling for each separately rather than sharing one "bulk result toast" component.
 
 `DocumentResponseDto` = `{ data: { documentId, status: "draft"|"modified"|"published", createdAt, updatedAt,
-...every dynamic content-type field spread alongside these } }`. The dynamic fields aren't enumerable from the
-schema (TS can't type an open index signature) — read them off `GET /content-types/:slug`'s `fields` list at
-runtime instead of hardcoding per content type.
+updatedBy: { documentId, name } | null, ...every dynamic content-type field spread alongside these } }`. The
+dynamic fields aren't enumerable from the schema (TS can't type an open index signature) — read them off
+`GET /content-types/:slug`'s `fields` list at runtime instead of hardcoding per content type.
+
+`updatedBy` is `null` when the document has never been saved by an authenticated caller, or when the
+recorded user id no longer resolves to an existing user — never a missing key, and this route never `404`s
+or `500`s because of it. **Not present on `/public/documents/*` responses** (§5.8) — those stay exactly as
+before, no `updatedBy` key at all, by design (public responses don't expose internal editor identities).
 
 ### 5.8 Public documents (no auth) — `/public/documents`
 
@@ -350,7 +364,11 @@ allowlist). All filters AND together, and AND with `search`.
 
 `ListDocumentsResponseDto`: `{ items: ListedDocumentItemResponseDto[], total, start, size }`. Each item's
 `data` is **projected down to the content type's configured `listFields` only** — not the full document — so
-don't expect to render a full detail view from list data; fetch the single document on row-click.
+don't expect to render a full detail view from list data; fetch the single document on row-click. If
+`listFields` includes a system column (`documentId`/`status`/`createdAt`/`updatedAt`/`publishedAt`/`updatedBy`),
+`data` carries the real resolved value for it — e.g. `listFields: ["title", "updatedAt", "updatedBy"]` renders
+`data.updatedAt` as the real timestamp and `data.updatedBy` as `{ documentId, name } | null`, not `null`
+placeholders. This is what makes "Updated By" usable as a Configure-columns choice (§5.5).
 
 ## 7. Known gaps vs. a "complete" CMS-Admin API surface
 

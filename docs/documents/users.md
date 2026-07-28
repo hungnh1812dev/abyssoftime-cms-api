@@ -33,6 +33,7 @@ Maps to the `User` Prisma model minus relation fields (`role`, `updatedRoles`, `
 
 - `findAll(): Promise<UserEntity[]>`
 - `findById(documentId): Promise<UserEntity | null>`
+- `findByIds(documentIds: string[]): Promise<UserEntity[]>` — added for `document`'s `ListDocumentsService` to batch-resolve a page's `updatedBy` ids in one query instead of N+1 (see `document.md`'s [Resolved `updatedBy`](document.md#resolved-updatedby)). `documentIds: []` short-circuits to `[]` without touching Prisma; a partial match (some ids unknown) returns only the matched subset, in no particular order — callers key results back by `documentId`, never assume index alignment with the input array.
 - `findByEmail(email): Promise<UserEntity | null>`
 - `findByUsername(username): Promise<UserEntity | null>`
 - `findByResetTokenHash(resetTokenHash): Promise<UserEntity | null>` — added for `auth`'s `ResetPasswordService`; uses `findFirst` (no unique constraint on the column), same pattern as `findByUsername`.
@@ -114,7 +115,7 @@ This module previously had an admin-only `POST /api/v1/users` route (`CreateUser
 
 ## Tests
 
-Unit tests (Jest, mocked `IUserRepository`/`IRoleRepository`, ≥80% branch coverage) live next to each source file: `update-user.service.spec.ts` (self-or-manager authorization only, no role logic), `update-user-role.service.spec.ts` (the relocated hierarchy/new-role-check/super-admin-promotion cases, plus the new roleId-not-found 404), `delete-user.service.spec.ts` (hierarchy check), `list-user.service.spec.ts`, `user.controller.spec.ts` (provides a mocked `JwtTokenService` for `JwtAuthGuard` instantiation, one delegation test per route, asserts every response is the mapped `UserResponseDto` shape with no `password` property), `user-response.dto.spec.ts` (asserts `fromEntity` strips all five sensitive fields), `user.module.spec.ts` (provider/import wiring), `prisma-user.repository.spec.ts` (covers `findByUsername`/`findByResetTokenHash` → `findFirst` no-unique-constraint behavior, and the OTP/reset-token field pass-through).
+Unit tests (Jest, mocked `IUserRepository`/`IRoleRepository`, ≥80% branch coverage) live next to each source file: `update-user.service.spec.ts` (self-or-manager authorization only, no role logic), `update-user-role.service.spec.ts` (the relocated hierarchy/new-role-check/super-admin-promotion cases, plus the new roleId-not-found 404), `delete-user.service.spec.ts` (hierarchy check), `list-user.service.spec.ts`, `user.controller.spec.ts` (provides a mocked `JwtTokenService` for `JwtAuthGuard` instantiation, one delegation test per route, asserts every response is the mapped `UserResponseDto` shape with no `password` property), `user-response.dto.spec.ts` (asserts `fromEntity` strips all five sensitive fields), `user.module.spec.ts` (provider/import wiring), `prisma-user.repository.spec.ts` (covers `findByUsername`/`findByResetTokenHash` → `findFirst` no-unique-constraint behavior, the OTP/reset-token field pass-through, and `findByIds`'s empty-input short-circuit + partial-match behavior).
 
 ## Review notes
 

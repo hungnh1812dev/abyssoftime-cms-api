@@ -22,10 +22,10 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 3 (final, full integration):** full test suite green; manual end-to-end walkthrough — commit
 
 ## Phase 5 — Docs
-- [ ] `SPEC.md` trimmed to pointer
-- [ ] `docs/documents/content-type.md`, `document.md`, `users.md`, `docs/cms-admin-integration.md` updated
-- [ ] New `docs/documents/content-type-list-fields-techstack.md` (decision-rationale table)
-- [ ] **Checkpoint 4:** doc read-through — commit
+- [x] `SPEC.md` trimmed to pointer
+- [x] `docs/documents/content-type.md`, `document.md`, `users.md`, `docs/cms-admin-integration.md` updated
+- [x] New `docs/documents/content-type-list-fields-techstack.md` (decision-rationale table)
+- [x] **Checkpoint 4:** doc read-through — commit
 
 ## Phase 6 — Review + close-out
 - [ ] Five-axis review (correctness / readability / architecture / security / performance)
