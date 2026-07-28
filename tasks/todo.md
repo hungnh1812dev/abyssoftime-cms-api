@@ -13,15 +13,15 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 1:** `bun run build` / `bunx tsc --noEmit` / `bun run lint` / `bun run test:cov` green — commit (still-green intermediate: JWT routes on Passport, login unchanged)
 
 ## Phase 2 — Login half (`LocalStrategy` + shrunk `LoginService` + `AuthController.login` + remaining wiring)
-- [ ] `local.strategy.ts` — `LocalStrategy` (`usernameField: "email"`), credential logic moved verbatim, returns `{ user, role }`; export `ValidatedLoginUser`
-- [ ] `local.strategy.spec.ts` — all five credential cases moved from `login.service.spec.ts`
-- [ ] `login.service.ts` — shrink to synchronous `execute(ValidatedLoginUser): LoginResult`, token-signing only
-- [ ] `login.service.spec.ts` — rewrite: token-signing only, no repository mocks
-- [ ] `auth.controller.ts` — login route: `@UseGuards(RateLimitGuard, AuthGuard("local"))`, read `req.user`; check `eslint.config.mjs` for unused `@Body() dto` (rename `_dto` only if config requires)
-- [ ] `auth.controller.spec.ts` — update login-route test to `req.user` → `loginService.execute(req.user)`; assert cookies set
-- [ ] `auth.module.ts` — add `LocalStrategy` provider
-- [ ] `auth.module.spec.ts` — add `LocalStrategy` to providers array
-- [ ] **Checkpoint 2:** `bun run build` / `bunx tsc --noEmit` / `bun run lint` / `bun run test:cov` green — commit (last code phase; not held open for Phase 5 manual verification)
+- [x] `local.strategy.ts` — `LocalStrategy` (`usernameField: "email"`), credential logic moved verbatim, returns `{ user, role }`; export `ValidatedLoginUser`
+- [x] `local.strategy.spec.ts` — all five credential cases moved from `login.service.spec.ts`
+- [x] `login.service.ts` — shrink to synchronous `execute(ValidatedLoginUser): LoginResult`, token-signing only
+- [x] `login.service.spec.ts` — rewrite: token-signing only, no repository mocks
+- [x] `auth.controller.ts` — login route: `@UseGuards(RateLimitGuard, AuthGuard("local"))`, read `req.user`; checked `eslint.config.mjs` — no `argsIgnorePattern`/unused-param rule fires, `_dto` rename not needed (confirmed via `bun run lint`, not guessed)
+- [x] `auth.controller.spec.ts` — update login-route test to `req.user` → `loginService.execute(req.user)`; assert cookies set
+- [x] `auth.module.ts` — add `LocalStrategy` provider
+- [x] `auth.module.spec.ts` — add `LocalStrategy` to providers array
+- [x] **Checkpoint 2:** `bun run build` / `bunx tsc --noEmit` / `bun run lint` / `bun run test:cov` green — commit (last code phase; not held open for Phase 5 manual verification)
 
 ## Phase 3 — Docs (`auth.md`)
 - [ ] `docs/documents/auth.md` — Passport-based guard/login, two strategies, module wiring, updated Tests section; cross-link `auth-passport-techstack.md`

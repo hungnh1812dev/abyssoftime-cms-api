@@ -19,6 +19,7 @@ import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
 
 import { ACCESS_TOKEN_COOKIE } from "@/common/guards/jwt-auth.guard";
+import { type ValidatedLoginUser } from "@/common/strategies/local.strategy";
 
 import { AuthController, REFRESH_TOKEN_COOKIE } from "./auth.controller";
 
@@ -112,13 +113,15 @@ describe("AuthController", () => {
     expect(result).toEqual({ hasUsers: false });
   });
 
-  it("login() delegates to LoginService and sets httpOnly auth cookies", async () => {
+  it("login() delegates to LoginService with the passport-validated user and sets httpOnly auth cookies", () => {
     const dto: LoginDto = { email: "jane@example.com", password: "s3cret" };
-    loginService.execute.mockResolvedValue({ accessToken: "access-token", refreshToken: "refresh-token" });
+    const validatedUser = { user: { documentId: "user-1" }, role: { slug: "admin" } } as unknown as ValidatedLoginUser;
+    const req = { user: validatedUser } as unknown as Request & { user: ValidatedLoginUser };
+    loginService.execute.mockReturnValue({ accessToken: "access-token", refreshToken: "refresh-token" });
 
-    const result = await controller.login(dto, res as unknown as Response);
+    const result = controller.login(dto, req, res as unknown as Response);
 
-    expect(loginService.execute).toHaveBeenCalledWith(dto);
+    expect(loginService.execute).toHaveBeenCalledWith(validatedUser);
     expect(res.cookie).toHaveBeenCalledWith(ACCESS_TOKEN_COOKIE, "access-token", expect.objectContaining({ httpOnly: true, secure: true, sameSite: "lax" }));
     expect(res.cookie).toHaveBeenCalledWith(REFRESH_TOKEN_COOKIE, "refresh-token", expect.objectContaining({ httpOnly: true, secure: true, sameSite: "lax" }));
     expect(result).toEqual({ message: "Login successful." });
