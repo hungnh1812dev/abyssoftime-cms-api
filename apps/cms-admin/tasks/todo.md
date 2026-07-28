@@ -49,7 +49,9 @@ each task completes.
       available in this environment for the full live walkthrough — see summary); commit
 
 ## Phase 6 — Full Regression, Docs Update, Review, Clean-up
-- [ ] 6.1 Full automated regression (lint/test/build)
+- [x] 6.1 Full automated regression (lint/test/build) — 338/338 tests, build green, 1
+      pre-existing unrelated lint warning (`HealthContext.test.tsx`, untouched by this work), no
+      new warnings introduced
 - [ ] 6.2 Full live walkthrough, all flows, one continuous session
 - [ ] 6.3 Update `docs/documents/*.md`
 - [ ] 6.4 Update root `SPEC.md`
