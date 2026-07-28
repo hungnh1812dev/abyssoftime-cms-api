@@ -24,8 +24,8 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 2:** `bun run build` / `bunx tsc --noEmit` / `bun run lint` / `bun run test:cov` green — commit (last code phase; not held open for Phase 5 manual verification)
 
 ## Phase 3 — Docs (`auth.md`)
-- [ ] `docs/documents/auth.md` — Passport-based guard/login, two strategies, module wiring, updated Tests section; cross-link `auth-passport-techstack.md`
-- [ ] **Checkpoint 3:** doc read-through — no section still describes the old hand-rolled guard/login — commit
+- [x] `docs/documents/auth.md` — Passport-based guard/login, two strategies, module wiring, updated Tests section; cross-link `auth-passport-techstack.md`
+- [x] **Checkpoint 3:** doc read-through — no section still describes the old hand-rolled guard/login — commit
 
 ## Phase 4 — Five-axis review (Opus) + fixes + `SPEC.md` trim + close-out
 - [ ] Run the review on **Opus** (`[CAREFUL]` requires it — don't run on Sonnet)
