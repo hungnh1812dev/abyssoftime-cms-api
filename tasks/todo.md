@@ -23,7 +23,7 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint 3:** doc read-through — commit
 
 ## Phase 4 — Five-axis review + close-out
-- [ ] Five-axis review (correctness / readability / architecture / security / performance)
-- [ ] Address findings
-- [ ] `SPEC.md` — trim back to pointer
-- [ ] **Checkpoint 4 (final):** all checks green — commit
+- [x] Five-axis review (correctness / readability / architecture / security / performance)
+- [x] Address findings
+- [x] `SPEC.md` — trim back to pointer
+- [x] **Checkpoint 4 (final):** all checks green — commit
