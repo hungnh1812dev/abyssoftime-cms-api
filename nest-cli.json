@@ -8,6 +8,10 @@
       {
         "include": "prisma/application/client/**/*",
         "outDir": "dist/src"
+      },
+      {
+        "include": "modules/auth/infrastructure/email/templates/handlebars/**/*.hbs",
+        "outDir": "dist/src"
       }
     ]
   }

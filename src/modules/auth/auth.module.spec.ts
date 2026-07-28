@@ -1,3 +1,5 @@
+import { MailerService } from "@nestjs-modules/mailer";
+
 import { MODULE_METADATA } from "@nestjs/common/constants";
 import { ConfigService } from "@nestjs/config";
 
@@ -14,12 +16,21 @@ import { ResetPasswordService } from "./application/services/reset-password.serv
 import { VerifyOtpService } from "./application/services/verify-otp.service";
 import { AuthModule } from "./auth.module";
 import { EMAIL_SENDER } from "./domain/ports/email-sender.port";
+import { EMAIL_TEMPLATE_RENDERER } from "./infrastructure/email/renderers/email-template-renderer";
+import { resolveEmailTemplateRenderer } from "./infrastructure/email/renderers/resolve-email-template-renderer";
 import { resolveEmailSender } from "./infrastructure/email/resolve-email-sender";
 import { AuthController } from "./presentation/auth.controller";
 
 describe("AuthModule", () => {
-  it("imports UserModule and RoleModule", () => {
-    expect(Reflect.getMetadata(MODULE_METADATA.IMPORTS, AuthModule)).toEqual([UserModule, RoleModule]);
+  it("imports UserModule, RoleModule, and a MailerModule registration", () => {
+    const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AuthModule) as unknown[];
+
+    expect(imports).toHaveLength(3);
+    expect(imports[0]).toBe(UserModule);
+    expect(imports[1]).toBe(RoleModule);
+
+    const mailerModuleImport = imports[2] as { module: unknown };
+    expect(typeof mailerModuleImport.module).toBe("function");
   });
 
   it("registers the AuthController", () => {
@@ -38,7 +49,12 @@ describe("AuthModule", () => {
       RefreshTokenService,
       ForgotPasswordService,
       ResetPasswordService,
-      { provide: EMAIL_SENDER, useFactory: resolveEmailSender, inject: [ConfigService] },
+      { provide: EMAIL_TEMPLATE_RENDERER, useFactory: resolveEmailTemplateRenderer, inject: [ConfigService] },
+      {
+        provide: EMAIL_SENDER,
+        useFactory: resolveEmailSender,
+        inject: [ConfigService, MailerService, EMAIL_TEMPLATE_RENDERER],
+      },
     ]);
   });
 

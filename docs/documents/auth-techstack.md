@@ -43,6 +43,16 @@ Full account of the failure and pivot: `tasks/plan.md` finding 3.
 | Swap-in cost later        | N/A                                                   | One line in `auth.module.ts` (`{ provide: EMAIL_SENDER, useClass: ConsoleEmailSender }` → a real implementation of the same `IEmailSender` port) |
 | **Verdict**              | Rejected — out of scope for this cycle                | **Chosen** |
 
+## Auth strategy library
+
+| Criteria                  | Passport (`@nestjs/passport` + `passport-jwt`) | `@nestjs/jwt` + custom `JwtAuthGuard` (chosen) |
+| --------------------------- | -------------------------------------------------- | -------------------------------------------------- |
+| New dependency               | Yes — `@nestjs/passport`, `passport`, `passport-jwt`, `@types/passport-jwt` | None — `@nestjs/jwt` already installed for sign/verify |
+| Token location fit           | Default `ExtractJwt` strategies target the `Authorization` header; a cookie-based token needs a custom extractor anyway | Guard reads `request.cookies[ACCESS_TOKEN_COOKIE]` directly — no extractor abstraction needed |
+| Strategy count in this module | Built for pluggable/multiple strategies (local, JWT, OAuth, ...) via `PassportModule` | Exactly one strategy (stateless JWT via cookie) — the pluggability buys nothing here |
+| Control flow                 | Delegates verification/user-attachment through Passport's strategy + `AuthGuard('jwt')` machinery | `JwtTokenService.verifyAccessToken()` called directly in the guard — one less layer to trace |
+| **Verdict**                  | Rejected — extra dependency and indirection for a single cookie-based strategy | **Chosen** |
+
 ## Rate limiting
 
 | Criteria              | Redis-backed / library (e.g. `nestjs-rate-limiter`) | Hand-rolled in-memory token bucket (chosen)   |

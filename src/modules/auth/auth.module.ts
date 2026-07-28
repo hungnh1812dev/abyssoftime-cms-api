@@ -1,6 +1,9 @@
+import { MailerModule, MailerService } from "@nestjs-modules/mailer";
+
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
+import { type EnvironmentVariables } from "@/config/env.validation";
 import { RoleModule } from "@/modules/roles/role.module";
 import { UserModule } from "@/modules/users/user.module";
 
@@ -13,11 +16,32 @@ import { ResendOtpService } from "./application/services/resend-otp.service";
 import { ResetPasswordService } from "./application/services/reset-password.service";
 import { VerifyOtpService } from "./application/services/verify-otp.service";
 import { EMAIL_SENDER } from "./domain/ports/email-sender.port";
+import { EMAIL_TEMPLATE_RENDERER } from "./infrastructure/email/renderers/email-template-renderer";
+import { resolveEmailTemplateRenderer } from "./infrastructure/email/renderers/resolve-email-template-renderer";
 import { resolveEmailSender } from "./infrastructure/email/resolve-email-sender";
 import { AuthController } from "./presentation/auth.controller";
 
 @Module({
-  imports: [UserModule, RoleModule],
+  imports: [
+    UserModule,
+    RoleModule,
+    MailerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService<EnvironmentVariables, true>) => ({
+        transport: {
+          host: configService.get("SMTP_HOST", { infer: true }),
+          port: configService.get("SMTP_PORT", { infer: true }),
+          secure: configService.get("SMTP_SECURE", { infer: true }),
+          requireTLS: true,
+          auth: {
+            user: configService.get("SMTP_USER", { infer: true }),
+            pass: configService.get("SMTP_PASSWORD", { infer: true }),
+          },
+        },
+        defaults: { from: configService.get("EMAIL_FROM", { infer: true }) },
+      }),
+    }),
+  ],
   controllers: [AuthController],
   providers: [
     RegisterService,
@@ -28,7 +52,12 @@ import { AuthController } from "./presentation/auth.controller";
     RefreshTokenService,
     ForgotPasswordService,
     ResetPasswordService,
-    { provide: EMAIL_SENDER, useFactory: resolveEmailSender, inject: [ConfigService] },
+    { provide: EMAIL_TEMPLATE_RENDERER, useFactory: resolveEmailTemplateRenderer, inject: [ConfigService] },
+    {
+      provide: EMAIL_SENDER,
+      useFactory: resolveEmailSender,
+      inject: [ConfigService, MailerService, EMAIL_TEMPLATE_RENDERER],
+    },
   ],
 })
 export class AuthModule {}
