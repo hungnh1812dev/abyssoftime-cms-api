@@ -30,8 +30,8 @@ function createWrapper() {
 const permission = { documentId: "p1", slug: "document:read", name: "Read Documents", description: "View documents" };
 
 describe("usePermissions", () => {
-  it("returns list of permissions from GET /api/permissions", async () => {
-    mock.onGet("/api/permissions").reply(200, [permission]);
+  it("returns list of permissions from GET /permissions", async () => {
+    mock.onGet("/permissions").reply(200, [permission]);
     const { result } = renderHook(() => usePermissions(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual([permission]);
@@ -39,9 +39,9 @@ describe("usePermissions", () => {
 });
 
 describe("useCreatePermission", () => {
-  it("sends POST to /api/permissions and invalidates the list", async () => {
-    mock.onGet("/api/permissions").reply(200, []);
-    mock.onPost("/api/permissions").reply(201, permission);
+  it("sends POST to /permissions and invalidates the list", async () => {
+    mock.onGet("/permissions").reply(200, []);
+    mock.onPost("/permissions").reply(201, permission);
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
@@ -59,9 +59,9 @@ describe("useCreatePermission", () => {
 });
 
 describe("useUpdatePermission", () => {
-  it("sends PUT to /api/permissions/{id} and invalidates the list", async () => {
-    mock.onGet("/api/permissions").reply(200, []);
-    mock.onPut("/api/permissions/p1").reply(200, { ...permission, name: "Read Docs (renamed)" });
+  it("sends PUT to /permissions/{id} and invalidates the list", async () => {
+    mock.onGet("/permissions").reply(200, []);
+    mock.onPut("/permissions/p1").reply(200, { ...permission, name: "Read Docs (renamed)" });
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children);
@@ -79,8 +79,8 @@ describe("useUpdatePermission", () => {
 });
 
 describe("useDeletePermission", () => {
-  it("sends DELETE to /api/permissions/{id}", async () => {
-    mock.onDelete("/api/permissions/p1").reply(204);
+  it("sends DELETE to /permissions/{id}", async () => {
+    mock.onDelete("/permissions/p1").reply(204);
     const { result } = renderHook(() => useDeletePermission(), { wrapper: createWrapper() });
 
     result.current.mutate("p1");

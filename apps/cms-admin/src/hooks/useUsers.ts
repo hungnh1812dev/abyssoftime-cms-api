@@ -1,45 +1,42 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AxiosError } from "axios";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/errors";
 
 export interface UserItem {
-  id: string;
+  documentId: string;
   email: string;
-  displayName: string;
-  role: string;
-}
-
-interface UserListResponse {
-  items: UserItem[];
-  total: number;
-  page: number;
-  limit: number;
+  name: string;
+  username: string;
+  accountType: boolean;
+  verified: boolean;
+  roleId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const KEYS = {
-  list: (page: number) => ["users", "list", page] as const,
   all: ["users"] as const,
 };
 
-export function useUserList(page: number) {
-  return useQuery<UserListResponse>({
-    queryKey: KEYS.list(page),
-    queryFn: () => api.get<UserListResponse>(`/api/users?page=${page}&limit=20`).then((response) => response.data),
+// GET /users is not paginated — it returns every user.
+export function useUserList() {
+  return useQuery<UserItem[]>({
+    queryKey: KEYS.all,
+    queryFn: () => api.get<UserItem[]>("/users").then((response) => response.data),
   });
 }
 
 export function useUpdateUserRole() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, role }: { id: string; role: string }) => api.put(`/api/users/${id}/role`, { role }),
+    mutationFn: ({ id, roleId }: { id: string; roleId: string }) => api.patch<UserItem>(`/users/${id}/role`, { roleId }).then((response) => response.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: KEYS.all });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to update role";
-      toast.error(message);
+      toast.error(apiErrorMessage(error, "Failed to update role"));
     },
   });
 }
@@ -47,13 +44,12 @@ export function useUpdateUserRole() {
 export function useDeleteUser() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.delete(`/api/users/${id}`),
+    mutationFn: (id: string) => api.delete(`/users/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: KEYS.all });
     },
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to delete user";
-      toast.error(message);
+      toast.error(apiErrorMessage(error, "Failed to delete user"));
     },
   });
 }

@@ -1,40 +1,26 @@
-import { useState } from "react";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/context/AuthContext";
-import { useRoleList } from "@/hooks/useRoles";
+import { type RoleItem, useRoleList } from "@/hooks/useRoles";
 import { useDeleteUser, useUpdateUserRole, useUserList } from "@/hooks/useUsers";
-import { roleLevel } from "@/lib/roles";
-
-const ALL_ROLES = ["super_admin", "admin", "editor", "guest"] as const;
-
-function rolesBelow(currentRole: string | null): string[] {
-  const level = roleLevel(currentRole);
-  return ALL_ROLES.filter((role) => roleLevel(role) < level);
-}
 
 export function UsersPage() {
-  // TODO(Phase 2 / Task 2.3): role is now a live RoleItem object, not a slug
-  // string — this shim keeps the file compiling against the still-hardcoded
-  // ALL_ROLES/roleLevel model below until that task replaces both.
-  const { role: myRoleObj, userId } = useAuth();
-  const myRole = myRoleObj?.slug ?? null;
-  const [page, setPage] = useState(1);
+  const { role: myRole, userId } = useAuth();
 
-  const { data: usersData, isLoading } = useUserList(page);
-  const { data: rolesData } = useRoleList();
+  const { data: users = [], isLoading } = useUserList();
+  const { data: roles = [] } = useRoleList();
   const updateRole = useUpdateUserRole();
   const deleteUser = useDeleteUser();
 
-  const users = usersData?.items ?? [];
-  const total = usersData?.total ?? 0;
-  const hasNext = page * 20 < total;
-  const hasPrev = page > 1;
-  const availableRoles = rolesBelow(myRole);
-  const roleNameBySlug = new Map((rolesData ?? []).map((role) => [role.slug, role.name]));
+  const roleById = new Map(roles.map((role) => [role.documentId, role]));
+  const myLevel = myRole?.level ?? 0;
+  // A role can only be assigned by (and to a row managed by) a caller whose
+  // own role level is strictly higher — mirrors the server-side hierarchy
+  // check on PATCH /users/:id/role, done here against live role data instead
+  // of a hardcoded role list.
+  const availableRoles = roles.filter((role) => role.level < myLevel);
 
   return (
     <div className="space-y-6 p-6">
@@ -56,32 +42,33 @@ export function UsersPage() {
           </TableHeader>
           <TableBody>
             {users.map((user) => {
-              const isMe = user.id === userId;
-              const canManage = !isMe && roleLevel(myRole) > roleLevel(user.role);
+              const isMe = user.documentId === userId;
+              const userRole: RoleItem | undefined = user.roleId ? roleById.get(user.roleId) : undefined;
+              const canManage = !isMe && myLevel > (userRole?.level ?? 0);
               return (
-                <TableRow key={user.id} className={isMe ? "bg-accent/30" : undefined}>
+                <TableRow key={user.documentId} className={isMe ? "bg-accent/30" : undefined}>
                   <TableCell>
                     {user.email}
                     {isMe && <span className="text-muted-foreground ml-2 text-xs">(you)</span>}
                   </TableCell>
-                  <TableCell>{user.displayName}</TableCell>
+                  <TableCell>{user.name}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{roleNameBySlug.get(user.role) ?? user.role}</Badge>
+                    <Badge variant="secondary">{userRole?.name ?? "No role"}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     {canManage && (
                       <div className="flex justify-end gap-2">
                         <Select
-                          onValueChange={(role: string | null) => {
-                            if (role) updateRole.mutate({ id: user.id, role });
+                          onValueChange={(roleId: string | null) => {
+                            if (roleId) updateRole.mutate({ id: user.documentId, roleId });
                           }}>
                           <SelectTrigger className="h-8 w-32 text-xs">
                             <SelectValue placeholder="Change role" />
                           </SelectTrigger>
                           <SelectContent>
                             {availableRoles.map((role) => (
-                              <SelectItem key={role} value={role}>
-                                {role}
+                              <SelectItem key={role.documentId} value={role.documentId}>
+                                {role.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -91,7 +78,7 @@ export function UsersPage() {
                           size="sm"
                           onClick={() => {
                             if (confirm(`Delete user ${user.email}?`)) {
-                              deleteUser.mutate(user.id);
+                              deleteUser.mutate(user.documentId);
                             }
                           }}>
                           Delete
@@ -106,19 +93,9 @@ export function UsersPage() {
         </Table>
       )}
 
-      <div className="flex items-center justify-between">
-        <span className="text-muted-foreground text-sm">
-          {total} user{total !== 1 ? "s" : ""}
-        </span>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage - 1)} disabled={!hasPrev}>
-            Prev
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setPage((currentPage) => currentPage + 1)} disabled={!hasNext}>
-            Next
-          </Button>
-        </div>
-      </div>
+      <p className="text-muted-foreground text-sm">
+        {users.length} user{users.length !== 1 ? "s" : ""}
+      </p>
     </div>
   );
 }
