@@ -59,6 +59,10 @@ each task completes.
       `documents.md`, `content-type.md`, `media.md`, `locales-and-invites.md` for the new contract;
       also fixed stale locale/`minRole` references found in `navigation-shell.md` and
       `form-system.md` while sweeping for consistency. 338/338 tests, lint, build green
-- [ ] 6.4 Update root `SPEC.md`
+- [x] 6.4 Update root `SPEC.md` — objective/structure/code-style/boundaries sections now reflect
+      cookie-session auth, dynamic roles, hidden locales, `minLevel`, and `apiErrorMessage`;
+      re-validated success-criteria date; corrected the stale `specs/access-token-auth-mismatch.md`
+      pointer's actual current location (`Sidebar.tsx`, still a nonexistent file). 338/338 tests,
+      lint, build green
 - [ ] 6.5 Five-axis code review
 - [ ] 6.6 Clean-up — delete `specs/cms-api-integration.md` and `tasks/plan.md`/`tasks/todo.md`

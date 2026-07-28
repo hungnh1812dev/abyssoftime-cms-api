@@ -4,7 +4,7 @@ See `/docs/ENTRYPOINT.md` for the full doc index. This file only orients — mod
 
 ## Objective
 
-The admin web UI for the AbyssOfTime headless CMS: authenticate, browse/manage content types (single & collection), edit documents through schema-driven forms, manage media, and administer users/roles/permissions/access-tokens/locales. Consumes the `cms-api` backend (sibling app, `apps/cms-api`) over `VITE_API_URL`; see that app's `docs/cms-admin-integration.md` for the API contract this frontend is built against.
+The admin web UI for the AbyssOfTime headless CMS: authenticate (cookie-session, self-register + OTP verification, no invites), browse/manage content types (single & collection), edit documents through schema-driven forms, manage media, and administer users/roles/permissions/access-tokens against a fully dynamic, DB-backed catalog. Locale administration has no UI in this app — the backend has no locale/i18n module, so that source is kept but unreachable (see `docs/documents/locales-and-invites.md`). Consumes the `cms-api` backend (sibling app, `apps/cms-api`) over `VITE_API_URL`, every route under `/api/v1/*` except `GET /health`; see that app's `docs/cms-admin-integration.md` for the API contract this frontend is built against.
 
 ## Tech Stack
 
@@ -38,11 +38,11 @@ src/
   lib/                          → api client, query client, cn(), shared constants
   content-type-registry/       → per-slug list-view/wrapper overrides
   pages/
-    auth/                       → login/register/invite-accept
+    auth/                       → login/register/verify-otp/forgot-password/reset-password (no invite flow — removed)
     admin/layout/                → AdminLayout, TopBar, StickyActionBar
     admin/panels/                → content-type & collection-type screens
-    admin/settings/              → users/roles/permissions/access-tokens/media/locales
-  types/cms.ts                 → shared API response/schema types
+    admin/settings/              → users/roles/permissions/access-tokens/media (+ orphaned, unreachable internationalize)
+  types/cms.ts                 → shared API response/schema types (camelCase DTO shapes)
 docs/
   ENTRYPOINT.md                → doc index, start here
   rules/                        → workflow.md, bun.md
@@ -54,17 +54,16 @@ docs/
 - Function components, named exports (`export function Foo()`), no default exports for components.
 - Data fetching/mutation always goes through a `hooks/use*.ts` file wrapping TanStack Query — components never call `api` directly except one-off inline queries inside a page (e.g. `LoginPage`'s `auth-setup` check).
 - Tailwind utility classes composed via `cn()` (`lib/utils.ts`), not `classnames`/manual string concat.
-- Errors from mutations surface via `sonner` toasts reading the API's `{ error: string }` body shape, with a generic fallback string — see any `hooks/use*.ts` file for the pattern.
+- Errors from mutations surface via `sonner` toasts reading the API's Nest `HttpException` body (`{ statusCode, message, error }`, `message` a string or string array) through the shared `lib/errors.ts` `apiErrorMessage(error, fallback)` helper — see any `hooks/use*.ts` file for the pattern.
 
 ```tsx
 export function useDeleteRole() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (documentId: string) => api.delete(`/api/roles/${documentId}`),
+    mutationFn: (documentId: string) => api.delete(`/roles/${documentId}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.all }),
     onError: (error: unknown) => {
-      const message = (error as AxiosError<{ error: string }>).response?.data?.error ?? "Failed to delete role";
-      toast.error(message);
+      toast.error(apiErrorMessage(error, "Failed to delete role"));
     },
   });
 }
@@ -77,14 +76,14 @@ Vitest + Testing Library (`@testing-library/react`, `jsdom` environment), `axios
 ## Boundaries
 
 - **Always:** run `bun run lint` (never `bunx eslint .` directly) and `bun run test` before considering a change done; format changed `.ts`/`.tsx` files with `bun run format` before committing; keep module files ≤500 lines (split when they grow past that); keep new features independent of unrelated modules' internals (prefer additive files over editing shared internals).
-- **Ask first:** adding a new dependency; introducing a new cross-module coupling; changing the route table's auth gating (`minRole`/permission checks in `router.tsx` or `Sidebar`); any schema/contract assumption about the `cms-api` backend that isn't already documented in its `docs/cms-admin-integration.md`.
-- **Never:** commit without explicit user confirmation of the exact staged files + message (see `docs/rules/workflow.md`); include `Co-Authored-By` in commit messages; store the access token anywhere but in-memory (`lib/api.ts`); bypass the `docs/rules/workflow.md` spec→build→update-docs→review→cleanup sequence for a new feature/page/module.
+- **Ask first:** adding a new dependency; introducing a new cross-module coupling; changing the route table's auth gating (`minLevel`/permission checks in `router.tsx` or `Sidebar`); any schema/contract assumption about the `cms-api` backend that isn't already documented in its `docs/cms-admin-integration.md`.
+- **Never:** commit without explicit user confirmation of the exact staged files + message (see `docs/rules/workflow.md`); include `Co-Authored-By` in commit messages; read/store a session token client-side — both tokens are httpOnly cookies this app never touches directly (`lib/api.ts`); bypass the `docs/rules/workflow.md` spec→build→update-docs→review→cleanup sequence for a new feature/page/module.
 
 ## Success Criteria
 
-This spec + `docs/documents/*` accurately describe the app as it exists today (validated by a full read-through of `src/` on 2026-07-28). Going forward: a feature is "documented" when its `docs/documents/*.md` file(s) are updated to match the shipped code, per `docs/rules/workflow.md`'s Update docs step — not when this SPEC.md is edited (this file stays pointer-only).
+This spec + `docs/documents/*` accurately describe the app as it exists today (originally validated by a full read-through of `src/` on 2026-07-28; re-validated on 2026-07-29 after the full `abyssoftime-cms-api` contract rewrite — cookie-session auth, dynamic roles/permissions, rebuilt access tokens, hidden locales, and the camelCase content-type/document/media rewrite — landed across six phases). Going forward: a feature is "documented" when its `docs/documents/*.md` file(s) are updated to match the shipped code, per `docs/rules/workflow.md`'s Update docs step — not when this SPEC.md is edited (this file stays pointer-only).
 
 ## Open Questions
 
 - `docs/rules/bun.md` is shared with the sibling `cms-api` backend and describes Bun-native APIs (`Bun.serve`, `bun:sqlite`, `Bun.redis`, HTML-import frontend bundling) that don't apply to this Vite-based app. Left as-is per user decision (2026-07-28) rather than forked/edited for cms-admin — flagged here in case that changes.
-- Several small duplications/gaps were found during this audit and are noted in their respective `docs/documents/*.md` files (`Known gaps` sections) rather than fixed outright, since fixing them wasn't in scope for a documentation pass: dead code (`App.tsx`, `AdminRoute.tsx`), a stale spec-file reference in `AuthContext.tsx`'s comments, `useBreadcrumbs`' incomplete `SETTINGS_LABELS` map, and the `MediaLibrary`/`MediaLibraryPage` upload-UI duplication.
+- Several small duplications/gaps were found during the original audit and are noted in their respective `docs/documents/*.md` files (`Known gaps` sections) rather than fixed outright, since fixing them wasn't in scope for a documentation pass: dead code (`App.tsx` — `AdminRoute.tsx` was also dead code at the time but has since been deleted as part of the auth rewrite), `useBreadcrumbs`' incomplete `SETTINGS_LABELS` map, and the `MediaLibrary`/`MediaLibraryPage` upload-UI duplication. The stale spec-file reference has since moved: `AuthContext.tsx`'s comments no longer cite it, but `Sidebar.tsx` now has a comment citing `specs/access-token-auth-mismatch.md` §13.6, a file that does not exist in this repo (only `specs/cms-api-integration.md` does) — worth reconciling the next time that file is touched.
