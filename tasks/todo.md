@@ -1,129 +1,39 @@
-# Todo — Document list API filter params
+# Todo — Integrate `@nestjs/passport` as the auth-strategy framework (`[CAREFUL]`)
 
-See `tasks/plan.md` for full context, approach, and confirmed decisions.
+See `tasks/plan.md` for full context and rationale.
 
-## Phase 1 — Filter primitives (SQL builder + parser), independently testable
+## Phase 1 — Install + JWT half (`JwtStrategy` + `JwtAuthGuard` conversion)
+- [x] `bun add @nestjs/passport passport passport-jwt passport-local && bun add -d @types/passport-jwt @types/passport-local`
+- [x] `jwt.strategy.ts` — `JwtStrategy extends PassportStrategy(Strategy, "jwt")`, custom cookie extractor, pass-through `validate`
+- [x] `jwt.strategy.spec.ts` — cookie extractor (present → token / absent → null) + `validate` pass-through
+- [x] `jwt-auth.guard.ts` — rewrite to `extends AuthGuard("jwt")` + `handleRequest` (two exact 401 messages); keep `ACCESS_TOKEN_COOKIE` export here
+- [x] `jwt-auth.guard.spec.ts` — rewrite: test `handleRequest` in isolation (all three branches)
+- [x] `auth.module.ts` — add `PassportModule.register({ defaultStrategy: "jwt" })` + `JwtStrategy` provider (partial wiring)
+- [x] `auth.module.spec.ts` — imports length 3→4 + positional PassportModule check; add `JwtStrategy` to providers array
+- [x] **Checkpoint 1:** `bun run build` / `bunx tsc --noEmit` / `bun run lint` / `bun run test:cov` green — commit (still-green intermediate: JWT routes on Passport, login unchanged)
 
-- [x] `where-builder.ts` — add `FilterOperator` type (`"$eq" | "$ne" | "$contains" | "$gt" | "$gte" |
-      "$lt" | "$lte"`), `ParsedFilter` interface (`{ column, operator, value }`), and
-      `buildFilterWhere(filters: ParsedFilter[], paramIndex: number): { sql: string; params:
-      unknown[] } | null`; empty array → `null`; AND-join each filter's clause; `$contains` reuses
-      `escapeSearchValue` + `ILIKE ... ESCAPE '\'`; every other operator maps to its SQL comparator
-      (`=`, `<>`, `>`, `>=`, `<`, `<=`); `quoteIdent` every column name
-- [x] `where-builder.spec.ts` — tests: empty filters → `null`; single `$eq` filter SQL+params shape;
-      `$contains` escaping/wildcarding; multiple filters AND'd with sequential placeholder indices;
-      unsafe column name throws `UnsafeSqlIdentifierError` (defense-in-depth, mirrors existing
-      `buildOrderByClause`/`buildSearchWhere` injection tests)
-- [x] New `filter-query.parser.ts` — `parseFilters(contentType, rawFilters:
-      Record<string, Record<string, string>> | undefined): ParsedFilter[]`; per field: must be in
-      `sortableColumnsFor(contentType.fields)` else `400`; per operator: must be legal for that
-      field's value class (text/number/boolean/id/document_id/timestamp — see `tasks/plan.md`'s
-      Approach section) else `400`; exactly one operator per field, more than one throws `400`;
-      value coercion per class, invalid value throws `400`; `undefined` input → `[]`
-- [x] New `filter-query.parser.spec.ts` — tests: valid single/multi-field parse; unknown field → 400;
-      unknown `$op` → 400; operator illegal for field class (e.g. `$contains` on `number`, `$gt` on
-      `boolean`) → 400; two operators on one field → 400; non-numeric value for `number` → 400;
-      non-`"true"/"false"` value for `boolean` → 400; unparseable date for a timestamp system column
-      → 400; `undefined` → `[]`
-- [x] **Checkpoint 1:** `bun run build && bun run test src/modules/document/infrastructure/persistence/sql/where-builder.spec.ts src/modules/document/application/support/filter-query.parser.spec.ts && bun run lint`
-      green (also ran the full `src/modules/document` suite: 210 tests, 29 suites, no regressions);
-      confirm staged files + commit message with user before committing
+## Phase 2 — Login half (`LocalStrategy` + shrunk `LoginService` + `AuthController.login` + remaining wiring)
+- [ ] `local.strategy.ts` — `LocalStrategy` (`usernameField: "email"`), credential logic moved verbatim, returns `{ user, role }`; export `ValidatedLoginUser`
+- [ ] `local.strategy.spec.ts` — all five credential cases moved from `login.service.spec.ts`
+- [ ] `login.service.ts` — shrink to synchronous `execute(ValidatedLoginUser): LoginResult`, token-signing only
+- [ ] `login.service.spec.ts` — rewrite: token-signing only, no repository mocks
+- [ ] `auth.controller.ts` — login route: `@UseGuards(RateLimitGuard, AuthGuard("local"))`, read `req.user`; check `eslint.config.mjs` for unused `@Body() dto` (rename `_dto` only if config requires)
+- [ ] `auth.controller.spec.ts` — update login-route test to `req.user` → `loginService.execute(req.user)`; assert cookies set
+- [ ] `auth.module.ts` — add `LocalStrategy` provider
+- [ ] `auth.module.spec.ts` — add `LocalStrategy` to providers array
+- [ ] **Checkpoint 2:** `bun run build` / `bunx tsc --noEmit` / `bun run lint` / `bun run test:cov` green — commit (last code phase; not held open for Phase 5 manual verification)
 
-## Phase 2 — Wire into the list request path (one full vertical slice)
+## Phase 3 — Docs (`auth.md`)
+- [ ] `docs/documents/auth.md` — Passport-based guard/login, two strategies, module wiring, updated Tests section; cross-link `auth-passport-techstack.md`
+- [ ] **Checkpoint 3:** doc read-through — no section still describes the old hand-rolled guard/login — commit
 
-- [x] `document.repository.ts` — `ListOptions` gains `filters: ParsedFilter[]`
-- [x] `list-query.parser.ts` — `ListQueryParams` gains `filters?: FilterQueryParams`; `parseListQuery`
-      calls `parseFilters(contentType, query.filters)` and includes the result in the returned
-      `ListOptions`
-- [x] `list-query.parser.spec.ts` — added cases: no `filters` in query → `filters: []`; valid
-      `filters` → parsed array present in the returned options; an invalid filter throws `400` from
-      within `parseListQuery` itself. Also fixed `prisma-document.repository.spec.ts`'s hand-built
-      `ListOptions` literal (missing `filters: []` — a `bun run build` type error `bun run test`
-      alone didn't catch, since ts-jest here doesn't do full-project type-checking; caught it by
-      running the build)
-- [x] `prisma-document.repository.ts` — `listPaginated`: after the existing `search` clause, calls
-      `buildFilterWhere(opts.filters, whereParams.length + 1)` and ANDs its `sql` into `whereSql`,
-      pushes its `params`; applies to both the count query and the data query (shared `whereSql`/
-      `whereParams`, one change point)
-- [x] `prisma-document.repository.spec.ts` — added cases: filters set → only matching rows/correct
-      `total` (asserted via the generated SQL/params, mocked DB); `filters` + `search` together →
-      AND with independent placeholders, not either/or
-- [x] `list-query.dto.ts` — added `filters?: FilterQueryParams`, `@IsOptional() @IsObject()` only
-      (shape gate, matches `save-document.dto.ts` precedent); `@ApiPropertyOptional` documenting the
-      bracket syntax + supported `$op` set per field class. Build caught a real Swagger-decorator
-      type error along the way: `type: "object"` requires an explicit `additionalProperties` in this
-      `@nestjs/swagger` version's typings — added `additionalProperties: true`
-- [x] **Checkpoint 2:** `bun run build && bun run test:cov && bun run lint` green (no new
-      `coverageThreshold` entries for the Prisma repository or controller). Manual smoke test via
-      `bun run start:dev` against the real dev Postgres: app boots cleanly with the new route param
-      registered, `GET /health` → 200, and `GET /api-docs-json` confirms the `filters` query param
-      is present on the collection-type list route with the documented bracket syntax/operator set.
-      Stopped short of an authenticated `curl` round-trip proving actual row filtering — this dev
-      DB's `/auth/register` DTO wants fields unrelated to this feature to construct a fresh account,
-      and existing dev credentials aren't known/available here. Deferred that exact proof (real
-      HTTP route + real Postgres + auth) to Task 6's e2e suite, which uses
-      `JwtTokenService.signAccessToken` directly (the existing e2e pattern) instead of a live
-      register/login round-trip — a stronger, repeatable check than one-off `curl` would have been
-      anyway; confirmed before committing
+## Phase 4 — Five-axis review (Opus) + fixes + `SPEC.md` trim + close-out
+- [ ] Run the review on **Opus** (`[CAREFUL]` requires it — don't run on Sonnet)
+- [ ] Five-axis review over the full cycle diff (message parity, timing mitigation, `req.user` shape, `TokenModule` untouched)
+- [ ] Fix Important/correctness findings; re-verify build/test/lint; record findings + resolutions
+- [ ] `SPEC.md` — trim to a one-line pointer at `docs/documents/auth.md` (+ techstack doc)
+- [ ] **Checkpoint 4 (final):** automated checks green after fixes; `SPEC.md` reduced to pointer — commit
 
-## Phase 3 — e2e proof, docs, spec cleanup, review
-
-- [x] `test/content-engine.e2e-spec.ts` — new "list filter params (cv-page)" describe block:
-      `$contains` on `position`, `$eq` on `isMain` combined with `$contains`, a filter combined with
-      `search`, a `$gte` timestamp-column filter (`created_at`), and two `400` cases (unknown field,
-      operator illegal for the field's type) — real HTTP route + real Postgres. The timestamp-cast
-      risk flagged in `tasks/plan.md` did **not** surface — Postgres's implicit text→timestamptz
-      cast held with no explicit `CAST` needed.
-- [x] **Pre-existing bugs found and fixed along the way** (all confirmed via `git show --stat` that
-      the `/api/v1` migration commit never touched test files, and via a temporary debug e2e test
-      reproducing the exact 400 body):
-      1. `bun run test:e2e` was already broken on `develop` (19/21 failing) — `content-engine.e2e-spec.ts`
-         and `media.e2e-spec.ts` still called pre-`/api/v1`-migration routes; `app.e2e-spec.ts` still
-         tested the old removed root `GET /` route instead of the `GET /health` that replaced it. Fixed
-         and committed separately (`ed9baed`, confirmed with user first) before adding new assertions.
-      2. **Real bug in this feature's own design**: `filters[field][$op]=value` requires Express's
-         "extended" (qs-based) query parser to arrive as a nested object; Express 5 defaults to
-         "simple" (no bracket nesting), which class-validator's `whitelist`/`forbidNonWhitelisted`
-         then rejected as an unrecognized flat property (`"property filters[position][$contains]
-         should not exist"`). SPEC.md's assumption that this "works with zero custom parser config"
-         was wrong for this repo's actual Express version. Fixed with `app.set("query parser",
-         "extended")` in `configure-app.ts`, TDD'd with a new `configureApp query parser` describe
-         block in `configure-app.spec.ts` (a throwaway echo controller proving bracket-notation
-         query params round-trip into a real nested object). This is a global, app-wide setting
-         change — verified safe/backward-compatible by re-running the full suite (674 unit tests,
-         22 e2e tests, build, lint) with no other regressions, since "extended" is a superset of
-         "simple" for every existing flat (non-bracketed) query param already in use.
-- [x] `docs/documents/document.md` — extend the "List query parsing" section with the new `filters`
-      mechanism (operators, value classes, 400 cases), mirroring how `search`/`orderBy` are
-      documented there
-- [x] `docs/documents/swagger.md` — checked: no update needed. `filters` is a new field on the
-      existing `ListQueryDto`/existing collection-type list route — no new path or operation, so the
-      documented "36 paths, 47 operations" count is unchanged. The param itself is already
-      documented via `ListQueryDto`'s own `@ApiPropertyOptional` (visible in the generated
-      `/api-docs-json`), which is the mechanism this file describes rather than duplicates.
-- [x] **Checkpoint 3 (final):** `bun run build && bun run test:cov && bun run test:e2e && bun run
-      lint` all green (676 unit tests/117 suites, 22 e2e tests/3 suites — one pre-existing, unrelated
-      1ms timestamp flake in `bulk-create-publish.service.spec.ts` reproduced and confirmed to pass
-      on retry, not a regression; `main.ts`'s pre-existing `no-floating-promises` lint warning is the
-      only lint output, matching baseline). Five-axis code review
-      (`agent-skills:code-reviewer`) over the full diff (`5c9afe5..HEAD`) found two Important issues,
-      both fixed:
-      1. `filter-query.parser.ts`'s `coerceValue` never confirmed a filter value was actually a
-         string — `qs`'s "extended" parser (the very parser this diff turns on globally) can hand it
-         an array/object for `text`/`document_id`/timestamp filters, which then flowed through
-         unvalidated and could produce an unhandled `500` instead of the documented "always `400` on
-         bad input" guarantee. Fixed with a single `typeof rawValue !== "string"` check right after
-         destructuring the operator/value pair, before any class-specific coercion runs; two new RED→
-         GREEN test cases added (array value on a timestamp column, object value on a text field).
-      2. `domain/repositories/document.repository.ts` imported `ParsedFilter` from
-         `infrastructure/persistence/sql/where-builder.ts` — the only domain→infrastructure import in
-         the codebase, an unprecedented boundary violation. Fixed by moving `FilterOperator`/
-         `ParsedFilter` into a new `domain/entities/filter.ts` (mirroring `field-definition.ts`'s
-         existing "plain types live in `domain/entities`" precedent); `where-builder.ts` now imports
-         and re-exports them from there instead of defining them itself, so every other existing
-         import site (`filter-query.parser.ts`, `where-builder.spec.ts`) needed no change.
-      A Suggestion-level finding (`$ne` excludes `NULL` rows under standard SQL three-valued logic,
-      undocumented) was addressed by adding a short caveat to `docs/documents/document.md`'s "List
-      query parsing" section rather than a code change, since it's correct existing SQL semantics,
-      not a bug. `SPEC.md` trimmed to a one-line pointer at `docs/documents/document.md`, per "Root
-      docs" rule. Confirmed with user before the final commit.
+## Phase 5 — Manual verification (non-blocking for the Phase 2 commit)
+- [ ] User runs `bun run start:dev` against a real DB: login success (cookies set), wrong-password (401), unverified-user (403), one JWT-guarded route with/without a valid `access_token` cookie (200 vs 401 "Missing access token")
+- [ ] Tracked open until the user confirms — required before the feature is fully done

@@ -2,7 +2,9 @@ import { MailerModule, MailerService } from "@nestjs-modules/mailer";
 
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { PassportModule } from "@nestjs/passport";
 
+import { JwtStrategy } from "@/common/strategies/jwt.strategy";
 import { type EnvironmentVariables } from "@/config/env.validation";
 import { RoleModule } from "@/modules/roles/role.module";
 import { UserModule } from "@/modules/users/user.module";
@@ -41,6 +43,7 @@ import { AuthController } from "./presentation/auth.controller";
         defaults: { from: configService.get("EMAIL_FROM", { infer: true }) },
       }),
     }),
+    PassportModule.register({ defaultStrategy: "jwt" }),
   ],
   controllers: [AuthController],
   providers: [
@@ -52,6 +55,7 @@ import { AuthController } from "./presentation/auth.controller";
     RefreshTokenService,
     ForgotPasswordService,
     ResetPasswordService,
+    JwtStrategy,
     { provide: EMAIL_TEMPLATE_RENDERER, useClass: HandlebarsEmailTemplateRenderer },
     {
       provide: EMAIL_SENDER,
