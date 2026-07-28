@@ -1,46 +1,39 @@
-import { type JwtTokenService } from "../token/jwt-token.service";
 import { type AccessTokenPayload } from "../types/jwt-payload";
 
-import { type ExecutionContext, UnauthorizedException } from "@nestjs/common";
+import { UnauthorizedException } from "@nestjs/common";
 
-import { ACCESS_TOKEN_COOKIE, JwtAuthGuard } from "./jwt-auth.guard";
+import { JwtAuthGuard } from "./jwt-auth.guard";
 
-describe("JwtAuthGuard", () => {
-  let tokenService: jest.Mocked<Pick<JwtTokenService, "verifyAccessToken">>;
+// The guard is now an AuthGuard("jwt") subclass — canActivate() itself is inherited framework code
+// (@nestjs/passport), not this repo's. The only repo-owned logic left is handleRequest(), so that's
+// what's tested here, in isolation, with synthetic err/user/info args rather than driving the full
+// Passport authenticate() chain.
+describe("JwtAuthGuard.handleRequest", () => {
   let guard: JwtAuthGuard;
 
   const payload: AccessTokenPayload = { sub: "user-1", roleSlug: "admin", level: 50, permissions: ["role:read"] };
 
-  const contextWithCookies = (cookies: Record<string, string>, request: { cookies: Record<string, string>; user?: AccessTokenPayload } = { cookies }) =>
-    ({
-      switchToHttp: () => ({ getRequest: () => request }),
-    }) as unknown as ExecutionContext;
-
   beforeEach(() => {
-    tokenService = { verifyAccessToken: jest.fn() };
-    guard = new JwtAuthGuard(tokenService as unknown as JwtTokenService);
+    guard = new JwtAuthGuard();
   });
 
-  it("throws UnauthorizedException when the access token cookie is missing", () => {
-    expect(() => guard.canActivate(contextWithCookies({}))).toThrow(UnauthorizedException);
+  it('throws "Missing access token" when passport-jwt reports no token was found', () => {
+    expect(() => guard.handleRequest(null, false, new Error("No auth token"))).toThrow(new UnauthorizedException("Missing access token"));
   });
 
-  it("throws UnauthorizedException when the access token fails verification", () => {
-    tokenService.verifyAccessToken.mockImplementation(() => {
-      throw new Error("expired");
-    });
-
-    expect(() => guard.canActivate(contextWithCookies({ [ACCESS_TOKEN_COOKIE]: "bad-token" }))).toThrow(UnauthorizedException);
+  it('throws "Invalid or expired access token" when the token fails verification (info is a JWT error)', () => {
+    expect(() => guard.handleRequest(null, false, new Error("jwt expired"))).toThrow(new UnauthorizedException("Invalid or expired access token"));
   });
 
-  it("attaches the verified payload to req.user and allows the request", () => {
-    tokenService.verifyAccessToken.mockReturnValue(payload);
-    const request = { cookies: { [ACCESS_TOKEN_COOKIE]: "good-token" } };
+  it('throws "Invalid or expired access token" when passport passes an err', () => {
+    expect(() => guard.handleRequest(new Error("boom"), false, null)).toThrow(new UnauthorizedException("Invalid or expired access token"));
+  });
 
-    const result = guard.canActivate(contextWithCookies({}, request));
+  it('throws "Invalid or expired access token" when there is no user and no info at all', () => {
+    expect(() => guard.handleRequest(null, false, null)).toThrow(new UnauthorizedException("Invalid or expired access token"));
+  });
 
-    expect(tokenService.verifyAccessToken).toHaveBeenCalledWith("good-token");
-    expect(result).toBe(true);
-    expect((request as { user?: AccessTokenPayload }).user).toEqual(payload);
+  it("returns the verified payload unchanged when authentication succeeds", () => {
+    expect(guard.handleRequest(null, payload, null)).toEqual(payload);
   });
 });

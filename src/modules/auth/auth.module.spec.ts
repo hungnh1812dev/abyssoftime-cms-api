@@ -2,7 +2,9 @@ import { MailerService } from "@nestjs-modules/mailer";
 
 import { MODULE_METADATA } from "@nestjs/common/constants";
 import { ConfigService } from "@nestjs/config";
+import { PassportModule } from "@nestjs/passport";
 
+import { JwtStrategy } from "@/common/strategies/jwt.strategy";
 import { RoleModule } from "@/modules/roles/role.module";
 import { UserModule } from "@/modules/users/user.module";
 
@@ -22,15 +24,18 @@ import { resolveEmailSender } from "./infrastructure/email/resolve-email-sender"
 import { AuthController } from "./presentation/auth.controller";
 
 describe("AuthModule", () => {
-  it("imports UserModule, RoleModule, and a MailerModule registration", () => {
+  it("imports UserModule, RoleModule, a MailerModule registration, and a PassportModule registration", () => {
     const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AuthModule) as unknown[];
 
-    expect(imports).toHaveLength(3);
+    expect(imports).toHaveLength(4);
     expect(imports[0]).toBe(UserModule);
     expect(imports[1]).toBe(RoleModule);
 
     const mailerModuleImport = imports[2] as { module: unknown };
     expect(typeof mailerModuleImport.module).toBe("function");
+
+    const passportModuleImport = imports[3] as { module: unknown };
+    expect(passportModuleImport.module).toBe(PassportModule);
   });
 
   it("registers the AuthController", () => {
@@ -49,6 +54,7 @@ describe("AuthModule", () => {
       RefreshTokenService,
       ForgotPasswordService,
       ResetPasswordService,
+      JwtStrategy,
       { provide: EMAIL_TEMPLATE_RENDERER, useClass: HandlebarsEmailTemplateRenderer },
       {
         provide: EMAIL_SENDER,
