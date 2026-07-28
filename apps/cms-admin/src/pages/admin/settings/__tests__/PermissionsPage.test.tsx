@@ -1,0 +1,148 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import MockAdapter from 'axios-mock-adapter';
+import { api } from '@/lib/api';
+import { renderWithProviders } from '@/test-utils';
+import { PermissionsPage } from '../PermissionsPage';
+
+let mock: MockAdapter;
+
+const permissionsResponse = [
+  { documentId: 'p1', slug: 'document:read', name: 'Read Documents', description: 'View documents' },
+  { documentId: 'p2', slug: 'media:manager', name: 'Manage Media', description: 'Upload, delete, and edit media' },
+];
+
+beforeEach(() => {
+  mock = new MockAdapter(api);
+  mock.onGet('/api/permissions').reply(200, permissionsResponse);
+});
+
+afterEach(() => {
+  mock.restore();
+  vi.clearAllMocks();
+});
+
+describe('PermissionsPage', () => {
+  it('renders the permission catalog with slug, name, and description', async () => {
+    renderWithProviders(<PermissionsPage />);
+    await waitFor(() => {
+      expect(screen.getByText('document:read')).toBeInTheDocument();
+      expect(screen.getByText('Read Documents')).toBeInTheDocument();
+      expect(screen.getByText('View documents')).toBeInTheDocument();
+      expect(screen.getByText('media:manager')).toBeInTheDocument();
+    });
+  });
+
+  it('shows an error state when the catalog fails to load', async () => {
+    mock.onGet('/api/permissions').reply(500);
+    renderWithProviders(<PermissionsPage />);
+    await waitFor(() => expect(screen.getByText(/failed to load permissions/i)).toBeInTheDocument());
+  });
+
+  it('opens the create-permission dialog and closes it on Cancel', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<PermissionsPage />);
+    await waitFor(() => screen.getByText('Create Permission'));
+
+    await user.click(screen.getByText('Create Permission'));
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+
+    await user.click(screen.getByText('Cancel'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('rejects a malformed slug and keeps the submit button disabled', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<PermissionsPage />);
+    await waitFor(() => screen.getByText('Create Permission'));
+    await user.click(screen.getByText('Create Permission'));
+
+    await waitFor(() => screen.getByLabelText('Slug'));
+    await user.type(screen.getByLabelText('Slug'), 'NoColon');
+    await user.type(screen.getByLabelText('Name'), 'Bad');
+
+    expect(screen.getByText(/must match resource:action format/i)).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Create Permission' })).toBeDisabled();
+  });
+
+  it('submits a new permission on Create', async () => {
+    mock.onPost('/api/permissions').reply(201, { documentId: 'p3', slug: 'reports:generate', name: 'Generate Reports', description: '' });
+    const user = userEvent.setup();
+    renderWithProviders(<PermissionsPage />);
+    await waitFor(() => screen.getByText('Create Permission'));
+    await user.click(screen.getByText('Create Permission'));
+
+    await waitFor(() => screen.getByLabelText('Slug'));
+    await user.type(screen.getByLabelText('Slug'), 'reports:generate');
+    await user.type(screen.getByLabelText('Name'), 'Generate Reports');
+
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Create Permission' }));
+
+    await waitFor(() => expect(mock.history.post).toHaveLength(1));
+    expect(JSON.parse(mock.history.post[0].data)).toEqual({ slug: 'reports:generate', name: 'Generate Reports', description: '' });
+  });
+
+  it('opens the edit dialog pre-filled with the slug locked', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<PermissionsPage />);
+    await waitFor(() => screen.getByText('document:read'));
+
+    const row = screen.getByText('document:read').closest('tr') as HTMLElement;
+    await user.click(within(row).getByText('Edit'));
+
+    await waitFor(() => expect(screen.getByDisplayValue('document:read')).toBeInTheDocument());
+    expect(screen.getByDisplayValue('document:read')).toBeDisabled();
+    expect(screen.getByDisplayValue('Read Documents')).toBeInTheDocument();
+  });
+
+  it('submits a name/description change on Save, not the slug', async () => {
+    mock.onPut('/api/permissions/p1').reply(200, { documentId: 'p1', slug: 'document:read', name: 'Read Docs (renamed)', description: 'View documents' });
+    const user = userEvent.setup();
+    renderWithProviders(<PermissionsPage />);
+    await waitFor(() => screen.getByText('document:read'));
+
+    const row = screen.getByText('document:read').closest('tr') as HTMLElement;
+    await user.click(within(row).getByText('Edit'));
+
+    await waitFor(() => screen.getByDisplayValue('Read Documents'));
+    await user.clear(screen.getByDisplayValue('Read Documents'));
+    await user.type(screen.getByLabelText('Name'), 'Read Docs (renamed)');
+
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => expect(mock.history.put).toHaveLength(1));
+    expect(JSON.parse(mock.history.put[0].data)).toEqual({ name: 'Read Docs (renamed)', description: 'View documents' });
+  });
+
+  it('shows an inline error when deleting a referenced permission is blocked (409)', async () => {
+    mock.onDelete('/api/permissions/p1').reply(409, { error: 'permission "document:read" is used by 2 role(s) and 0 token(s)' });
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderWithProviders(<PermissionsPage />);
+    await waitFor(() => screen.getByText('document:read'));
+
+    const row = screen.getByText('document:read').closest('tr') as HTMLElement;
+    await user.click(within(row).getByText('Delete'));
+
+    await waitFor(() => expect(screen.getByText(/used by 2 role/i)).toBeInTheDocument());
+    confirmSpy.mockRestore();
+  });
+
+  it('deletes an unreferenced permission without error', async () => {
+    mock.onDelete('/api/permissions/p2').reply(204);
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderWithProviders(<PermissionsPage />);
+    await waitFor(() => screen.getByText('media:manager'));
+
+    const row = screen.getByText('media:manager').closest('tr') as HTMLElement;
+    await user.click(within(row).getByText('Delete'));
+
+    await waitFor(() => expect(mock.history.delete).toHaveLength(1));
+    confirmSpy.mockRestore();
+  });
+});

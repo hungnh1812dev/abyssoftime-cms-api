@@ -1,3 +1,4 @@
+# ===== CMS API =====
 # compiled output
 /apps/cms-api/dist
 /apps/cms-api/node_modules
@@ -57,3 +58,30 @@
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 /apps/cms-api/report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+#===== CMS ADMIN =====
+# Logs
+/apps/cms-admin/logs
+/apps/cms-admin/*.log
+/apps/cms-admin/npm-debug.log*
+/apps/cms-admin/yarn-debug.log*
+/apps/cms-admin/yarn-error.log*
+/apps/cms-admin/pnpm-debug.log*
+/apps/cms-admin/lerna-debug.log*
+
+/apps/cms-admin/node_modules
+/apps/cms-admin/dist
+/apps/cms-admin/dist-ssr
+/apps/cms-admin/*.local
+
+# Editor directories and files
+/apps/cms-admin/.vscode/*
+/apps/cms-admin/!.vscode/settings.json
+/apps/cms-admin/!.vscode/extensions.json
+/apps/cms-admin/.idea
+/apps/cms-admin/.DS_Store
+/apps/cms-admin/*.suo
+/apps/cms-admin/*.ntvs*
+/apps/cms-admin/*.njsproj
+/apps/cms-admin/*.sln
+/apps/cms-admin/*.sw?
