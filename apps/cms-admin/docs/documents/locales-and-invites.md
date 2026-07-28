@@ -1,14 +1,21 @@
-# Locales & Invites
+# Locales (orphaned) & Invites (removed)
 
-`src/pages/admin/settings/InternationalizePage.tsx`, `src/components/locale/LocaleSelector.tsx`, `src/hooks/{useLocales,useLocalesMutations}.ts`, `src/hooks/useInvites.ts`, `src/pages/auth/InviteAcceptPage.tsx` — the locale catalog (used everywhere content is edited, see [content-type.md](./content-type.md) and [documents.md](./documents.md)) and the invite-a-user flow (surfaced inside [access-control.md](./access-control.md)'s `UsersPage`, not its own settings page).
+`src/pages/admin/settings/InternationalizePage.tsx`, `src/components/locale/LocaleSelector.tsx`, `src/hooks/{useLocales,useLocalesMutations}.ts` — the locale catalog UI, kept as **source-only, unreachable dead code** per an explicit product decision: this backend (`abyssoftime-cms-api`) has no locale/i18n module at all. There is no invite flow anymore — it was removed entirely, not hidden (see below).
 
-## Locales
+## Locales — hidden, not deleted
 
-- **`useLocales`** (`hooks/useLocales.ts`) — `GET /api/locales`, the single read query every locale-aware screen (`LocaleSelector`, `ContentTypePanel`, `CollectionListPage`) depends on.
-- **`useLocalesMutations`** (`hooks/useLocalesMutations.ts`) — create/update/delete over `/api/locales/:code`, all invalidating the one `["locales"]` query key.
-- **`LocaleSelector`** (`components/locale/LocaleSelector.tsx`) — resolves an empty/unset `value` to the default locale (`isDefault: true`, falling back to the first locale) rather than leaving the select blank; renders nothing (`null`) if the locale list is empty (e.g. still loading) instead of showing a disabled/loading state.
-- **`InternationalizePage`** (`/admin/settings/internationalize`, `minRole="super_admin"`) — CRUD table over locales. Locale `code` is immutable after creation (2–5 lowercase chars, pattern-validated client-side, e.g. `en`/`vi`/`zh-cn`); delete is disabled in the UI once only one locale remains (`locales.length <= 1`) so the catalog can't be emptied from this screen.
+The `/admin/settings/internationalize` route and the `locales:manager` Sidebar item have been removed from `router.tsx`/`Sidebar.tsx` (see [app-shell.md](./app-shell.md), [navigation-shell.md](./navigation-shell.md)) — there is no way to reach `InternationalizePage` through the UI. The files themselves — `InternationalizePage.tsx`, `LocaleSelector.tsx`, `useLocales.ts`, `useLocalesMutations.ts`, and the `Locale` type in `types/cms.ts` — were deliberately **left in place, untouched**, so a future backend that does add locale support has something to re-wire rather than rebuild from scratch. `bun run build` passes with these files present and unreferenced.
 
-## Invites (`hooks/useInvites.ts`)
+`ContentTypePanel` and `CollectionListPage` (see [content-type.md](./content-type.md), [documents.md](./documents.md)) no longer import `LocaleSelector`/`useLocales` at all — the locale-switcher UI, the "discard unsaved changes on locale switch" dialog, and every `locale` query param/query-key segment were stripped from both, not just hidden behind a flag.
 
-Three hooks: `useInviteList` (`GET /api/invites`), `useCreateInvite`/`useRevokeInvite` (`POST`/`DELETE /api/invites`), and `useAcceptInvite` (`POST /auth/invite/:token` — note the `/auth/` prefix, not `/api/invites/` — this is an unauthenticated auth-flow endpoint, not a settings-CRUD one). No dedicated `InvitesPage`; the create/list/revoke UI is embedded directly in [access-control.md](./access-control.md)'s `UsersPage` (invite dialog + "Pending Invites" table below the user list), and invite **acceptance** is [auth.md](./auth.md)'s `InviteAcceptPage` at the public `/invite/:token` route. A freshly-created invite's link (`{origin}/invite/{token}`) is shown once in the creation dialog with a copy button, mirroring the access-token creation UX (see [access-control.md](./access-control.md)).
+**Known-stale artifact**: `useLocales.ts`/`useLocalesMutations.ts` call `/api/locales` directly against the `api` axios instance, whose `baseURL` is already `.../api/v1` (see [app-shell.md](./app-shell.md)) — that resolves to `/api/v1/api/locales`, which doesn't match this API's actual `/api/v1/locales`-style convention even if it were reachable. This predates the contract rewrite and was never fixed, since the code is orphaned and unreachable through the UI; harmless as long as it stays that way.
+
+## Invites — removed entirely
+
+Unlike locales, invites are **not** an orphaned-source situation — this is the one explicit exception to "keep the source, just hide the UI." There is no invite-based onboarding in `abyssoftime-cms-api` (no `/invites` endpoint, no `/auth/invite/:token`); onboarding is open self-registration + OTP verification only (see [auth.md](./auth.md)). Accordingly:
+
+- `hooks/useInvites.ts` and `pages/auth/InviteAcceptPage.tsx` have been **deleted**.
+- The `/invite/:token` route no longer exists in `router.tsx`.
+- The invite-creation dialog and "Pending Invites" table that used to render inline inside [access-control.md](./access-control.md)'s `UsersPage` have been stripped out.
+
+If a future backend contract adds invite-based onboarding, this would need to be rebuilt from scratch — there's no dead code left to resurrect, unlike the locale files above.

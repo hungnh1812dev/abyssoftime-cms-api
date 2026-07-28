@@ -9,7 +9,7 @@ Not `react-hook-form`'s own `FormProvider` — this one owns the whole fetch/edi
 - `query` (optional `UseQueryOptions`) seeds initial form values via `useQuery`; if omitted, a no-op disabled query runs instead (`enabled: false`) so the hook count stays stable across renders.
 - `values` (optional, external) overrides the query-derived values entirely — used for the "create new" flow where there's no document to fetch yet (see [content-type.md](./content-type.md)'s `ContentTypePanel`).
 - `mutationFn` is called with the submitted form values on submit (`methods.handleSubmit(onSubmit)` on a real `<form>`). On success: toasts "Saved", resets the form to the just-saved values (clears dirty state without refetching), invalidates `query.queryKey` if present, and calls `onSuccess`. On error: toasts the API's `error` message or a generic fallback.
-- `onDirtyChange` is called on every `isDirty` transition — this is how parent panels (e.g. `ContentTypePanel`'s locale-switch-with-unsaved-changes confirmation) observe form dirtiness without owning the `react-hook-form` instance themselves.
+- `onDirtyChange` is called on every `isDirty` transition — plumbing for a parent panel to observe form dirtiness without owning the `react-hook-form` instance itself. Currently unused in practice: `ContentTypePanel`'s only consumer of this (the locale-switch-with-unsaved-changes confirmation) was removed along with locale support (see [locales-and-invites.md](./locales-and-invites.md)), so no caller passes it today — the prop stays on `FormProvider`/`ContentTypeBuilder` as ready-to-use plumbing for the next feature that needs it.
 - Publishes `{ loading, submitting, isDirty }` via `FormStateContext` so descendants (e.g. the Save button) can react without prop-drilling.
 
 ## `FormField` (`components/form/FormField.tsx`)
@@ -31,7 +31,7 @@ Wraps a single input, registers it with `react-hook-form` (`register(name)` + `c
 
 `RichTextInput` and `JsonInput` are `React.lazy`-loaded from `renderSchemaField` (see [content-type.md](./content-type.md)) — CKEditor and CodeMirror are the two heaviest dependencies in this app, so they're kept out of the main bundle until a schema actually uses a `richtext`/`json` field.
 
-**`JsonInput`'s edit-buffer**: on every keystroke it tries `JSON.parse`; on success it commits the parsed value via `field.onChange` and clears the syntax-error message, on failure it sets an error message and calls `field.onChange(undefined)` (which `FormProvider`'s validation rule — `value !== undefined` — turns into a form error) while leaving the visibly-typed invalid text in the editor untouched. An `editCount`/`syncedAt` pair guards against the external `field.value` (e.g. a locale switch reloading the query) clobbering an in-progress edit that hasn't round-tripped yet.
+**`JsonInput`'s edit-buffer**: on every keystroke it tries `JSON.parse`; on success it commits the parsed value via `field.onChange` and clears the syntax-error message, on failure it sets an error message and calls `field.onChange(undefined)` (which `FormProvider`'s validation rule — `value !== undefined` — turns into a form error) while leaving the visibly-typed invalid text in the editor untouched. An `editCount`/`syncedAt` pair guards against the external `field.value` (e.g. the query refetching after a save) clobbering an in-progress edit that hasn't round-tripped yet.
 
 ## `useCmsFormState` (`FormStateContext.tsx`)
 

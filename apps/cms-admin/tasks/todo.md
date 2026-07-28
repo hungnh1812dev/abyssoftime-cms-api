@@ -52,8 +52,13 @@ each task completes.
 - [x] 6.1 Full automated regression (lint/test/build) — 338/338 tests, build green, 1
       pre-existing unrelated lint warning (`HealthContext.test.tsx`, untouched by this work), no
       new warnings introduced
-- [ ] 6.2 Full live walkthrough, all flows, one continuous session
-- [ ] 6.3 Update `docs/documents/*.md`
+- [ ] 6.2 Full live walkthrough, all flows, one continuous session — **deferred by user decision**
+      (2026-07-29); no browser tool available in this environment; user to perform manually and
+      report back before this is marked complete
+- [x] 6.3 Update `docs/documents/*.md` — rewrote `auth.md`, `access-control.md`, `app-shell.md`,
+      `documents.md`, `content-type.md`, `media.md`, `locales-and-invites.md` for the new contract;
+      also fixed stale locale/`minRole` references found in `navigation-shell.md` and
+      `form-system.md` while sweeping for consistency. 338/338 tests, lint, build green
 - [ ] 6.4 Update root `SPEC.md`
 - [ ] 6.5 Five-axis code review
 - [ ] 6.6 Clean-up — delete `specs/cms-api-integration.md` and `tasks/plan.md`/`tasks/todo.md`
