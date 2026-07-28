@@ -1,14 +1,18 @@
+import { MailerService } from "@nestjs-modules/mailer";
+
 import { ConfigService } from "@nestjs/config";
 
 import { type EnvironmentVariables } from "@/config/env.validation";
 
 import { ConsoleEmailSender } from "./console-email.sender";
+import { IEmailTemplateRenderer } from "./renderers/email-template-renderer";
 import { resolveEmailSender } from "./resolve-email-sender";
 import { SmtpEmailSender } from "./smtp-email.sender";
 
-jest.mock("nodemailer");
-
 describe("resolveEmailSender", () => {
+  const mailerService = {} as unknown as MailerService;
+  const templateRenderer = {} as unknown as IEmailTemplateRenderer;
+
   function makeConfig(smtpHost: string): ConfigService<EnvironmentVariables, true> {
     return {
       get: jest.fn((key: string) => {
@@ -27,13 +31,13 @@ describe("resolveEmailSender", () => {
   }
 
   it("returns a SmtpEmailSender when SMTP_HOST is set", () => {
-    const sender = resolveEmailSender(makeConfig("smtp.example.com"));
+    const sender = resolveEmailSender(makeConfig("smtp.example.com"), mailerService, templateRenderer);
 
     expect(sender).toBeInstanceOf(SmtpEmailSender);
   });
 
   it("returns a ConsoleEmailSender when SMTP_HOST is empty", () => {
-    const sender = resolveEmailSender(makeConfig(""));
+    const sender = resolveEmailSender(makeConfig(""), mailerService, templateRenderer);
 
     expect(sender).toBeInstanceOf(ConsoleEmailSender);
   });

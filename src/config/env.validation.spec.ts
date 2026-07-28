@@ -37,6 +37,7 @@ describe("validate", () => {
     expect(result.SMTP_SECURE).toBe(false);
     expect(result.EMAIL_FROM).toBe("no-reply@example.com");
     expect(result.FRONTEND_URL).toBe("http://localhost:3000");
+    expect(result.EMAIL_TEMPLATE_ENGINE).toBe("ts");
   });
 
   it("transforms COOKIE_SECURE 'true' to boolean true", () => {
@@ -63,6 +64,16 @@ describe("validate", () => {
 
   it("rejects a COOKIE_SAMESITE value outside lax/strict/none", () => {
     expect(() => validate({ ...requiredConfig, COOKIE_SAMESITE: "invalid" })).toThrow();
+  });
+
+  it("overrides EMAIL_TEMPLATE_ENGINE when explicitly provided", () => {
+    const result = validate({ ...requiredConfig, EMAIL_TEMPLATE_ENGINE: "handlebars" });
+
+    expect(result.EMAIL_TEMPLATE_ENGINE).toBe("handlebars");
+  });
+
+  it("rejects an EMAIL_TEMPLATE_ENGINE value outside ts/handlebars", () => {
+    expect(() => validate({ ...requiredConfig, EMAIL_TEMPLATE_ENGINE: "pug" })).toThrow();
   });
 
   it("overrides RATE_LIMIT_FPS/RATE_LIMIT_BURST when explicitly provided", () => {
