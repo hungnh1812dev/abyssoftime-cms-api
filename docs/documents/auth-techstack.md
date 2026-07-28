@@ -43,6 +43,24 @@ Full account of the failure and pivot: `tasks/plan.md` finding 3.
 | Swap-in cost later        | N/A                                                   | One line in `auth.module.ts` (`{ provide: EMAIL_SENDER, useClass: ConsoleEmailSender }` → a real implementation of the same `IEmailSender` port) |
 | **Verdict**              | Rejected — out of scope for this cycle                | **Chosen** |
 
+## Email template rendering
+
+| Criteria                  | TS template-literal functions                       | Handlebars `.hbs` files (chosen)                   |
+| --------------------------- | -------------------------------------------------- | -------------------------------------------------- |
+| New dependency               | None                                                | `handlebars`                                       |
+| Output escaping               | Manual — raw `${value}` interpolation, nothing escapes by default | `{{value}}` HTML-escapes by default; safe unless explicitly opted out with `{{{value}}}` |
+| Editing without touching TS  | No — templates are TS source, require a rebuild to change copy | Yes — `.hbs` files are plain markup, editable independent of application code |
+| Build step                   | None                                                | `nest-cli.json` asset copy (`templates/handlebars/**/*.hbs` → `dist/src/...`) |
+| **Verdict**                  | Rejected — kept alongside Handlebars during evaluation, since removed to avoid maintaining two copies of the same two templates | **Chosen** |
+
+## SMTP send library
+
+| Criteria              | Direct `nodemailer.createTransport()` | `@nestjs-modules/mailer` (chosen)                 |
+| ------------------------ | ---------------------------------------- | -------------------------------------------------- |
+| New dependency            | None — `nodemailer` already required      | Yes — `@nestjs-modules/mailer` (pulls in optional template-adapter deps: `mjml`, `pug`, `ejs`, `nunjucks`, `liquidjs`, unused here since HTML is pre-rendered by `IEmailTemplateRenderer` before `sendMail`) |
+| NestJS DI fit              | Manual instantiation inside `SmtpEmailSender`'s constructor | `MailerModule.forRootAsync()` registers `MailerService` as an injectable, config-driven provider |
+| **Verdict**                | Viable, smaller dependency footprint      | **Chosen** — accepted the extra dependency weight for NestJS-native module/DI integration |
+
 ## Auth strategy library
 
 | Criteria                  | Passport (`@nestjs/passport` + `passport-jwt`) | `@nestjs/jwt` + custom `JwtAuthGuard` (chosen) |
