@@ -33,9 +33,9 @@ describe("ContentTypeModule", () => {
     );
   });
 
-  it("exports GetContentTypeService and CONTENT_TYPE_REPOSITORY for the document module", () => {
+  it("exports GetContentTypeService, CONTENT_TYPE_REPOSITORY, and SchemaLoaderService for the document/graphql modules", () => {
     const exportsMetadata = Reflect.getMetadata(MODULE_METADATA.EXPORTS, ContentTypeModule) as unknown[];
 
-    expect(exportsMetadata).toEqual(expect.arrayContaining([GetContentTypeService, CONTENT_TYPE_REPOSITORY]));
+    expect(exportsMetadata).toEqual(expect.arrayContaining([GetContentTypeService, CONTENT_TYPE_REPOSITORY, SchemaLoaderService]));
   });
 });
