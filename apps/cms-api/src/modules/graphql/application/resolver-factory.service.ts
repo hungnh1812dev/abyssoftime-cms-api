@@ -6,6 +6,7 @@ import {
   listQueryName,
   publishMutationName,
   queryName,
+  saveMutationName,
   typeName,
   unpublishMutationName,
   updateMutationName,
@@ -20,10 +21,15 @@ import { FieldDefinition } from "@/modules/content-type/domain/entities/field-de
 import { DeleteDocumentService } from "@/modules/document/application/services/delete-document.service";
 import { GetDocumentForEditService } from "@/modules/document/application/services/get-document-for-edit.service";
 import { GetPublicDocumentService } from "@/modules/document/application/services/get-public-document.service";
+import { GetPublicSingleTypeService } from "@/modules/document/application/services/get-public-single-type.service";
+import { GetSingleTypeService } from "@/modules/document/application/services/get-single-type.service";
 import { ListDocumentsFullService } from "@/modules/document/application/services/list-documents-full.service";
 import { PublishDocumentService } from "@/modules/document/application/services/publish-document.service";
+import { PublishSingleTypeService } from "@/modules/document/application/services/publish-single-type.service";
 import { SaveDocumentService } from "@/modules/document/application/services/save-document.service";
+import { SaveSingleTypeService } from "@/modules/document/application/services/save-single-type.service";
 import { UnpublishDocumentService } from "@/modules/document/application/services/unpublish-document.service";
+import { UnpublishSingleTypeService } from "@/modules/document/application/services/unpublish-single-type.service";
 import { DocumentEntity } from "@/modules/document/domain/entities/document.entity";
 import { MediaAssetEntity } from "@/modules/media/domain/entities/media-asset.entity";
 import { type IMediaAssetRepository } from "@/modules/media/domain/repositories/media-asset.repository";
@@ -34,6 +40,10 @@ import { type ListArgsInput, translateListArgs } from "./list-args.translator";
 
 interface SingleQueryArgs {
   Id: string;
+  status?: string;
+}
+
+interface StatusOnlyArgs {
   status?: string;
 }
 
@@ -139,6 +149,11 @@ export class ResolverFactoryService {
     private readonly publishDocument: PublishDocumentService,
     private readonly unpublishDocument: UnpublishDocumentService,
     private readonly deleteDocument: DeleteDocumentService,
+    private readonly getPublicSingleType: GetPublicSingleTypeService,
+    private readonly getSingleType: GetSingleTypeService,
+    private readonly saveSingleType: SaveSingleTypeService,
+    private readonly publishSingleType: PublishSingleTypeService,
+    private readonly unpublishSingleType: UnpublishSingleTypeService,
   ) {}
 
   async buildResolvers(): Promise<{
@@ -149,6 +164,7 @@ export class ResolverFactoryService {
   }> {
     const definitions = await this.schemaLoader.load();
     const collectionDefinitions = definitions.filter((definition) => definition.kind === "collection");
+    const singleDefinitions = definitions.filter((definition) => definition.kind === "single");
 
     const query: Record<string, FieldResolver> = {};
     const mutation: Record<string, FieldResolver> = {};
@@ -208,6 +224,41 @@ export class ResolverFactoryService {
         assertApiTokenPermission(context, "document:unpublish");
         await withMutationErrorMapping(() => this.unpublishDocument.execute(definition.slug, args.Id));
         const result = await withMutationErrorMapping(() => this.getDocumentForEdit.execute(definition.slug, args.Id));
+        return toResolverValue(result.document);
+      };
+    }
+
+    for (const definition of singleDefinitions) {
+      collectMediaFieldResolvers(typeName(definition.slug), definition.slug, definition.fields, this.mediaAssets, typeResolvers);
+
+      query[queryName(definition.slug)] = async (_parent: unknown, args: StatusOnlyArgs, context: GraphqlContext) => {
+        if (args.status === "draft") {
+          assertApiTokenPermission(context, "document:read");
+          const result = await resolveOrNull(() => this.getSingleType.execute(definition.slug));
+          return result ? toResolverValue(result.document) : null;
+        }
+
+        const document = await resolveOrNull(() => this.getPublicSingleType.execute(definition.slug));
+        return document ? toResolverValue(document) : null;
+      };
+
+      mutation[saveMutationName(definition.slug)] = async (_parent: unknown, args: CreateMutationArgs, context: GraphqlContext) => {
+        assertApiTokenPermission(context, "document:update");
+        await withMutationErrorMapping(() => this.saveSingleType.execute(definition.slug, args.data, context.apiToken!.documentId));
+        const result = await withMutationErrorMapping(() => this.getSingleType.execute(definition.slug));
+        return toResolverValue(result.document);
+      };
+
+      mutation[publishMutationName(definition.slug)] = async (_parent: unknown, _args: Record<string, never>, context: GraphqlContext) => {
+        assertApiTokenPermission(context, "document:publish");
+        const published = await withMutationErrorMapping(() => this.publishSingleType.execute(definition.slug, context.apiToken!.documentId));
+        return toResolverValue(published);
+      };
+
+      mutation[unpublishMutationName(definition.slug)] = async (_parent: unknown, _args: Record<string, never>, context: GraphqlContext) => {
+        assertApiTokenPermission(context, "document:unpublish");
+        await withMutationErrorMapping(() => this.unpublishSingleType.execute(definition.slug));
+        const result = await withMutationErrorMapping(() => this.getSingleType.execute(definition.slug));
         return toResolverValue(result.document);
       };
     }

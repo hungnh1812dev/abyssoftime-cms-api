@@ -62,3 +62,7 @@ export function publishMutationName(slug: string): string {
 export function unpublishMutationName(slug: string): string {
   return `unpublish${typeName(slug)}`;
 }
+
+export function saveMutationName(slug: string): string {
+  return `save${typeName(slug)}`;
+}

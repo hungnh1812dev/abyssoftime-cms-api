@@ -62,6 +62,11 @@ import { SingleTypeDocumentController } from "./presentation/single-type-documen
     PublishDocumentService,
     UnpublishDocumentService,
     DeleteDocumentService,
+    GetSingleTypeService,
+    SaveSingleTypeService,
+    PublishSingleTypeService,
+    UnpublishSingleTypeService,
+    GetPublicSingleTypeService,
   ],
 })
 export class DocumentModule {}

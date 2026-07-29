@@ -9,6 +9,7 @@ import {
   orderByTypeName,
   publishMutationName,
   queryName,
+  saveMutationName,
   typeName,
   unpublishMutationName,
   updateMutationName,
@@ -58,6 +59,10 @@ describe("naming", () => {
       expect(deleteMutationName("cv-page")).toBe("deleteCvPage");
       expect(publishMutationName("cv-page")).toBe("publishCvPage");
       expect(unpublishMutationName("cv-page")).toBe("unpublishCvPage");
+    });
+
+    it("derives the single-type save mutation name", () => {
+      expect(saveMutationName("cv-page")).toBe("saveCvPage");
     });
   });
 
