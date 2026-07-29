@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { type ContentType } from "@/types/cms";
 
 const SYSTEM_DISPLAY_FIELDS = [
+  { key: "id", label: "ID" },
   { key: "createdAt", label: "Created At" },
   { key: "updatedAt", label: "Updated At" },
   { key: "updatedBy", label: "Updated By" },

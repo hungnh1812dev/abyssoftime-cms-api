@@ -231,7 +231,7 @@ Schema itself (`fields`/`kind`/`draftToPublish`) is schema-as-code (JSON files),
 - **Auth:** `content_type:manager` (seeded to `super_admin` only — expect `403` for every other role)
 - **Request:** `UpdateListFieldsDto { listFields: string[] }` (non-empty)
 - **Response:** `200 ContentTypeResponseDto` — same shape as `GET :slug`, `listFields` reflects the new value; persists across a backend restart
-- **Error:** `400` unsafe/malformed slug, empty array, or an entry that isn't a listable system column (`documentId`, `status`, `createdAt`, `updatedAt`, `publishedAt`, `updatedBy`) or an eligible field (`text`/`number`/`boolean` kind only); `403` caller isn't `super_admin`; `404` unknown slug
+- **Error:** `400` unsafe/malformed slug, empty array, or an entry that isn't a listable system column (`id`, `documentId`, `status`, `createdAt`, `updatedAt`, `publishedAt`, `updatedBy`) or an eligible field (`text`/`number`/`boolean` kind only); `403` caller isn't `super_admin`; `404` unknown slug
 
 ---
 
@@ -272,7 +272,7 @@ No delete route — single-types are never deleted, only overwritten.
 #### `GET /documents/collection-type/:slug`
 - **Auth:** `document:read`
 - **Request:** query params — see "Collection-list pagination & filtering" below
-- **Response:** `200 ListDocumentsResponseDto { items: ListedDocumentItemResponseDto[], total, start, size }` — each item's `data` is projected to the content type's configured `listFields` only
+- **Response:** `200 ListDocumentsResponseDto { items: ListedDocumentItemResponseDto[], total, start, size }` — each item carries `id: number` (the DB-generated autoincrement key, internal ordering only — not a stable public identifier, use `documentId` for that) alongside `documentId`, `status`, `createdAt`, `updatedAt`, `updatedBy`; `data` is separately projected to the content type's configured `listFields` only
 - **Error:** `400` invalid query param
 
 #### `POST /documents/collection-type/:slug`

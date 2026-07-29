@@ -55,6 +55,9 @@ export interface Document {
 // and `data` holds only the content-type's configured `listFields` content
 // columns (never system columns, regardless of listFields config).
 export interface ListedDocumentItem {
+  // DB-generated autoincrement key — internal ordering only, not a stable
+  // public identifier; use documentId for that.
+  id: number;
   documentId: string;
   status: EntryStatus;
   createdAt: string;

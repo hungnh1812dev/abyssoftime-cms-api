@@ -23,7 +23,7 @@ interface Props {
   contentType: ContentType;
 }
 
-const SYSTEM_FIELD_KEYS = new Set(["createdAt", "updatedAt", "updatedBy"]);
+const SYSTEM_FIELD_KEYS = new Set(["id", "createdAt", "updatedAt", "updatedBy"]);
 
 function deriveColumns(contentType: ContentType): CollectionColumnDef[] {
   const registration = getRegistration(contentType.slug);
@@ -53,11 +53,12 @@ function deriveColumns(contentType: ContentType): CollectionColumnDef[] {
   });
 }
 
-function deriveSystemVisibility(listFields: string[]): { showCreatedAt: boolean; showUpdatedAt: boolean; showUpdatedBy: boolean } {
+function deriveSystemVisibility(listFields: string[]): { showId: boolean; showCreatedAt: boolean; showUpdatedAt: boolean; showUpdatedBy: boolean } {
   if (listFields.length === 0) {
-    return { showCreatedAt: true, showUpdatedAt: true, showUpdatedBy: true };
+    return { showId: true, showCreatedAt: true, showUpdatedAt: true, showUpdatedBy: true };
   }
   return {
+    showId: listFields.includes("id"),
     showCreatedAt: listFields.includes("createdAt"),
     showUpdatedAt: listFields.includes("updatedAt"),
     showUpdatedBy: listFields.includes("updatedBy"),
@@ -402,6 +403,11 @@ export function CollectionListPage({ contentType }: Props) {
                       onCheckedChange={(checked) => toggleSelectAll(checked === true)}
                     />
                   </TableHead>
+                  {systemVis.showId && (
+                    <TableHead>
+                      <SortableHeader label="ID" field="id" activeField={orderBy} activeDir={sortDir} onSort={handleSort} />
+                    </TableHead>
+                  )}
                   {columns.map((column) =>
                     sortableFields.has(column.key) ? (
                       <TableHead key={column.key}>
@@ -436,6 +442,7 @@ export function CollectionListPage({ contentType }: Props) {
                         onCheckedChange={(checked) => toggleSelectRow(doc.documentId, checked === true)}
                       />
                     </TableCell>
+                    {systemVis.showId && <TableCell className="text-muted-foreground text-sm">{doc.id}</TableCell>}
                     {columns.map((column) => (
                       <TableCell key={column.key}>{cellValue(doc, column)}</TableCell>
                     ))}
