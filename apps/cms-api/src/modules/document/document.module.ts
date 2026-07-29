@@ -11,6 +11,7 @@ import { GetDocumentForEditService } from "./application/services/get-document-f
 import { GetPublicDocumentService } from "./application/services/get-public-document.service";
 import { GetPublicSingleTypeService } from "./application/services/get-public-single-type.service";
 import { GetSingleTypeService } from "./application/services/get-single-type.service";
+import { ListDocumentsFullService } from "./application/services/list-documents-full.service";
 import { ListDocumentsService } from "./application/services/list-documents.service";
 import { PublishDocumentService } from "./application/services/publish-document.service";
 import { PublishSingleTypeService } from "./application/services/publish-single-type.service";
@@ -41,6 +42,7 @@ import { SingleTypeDocumentController } from "./presentation/single-type-documen
     GetPublicDocumentService,
     DeleteDocumentService,
     ListDocumentsService,
+    ListDocumentsFullService,
     DuplicateDocumentService,
     BulkCreateAndPublishService,
     BulkDeleteService,
@@ -52,6 +54,6 @@ import { SingleTypeDocumentController } from "./presentation/single-type-documen
     { provide: DOCUMENT_REPOSITORY, useClass: PrismaDocumentRepository },
     { provide: COMPONENT_REPOSITORY, useClass: PrismaComponentRepository },
   ],
-  exports: [GetPublicDocumentService, GetDocumentForEditService],
+  exports: [GetPublicDocumentService, GetDocumentForEditService, ListDocumentsFullService],
 })
 export class DocumentModule {}

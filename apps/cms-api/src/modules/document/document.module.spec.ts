@@ -11,6 +11,7 @@ import { GetDocumentForEditService } from "./application/services/get-document-f
 import { GetPublicDocumentService } from "./application/services/get-public-document.service";
 import { GetPublicSingleTypeService } from "./application/services/get-public-single-type.service";
 import { GetSingleTypeService } from "./application/services/get-single-type.service";
+import { ListDocumentsFullService } from "./application/services/list-documents-full.service";
 import { ListDocumentsService } from "./application/services/list-documents.service";
 import { PublishDocumentService } from "./application/services/publish-document.service";
 import { PublishSingleTypeService } from "./application/services/publish-single-type.service";
@@ -56,6 +57,7 @@ describe("DocumentModule", () => {
         GetPublicDocumentService,
         DeleteDocumentService,
         ListDocumentsService,
+        ListDocumentsFullService,
         DuplicateDocumentService,
         BulkCreateAndPublishService,
         BulkDeleteService,
@@ -70,9 +72,9 @@ describe("DocumentModule", () => {
     );
   });
 
-  it("exports GetPublicDocumentService and GetDocumentForEditService for the graphql module", () => {
+  it("exports GetPublicDocumentService, GetDocumentForEditService, and ListDocumentsFullService for the graphql module", () => {
     const exportsMetadata = Reflect.getMetadata(MODULE_METADATA.EXPORTS, DocumentModule) as unknown[];
 
-    expect(exportsMetadata).toEqual(expect.arrayContaining([GetPublicDocumentService, GetDocumentForEditService]));
+    expect(exportsMetadata).toEqual(expect.arrayContaining([GetPublicDocumentService, GetDocumentForEditService, ListDocumentsFullService]));
   });
 });

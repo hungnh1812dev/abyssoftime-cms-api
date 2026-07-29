@@ -4,6 +4,7 @@ import { SchemaLoaderService } from "@/modules/content-type/application/schema/s
 import { ContentTypeDefinition } from "@/modules/content-type/domain/entities/content-type.entity";
 import { GetDocumentForEditService } from "@/modules/document/application/services/get-document-for-edit.service";
 import { GetPublicDocumentService } from "@/modules/document/application/services/get-public-document.service";
+import { ListDocumentsFullService } from "@/modules/document/application/services/list-documents-full.service";
 import { DocumentEntity } from "@/modules/document/domain/entities/document.entity";
 
 import { type GraphqlContext } from "./graphql-context.factory";
@@ -14,7 +15,10 @@ const cvPage: ContentTypeDefinition = {
   name: "CV Page",
   kind: "collection",
   draftToPublish: true,
-  fields: [{ name: "position", type: "text" }],
+  fields: [
+    { name: "position", type: "text" },
+    { name: "isMain", type: "boolean" },
+  ],
 };
 
 const validId = "5f8b1a3e-4d2c-4a1b-9e3f-2c1d4a5b6c7d";
@@ -28,6 +32,7 @@ describe("ResolverFactoryService", () => {
   let schemaLoader: jest.Mocked<SchemaLoaderService>;
   let getPublicDocument: jest.Mocked<GetPublicDocumentService>;
   let getDocumentForEdit: jest.Mocked<GetDocumentForEditService>;
+  let listDocumentsFull: jest.Mocked<ListDocumentsFullService>;
   let service: ResolverFactoryService;
 
   const noToken: GraphqlContext = { apiToken: null };
@@ -37,13 +42,14 @@ describe("ResolverFactoryService", () => {
     schemaLoader = { load: jest.fn().mockResolvedValue([cvPage]), loadFromDir: jest.fn() } as unknown as jest.Mocked<SchemaLoaderService>;
     getPublicDocument = { execute: jest.fn() } as unknown as jest.Mocked<GetPublicDocumentService>;
     getDocumentForEdit = { execute: jest.fn() } as unknown as jest.Mocked<GetDocumentForEditService>;
-    service = new ResolverFactoryService(schemaLoader, getPublicDocument, getDocumentForEdit);
+    listDocumentsFull = { execute: jest.fn().mockResolvedValue({ items: [], total: 0, start: 0, size: 20 }) } as unknown as jest.Mocked<ListDocumentsFullService>;
+    service = new ResolverFactoryService(schemaLoader, getPublicDocument, getDocumentForEdit, listDocumentsFull);
   });
 
-  it("builds a Query resolver named after each collection-type's camelCase slug", async () => {
+  it("builds single-item and list Query resolvers named after each collection-type's camelCase slug", async () => {
     const resolvers = await service.buildResolvers();
 
-    expect(Object.keys(resolvers.Query)).toEqual(["cvPage"]);
+    expect(Object.keys(resolvers.Query)).toEqual(["cvPage", "cvPageList"]);
   });
 
   it("delegates a non-draft query to GetPublicDocumentService with (slug, Id), no token required", async () => {
@@ -101,5 +107,34 @@ describe("ResolverFactoryService", () => {
     const result = await resolvers.Query.cvPage(undefined, { Id: anotherValidId, status: "draft" }, readScopedToken, undefined);
 
     expect(result).toBeNull();
+  });
+
+  it("delegates cvPageList to translateListArgs + ListDocumentsFullService.execute, no token required", async () => {
+    const items = [{ documentId: validId, position: "Engineer", isMain: true }];
+    listDocumentsFull.execute.mockResolvedValue({ items, total: 1, start: 0, size: 20 });
+    const resolvers = await service.buildResolvers();
+
+    const result = await resolvers.Query.cvPageList(undefined, { where: { isMain: { eq: true } }, start: 0, size: 10 }, noToken, undefined);
+
+    expect(listDocumentsFull.execute).toHaveBeenCalledWith(
+      "cv-page",
+      expect.objectContaining({ start: 0, size: 10, filters: [{ column: "isMain", operator: "$eq", value: true }] }),
+    );
+    expect(result).toBe(items);
+  });
+
+  it("propagates a BAD_USER_INPUT GraphQL error for an invalid where field, never swallowed or ignored", async () => {
+    const resolvers = await service.buildResolvers();
+
+    await expect(resolvers.Query.cvPageList(undefined, { where: { nope: { eq: 1 } } }, noToken, undefined)).rejects.toMatchObject({
+      extensions: { code: "BAD_USER_INPUT" },
+    });
+    expect(listDocumentsFull.execute).not.toHaveBeenCalled();
+  });
+
+  it("returns a SortDirection enum value map (ASC/DESC -> asc/desc) alongside Query", async () => {
+    const resolvers = await service.buildResolvers();
+
+    expect(resolvers.SortDirection).toEqual({ ASC: "asc", DESC: "desc" });
   });
 });
