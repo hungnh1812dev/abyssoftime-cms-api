@@ -14,7 +14,7 @@ import { SidebarSubGroup } from "./SidebarSubGroup";
 export function Sidebar() {
   const { collapsed } = useSidebar();
   const { data: contentTypes } = useContentTypes();
-  const { displayName, permissions, logout } = useAuth();
+  const { displayName, role, permissions, logout } = useAuth();
 
   const singleTypes = (contentTypes ?? []).filter((contentType) => contentType.kind === "single");
   const collectionTypes = (contentTypes ?? []).filter((contentType) => contentType.kind === "collection");
@@ -63,7 +63,12 @@ export function Sidebar() {
       </nav>
 
       <div className="border-sidebar-border space-y-1 border-t p-2">
-        {displayName && !collapsed && <span className="text-sidebar-muted block truncate px-3 py-1 text-xs">{displayName}</span>}
+        {displayName && !collapsed && (
+          <span className="text-sidebar-muted block truncate px-3 py-1 text-xs">
+            {displayName}
+            {role && ` (${role.name})`}
+          </span>
+        )}
         <button
           type="button"
           onClick={logout}

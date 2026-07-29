@@ -17,8 +17,10 @@ vi.mock("@/hooks/useContentTypes", () => ({
 
 const ALL_SETTINGS_PERMISSIONS = ["media:read", "user:read", "api_token:manager", "role:manager", "permission:manager"];
 
+const superAdminRole = { documentId: "r1", name: "Super Admin", slug: "super_admin", permissions: ALL_SETTINGS_PERMISSIONS, level: 100, isDefault: true };
+
 const mockUseAuth = vi.fn(() => ({
-  role: "super_admin",
+  role: superAdminRole,
   displayName: "Jane Admin",
   permissions: ALL_SETTINGS_PERMISSIONS,
   token: "x",
@@ -45,7 +47,7 @@ function renderSidebar(initialPath = "/admin") {
 beforeEach(() => {
   localStorage.clear();
   mockUseAuth.mockReturnValue({
-    role: "super_admin",
+    role: superAdminRole,
     displayName: "Jane Admin",
     permissions: ALL_SETTINGS_PERMISSIONS,
     token: "x",
@@ -120,10 +122,25 @@ describe("Sidebar", () => {
     expect(screen.getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/settings/users");
   });
 
-  it("shows the display name in the footer, not the role slug", () => {
+  it("shows the display name with the role name in parentheses in the footer, not the role slug", () => {
+    renderSidebar();
+    expect(screen.getByText("Jane Admin (Super Admin)")).toBeInTheDocument();
+    expect(screen.queryByText("super_admin")).not.toBeInTheDocument();
+  });
+
+  it("shows just the display name when the caller has no role", () => {
+    mockUseAuth.mockReturnValue({
+      role: null,
+      displayName: "Jane Admin",
+      permissions: ALL_SETTINGS_PERMISSIONS,
+      token: "x",
+      userId: "1",
+      loading: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+    });
     renderSidebar();
     expect(screen.getByText("Jane Admin")).toBeInTheDocument();
-    expect(screen.queryByText("super_admin")).not.toBeInTheDocument();
   });
 });
 
