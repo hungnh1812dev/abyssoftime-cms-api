@@ -38,3 +38,27 @@ export function orderByTypeName(slug: string): string {
 export function componentTypeName(contentTypeSlug: string, componentName: string): string {
   return `${typeName(contentTypeSlug)}${toPascalCase(componentName)}`;
 }
+
+export function componentInputTypeName(contentTypeSlug: string, componentName: string): string {
+  return `${componentTypeName(contentTypeSlug, componentName)}Input`;
+}
+
+export function createMutationName(slug: string): string {
+  return `create${typeName(slug)}`;
+}
+
+export function updateMutationName(slug: string): string {
+  return `update${typeName(slug)}`;
+}
+
+export function deleteMutationName(slug: string): string {
+  return `delete${typeName(slug)}`;
+}
+
+export function publishMutationName(slug: string): string {
+  return `publish${typeName(slug)}`;
+}
+
+export function unpublishMutationName(slug: string): string {
+  return `unpublish${typeName(slug)}`;
+}

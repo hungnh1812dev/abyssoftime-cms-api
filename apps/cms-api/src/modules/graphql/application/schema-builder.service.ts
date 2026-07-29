@@ -1,5 +1,19 @@
 import { graphqlTypeFor } from "../domain/field-type-mapping";
-import { componentTypeName, filterTypeName, listQueryName, orderByTypeName, queryName, typeName } from "../domain/naming";
+import {
+  componentInputTypeName,
+  componentTypeName,
+  createMutationName,
+  deleteMutationName,
+  filterTypeName,
+  inputTypeName,
+  listQueryName,
+  orderByTypeName,
+  publishMutationName,
+  queryName,
+  typeName,
+  unpublishMutationName,
+  updateMutationName,
+} from "../domain/naming";
 
 import { Injectable } from "@nestjs/common";
 
@@ -66,7 +80,10 @@ function buildFieldLine(contentTypeSlug: string, field: FieldDefinition): string
 }
 
 function buildObjectType(definition: ContentTypeDefinition): string {
-  const fieldLines = definition.fields.map((field) => buildFieldLine(definition.slug, field));
+  // documentId isn't a schema-defined field, but every resolver (query and mutation) already
+  // attaches it (toResolverValue) — without it in the SDL, a client has no way to learn a newly
+  // created document's id, since create<Type>'s caller doesn't know it up front.
+  const fieldLines = ["  documentId: ID!", ...definition.fields.map((field) => buildFieldLine(definition.slug, field))];
 
   return `type ${typeName(definition.slug)} {\n${fieldLines.join("\n")}\n}`;
 }
@@ -95,6 +112,68 @@ function buildComponentTypesFor(definition: ContentTypeDefinition): string[] {
 
   visit(definition.fields);
   return componentTypes;
+}
+
+function buildInputFieldLine(contentTypeSlug: string, field: FieldDefinition): string {
+  if (field.type === "component") {
+    const nestedTypeName = componentInputTypeName(contentTypeSlug, field.component!);
+    // Unlike the object type's [Type!]! (always a real, possibly-empty array), the list itself
+    // stays nullable here: a mutation submits a partial <Type>Input, so a client omitting one
+    // repeatable component must not be forced to submit every other one as an empty array too.
+    const type = field.repeatable ? `[${nestedTypeName}!]` : nestedTypeName;
+    return `  ${field.name}: ${type}`;
+  }
+  // Media fields are submitted as the target asset's document id, not a MediaAsset object
+  // (GraphQL input types cannot reference an object output type).
+  if (field.type === "media") {
+    return `  ${field.name}: ID`;
+  }
+  return `  ${field.name}: ${graphqlTypeFor(field)}`;
+}
+
+function buildInputType(definition: ContentTypeDefinition): string {
+  const fieldLines = definition.fields.map((field) => buildInputFieldLine(definition.slug, field));
+
+  return `input ${inputTypeName(definition.slug)} {\n${fieldLines.join("\n")}\n}`;
+}
+
+// Mirrors buildComponentTypesFor's recursion, emitting the input-typed counterpart of each
+// component type instead.
+function buildComponentInputTypesFor(definition: ContentTypeDefinition): string[] {
+  const componentInputTypes: string[] = [];
+  const seen = new Set<string>();
+
+  function visit(fields: FieldDefinition[]): void {
+    for (const field of fields) {
+      if (field.type !== "component") {
+        continue;
+      }
+      const name = componentInputTypeName(definition.slug, field.component!);
+      if (seen.has(name)) {
+        continue;
+      }
+      seen.add(name);
+      const fieldLines = field.fields!.map((nestedField) => buildInputFieldLine(definition.slug, nestedField));
+      componentInputTypes.push(`input ${name} {\n${fieldLines.join("\n")}\n}`);
+      visit(field.fields!);
+    }
+  }
+
+  visit(definition.fields);
+  return componentInputTypes;
+}
+
+function buildMutationFields(definition: ContentTypeDefinition): string[] {
+  const type = typeName(definition.slug);
+  const input = inputTypeName(definition.slug);
+
+  return [
+    `  ${createMutationName(definition.slug)}(data: ${input}!): ${type}!`,
+    `  ${updateMutationName(definition.slug)}(Id: ID!, data: ${input}!): ${type}!`,
+    `  ${deleteMutationName(definition.slug)}(Id: ID!): Boolean!`,
+    `  ${publishMutationName(definition.slug)}(Id: ID!): ${type}!`,
+    `  ${unpublishMutationName(definition.slug)}(Id: ID!): ${type}!`,
+  ];
 }
 
 function buildFilterType(definition: ContentTypeDefinition): string {
@@ -129,11 +208,16 @@ export class SchemaBuilderService {
     const collectionDefinitions = definitions.filter((definition) => definition.kind === "collection");
 
     const objectTypes = collectionDefinitions.flatMap((definition) => [buildObjectType(definition), ...buildComponentTypesFor(definition)]);
+    const inputTypes = collectionDefinitions.flatMap((definition) => [buildInputType(definition), ...buildComponentInputTypesFor(definition)]);
     const filterTypes = collectionDefinitions.map(buildFilterType);
     const orderByTypes = collectionDefinitions.map(buildOrderByType);
     const queryFields = ["  _empty: String", ...collectionDefinitions.map(buildQueryField), ...collectionDefinitions.map(buildListQueryField)];
     const queryType = `type Query {\n${queryFields.join("\n")}\n}`;
+    const mutationFields = ["  _empty: String", ...collectionDefinitions.flatMap(buildMutationFields)];
+    const mutationType = `type Mutation {\n${mutationFields.join("\n")}\n}`;
 
-    return [MEDIA_ASSET_TYPE, JSON_SCALAR_TYPE, ...objectTypes, SHARED_FILTER_AND_ORDER_TYPES, ...filterTypes, ...orderByTypes, queryType].join("\n\n");
+    return [MEDIA_ASSET_TYPE, JSON_SCALAR_TYPE, ...objectTypes, ...inputTypes, SHARED_FILTER_AND_ORDER_TYPES, ...filterTypes, ...orderByTypes, queryType, mutationType].join(
+      "\n\n",
+    );
   }
 }

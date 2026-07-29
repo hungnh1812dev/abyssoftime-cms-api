@@ -12,7 +12,7 @@ import { ACCESS_TOKEN_REPOSITORY, type IAccessTokenRepository } from "@/modules/
 import { SchemaLoaderService } from "@/modules/content-type/application/schema/schema-loader.service";
 import { ContentTypeSyncService } from "@/modules/content-type/application/sync/content-type-sync.service";
 import { type ContentTypeDefinition } from "@/modules/content-type/domain/entities/content-type.entity";
-import { queryName } from "@/modules/graphql/domain/naming";
+import { createMutationName, inputTypeName, queryName, updateMutationName } from "@/modules/graphql/domain/naming";
 import { STORAGE_ADAPTER } from "@/modules/storage/domain/repositories/storage-adapter.repository";
 import { PrismaService } from "@/prisma/application/prisma.service";
 
@@ -67,10 +67,14 @@ describe("GraphQL (e2e)", () => {
 
   let superAdminCookie: string;
   let readScopedApiToken: string;
-  let readScopedTokenId: string;
-  let noScopeTokenId: string;
+  let createOnlyApiToken: string;
+  let updateOnlyApiToken: string;
+  let deleteOnlyApiToken: string;
+  let publishOnlyApiToken: string;
+  let unpublishOnlyApiToken: string;
 
   const createdUserIds: string[] = [];
+  const createdApiTokenIds: string[] = [];
   const createdMediaIds: string[] = [];
   const pendingCleanupCvPageIds = new Set<string>();
   const pendingCleanupMediaTypeIds = new Set<string>();
@@ -149,10 +153,21 @@ describe("GraphQL (e2e)", () => {
 
     const readScoped = await createAccessToken.execute({ name: `e2e-graphql-read-${runId}`, permissions: ["document:read"], expiresIn: "1h" }, null);
     readScopedApiToken = readScoped.plaintext;
-    readScopedTokenId = readScoped.entity.documentId;
+    createdApiTokenIds.push(readScoped.entity.documentId);
 
-    const noScope = await createAccessToken.execute({ name: `e2e-graphql-noscope-${runId}`, permissions: [], expiresIn: "1h" }, null);
-    noScopeTokenId = noScope.entity.documentId;
+    // One token per mutation, scoped with exactly that mutation's required permission (never a
+    // superset) — proves each resolver checks its own specific document:* slug, not "any token".
+    async function createScopedToken(permission: string): Promise<string> {
+      const token = await createAccessToken.execute({ name: `e2e-graphql-${permission.replace(":", "-")}-${runId}`, permissions: [permission], expiresIn: "1h" }, null);
+      createdApiTokenIds.push(token.entity.documentId);
+      return token.plaintext;
+    }
+
+    createOnlyApiToken = await createScopedToken("document:create");
+    updateOnlyApiToken = await createScopedToken("document:update");
+    deleteOnlyApiToken = await createScopedToken("document:delete");
+    publishOnlyApiToken = await createScopedToken("document:publish");
+    unpublishOnlyApiToken = await createScopedToken("document:unpublish");
   });
 
   afterAll(async () => {
@@ -175,8 +190,9 @@ describe("GraphQL (e2e)", () => {
     await unlink(mediaDefPath).catch(() => undefined);
     await syncService.sync(realDefs);
 
-    await accessTokens.delete(readScopedTokenId);
-    await accessTokens.delete(noScopeTokenId);
+    for (const tokenId of createdApiTokenIds) {
+      await accessTokens.delete(tokenId);
+    }
 
     if (createdUserIds.length > 0) {
       await prisma.user.deleteMany({ where: { documentId: { in: createdUserIds } } });
@@ -396,6 +412,148 @@ describe("GraphQL (e2e)", () => {
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
       expect(body.data).toEqual({ [mediaQueryName]: { title: `No cover ${runId}`, cover: null } });
+    });
+  });
+
+  describe("mutations (cv-page)", () => {
+    it("round-trips a full lifecycle — create, update, publish, unpublish, delete — each mutation using a token scoped with exactly its required permission", async () => {
+      const createResult = await gql(
+        `mutation($data: CvPageInput!) {
+          createCvPage(data: $data) {
+            documentId position isMain company
+            experiences { company location roles { position techStack } }
+          }
+        }`,
+        {
+          data: {
+            position: `Mutation Engineer ${runId}`,
+            isMain: true,
+            company: `MutationCo-${runId}`,
+            summary: "<p>Summary</p>",
+            experiences: [
+              {
+                company: "Acme",
+                location: "Remote",
+                roles: [{ position: "Engineer", period: "2023", teamSize: 3, projects: "CMS", techStack: ["ts", "graphql"], responsibilities: "<p>Built things</p>" }],
+              },
+            ],
+          },
+        },
+        createOnlyApiToken,
+      ).expect(200);
+      const createBody = createResult.body as GraphQLResponseBody;
+      expect(createBody.errors).toBeUndefined();
+      const created = (createBody.data as { createCvPage: Record<string, unknown> }).createCvPage;
+      const documentId = created.documentId as string;
+      pendingCleanupCvPageIds.add(documentId);
+      expect(created).toMatchObject({
+        position: `Mutation Engineer ${runId}`,
+        isMain: true,
+        company: `MutationCo-${runId}`,
+        experiences: [{ company: "Acme", location: "Remote", roles: [{ position: "Engineer", techStack: ["ts", "graphql"] }] }],
+      });
+
+      const updateResult = await gql(
+        `mutation($Id: ID!, $data: CvPageInput!) { updateCvPage(Id: $Id, data: $data) { documentId company } }`,
+        { Id: documentId, data: { position: `Mutation Engineer ${runId}`, isMain: true, company: `UpdatedCo-${runId}`, summary: "<p>Summary</p>" } },
+        updateOnlyApiToken,
+      ).expect(200);
+      const updateBody = updateResult.body as GraphQLResponseBody;
+      expect(updateBody.errors).toBeUndefined();
+      expect(updateBody.data).toEqual({ updateCvPage: { documentId, company: `UpdatedCo-${runId}` } });
+
+      const publishResult = await gql(`mutation($Id: ID!) { publishCvPage(Id: $Id) { documentId company } }`, { Id: documentId }, publishOnlyApiToken).expect(200);
+      const publishBody = publishResult.body as GraphQLResponseBody;
+      expect(publishBody.errors).toBeUndefined();
+      expect(publishBody.data).toEqual({ publishCvPage: { documentId, company: `UpdatedCo-${runId}` } });
+
+      const publicReadAfterPublish = await gql(`{ cvPage(Id: "${documentId}") { company } }`).expect(200);
+      expect((publicReadAfterPublish.body as GraphQLResponseBody).data).toEqual({ cvPage: { company: `UpdatedCo-${runId}` } });
+
+      const unpublishResult = await gql(`mutation($Id: ID!) { unpublishCvPage(Id: $Id) { documentId company } }`, { Id: documentId }, unpublishOnlyApiToken).expect(200);
+      const unpublishBody = unpublishResult.body as GraphQLResponseBody;
+      expect(unpublishBody.errors).toBeUndefined();
+      expect(unpublishBody.data).toEqual({ unpublishCvPage: { documentId, company: `UpdatedCo-${runId}` } });
+
+      const publicReadAfterUnpublish = await gql(`{ cvPage(Id: "${documentId}") { company } }`).expect(200);
+      expect((publicReadAfterUnpublish.body as GraphQLResponseBody).data).toEqual({ cvPage: null });
+
+      const deleteResult = await gql(`mutation($Id: ID!) { deleteCvPage(Id: $Id) }`, { Id: documentId }, deleteOnlyApiToken).expect(200);
+      const deleteBody = deleteResult.body as GraphQLResponseBody;
+      expect(deleteBody.errors).toBeUndefined();
+      expect(deleteBody.data).toEqual({ deleteCvPage: true });
+      pendingCleanupCvPageIds.delete(documentId);
+
+      const draftReadAfterDelete = await gql(`{ cvPage(Id: "${documentId}", status: "draft") { company } }`, undefined, readScopedApiToken).expect(200);
+      expect((draftReadAfterDelete.body as GraphQLResponseBody).data).toEqual({ cvPage: null });
+    });
+
+    const permissionDeniedCases: { mutationName: string; query: string; variables: Record<string, unknown> }[] = [
+      { mutationName: "createCvPage", query: `mutation($data: CvPageInput!) { createCvPage(data: $data) { documentId } }`, variables: { data: { position: "X" } } },
+      {
+        mutationName: "updateCvPage",
+        query: `mutation($Id: ID!, $data: CvPageInput!) { updateCvPage(Id: $Id, data: $data) { documentId } }`,
+        variables: { Id: randomUUID(), data: {} },
+      },
+      { mutationName: "deleteCvPage", query: `mutation($Id: ID!) { deleteCvPage(Id: $Id) }`, variables: { Id: randomUUID() } },
+      { mutationName: "publishCvPage", query: `mutation($Id: ID!) { publishCvPage(Id: $Id) { documentId } }`, variables: { Id: randomUUID() } },
+      { mutationName: "unpublishCvPage", query: `mutation($Id: ID!) { unpublishCvPage(Id: $Id) { documentId } }`, variables: { Id: randomUUID() } },
+    ];
+
+    it.each(permissionDeniedCases)("$mutationName rejects a wrongly-scoped token with FORBIDDEN, never executing the mutation", async ({ query, variables }) => {
+      const response = await gql(query, variables, readScopedApiToken).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.data).toBeNull();
+      expect(body.errors?.[0].extensions?.code).toBe("FORBIDDEN");
+    });
+
+    it.each(permissionDeniedCases)("$mutationName rejects a missing token with UNAUTHENTICATED, never executing the mutation", async ({ query, variables }) => {
+      const response = await gql(query, variables).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.data).toBeNull();
+      expect(body.errors?.[0].extensions?.code).toBe("UNAUTHENTICATED");
+    });
+  });
+
+  describe(`mutations (${mediaSlug} — media field persistence)`, () => {
+    it("createMediaSlug/updateMediaSlug persist a submitted media FK that reads back as a full MediaAsset", async () => {
+      const uploadResponse = await request(app.getHttpServer())
+        .post("/api/v1/media/upload")
+        .set("Cookie", [superAdminCookie])
+        .attach("file", buildPngBuffer(200, 150), "mutation-cover.png")
+        .expect(201);
+      const mutationMediaDocumentId = (uploadResponse.body as MediaUploadResponseBody).documentId;
+      createdMediaIds.push(mutationMediaDocumentId);
+
+      const createMutationField = createMutationName(mediaSlug);
+      const createResult = await gql(
+        `mutation($data: ${inputTypeName(mediaSlug)}!) {
+          ${createMutationField}(data: $data) { documentId title cover { documentId fileName } }
+        }`,
+        { data: { title: `Mutation media ${runId}`, cover: mutationMediaDocumentId } },
+        createOnlyApiToken,
+      ).expect(200);
+      const createBody = createResult.body as GraphQLResponseBody;
+      expect(createBody.errors).toBeUndefined();
+      const created = (createBody.data as Record<string, { documentId: string; title: string; cover: { documentId: string; fileName: string } }>)[createMutationField];
+      const documentId = created.documentId;
+      pendingCleanupMediaTypeIds.add(documentId);
+      expect(created).toMatchObject({ title: `Mutation media ${runId}`, cover: { documentId: mutationMediaDocumentId, fileName: "mutation-cover.png" } });
+
+      const updateMutationField = updateMutationName(mediaSlug);
+      const updateResult = await gql(
+        `mutation($Id: ID!, $data: ${inputTypeName(mediaSlug)}!) {
+          ${updateMutationField}(Id: $Id, data: $data) { documentId title cover { documentId fileName } }
+        }`,
+        { Id: documentId, data: { title: `Mutation media updated ${runId}`, cover: mutationMediaDocumentId } },
+        updateOnlyApiToken,
+      ).expect(200);
+      const updateBody = updateResult.body as GraphQLResponseBody;
+      expect(updateBody.errors).toBeUndefined();
+      const updated = (updateBody.data as Record<string, { documentId: string; title: string; cover: { documentId: string; fileName: string } }>)[updateMutationField];
+      expect(updated).toMatchObject({ documentId, title: `Mutation media updated ${runId}`, cover: { documentId: mutationMediaDocumentId, fileName: "mutation-cover.png" } });
     });
   });
 

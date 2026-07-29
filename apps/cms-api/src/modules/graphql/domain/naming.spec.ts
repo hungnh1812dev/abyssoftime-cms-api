@@ -1,4 +1,18 @@
-import { componentTypeName, filterTypeName, inputTypeName, listQueryName, orderByTypeName, queryName, typeName } from "./naming";
+import {
+  componentInputTypeName,
+  componentTypeName,
+  createMutationName,
+  deleteMutationName,
+  filterTypeName,
+  inputTypeName,
+  listQueryName,
+  orderByTypeName,
+  publishMutationName,
+  queryName,
+  typeName,
+  unpublishMutationName,
+  updateMutationName,
+} from "./naming";
 
 describe("naming", () => {
   describe("cv-page", () => {
@@ -32,6 +46,18 @@ describe("naming", () => {
 
     it("derives a component type name for an already-camelCase component name", () => {
       expect(componentTypeName("cv-page", "role")).toBe("CvPageRole");
+    });
+
+    it("derives a component input type name", () => {
+      expect(componentInputTypeName("cv-page", "skill")).toBe("CvPageSkillInput");
+    });
+
+    it("derives mutation names", () => {
+      expect(createMutationName("cv-page")).toBe("createCvPage");
+      expect(updateMutationName("cv-page")).toBe("updateCvPage");
+      expect(deleteMutationName("cv-page")).toBe("deleteCvPage");
+      expect(publishMutationName("cv-page")).toBe("publishCvPage");
+      expect(unpublishMutationName("cv-page")).toBe("unpublishCvPage");
     });
   });
 

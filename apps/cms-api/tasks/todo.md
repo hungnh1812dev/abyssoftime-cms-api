@@ -24,10 +24,10 @@ See `tasks/plan.md` for full context, dependency graph, and rationale.
 - [x] **Checkpoint 3:** `bun run test:e2e` green; manual nested+media query — commit
 
 ## Phase 4 — Mutations (collection-type)
-- [ ] Task 4.1 — Export remaining collection services; SDL for `<Type>Input` + 5 mutations
-- [ ] Task 4.2 — Mutation resolvers + permission checks (create/update/delete/publish/unpublish; update re-reads after save)
-- [ ] Task 4.3 — e2e: full CRUD lifecycle + permission-denied cases
-- [ ] **Checkpoint 4:** `bun run test:e2e` green; manual full lifecycle via a real token — commit
+- [x] Task 4.1 — Export remaining collection services; SDL for `<Type>Input` + 5 mutations
+- [x] Task 4.2 — Mutation resolvers + permission checks (create/update/delete/publish/unpublish; update re-reads after save)
+- [x] Task 4.3 — e2e: full CRUD lifecycle + permission-denied cases
+- [x] **Checkpoint 4:** `bun run test:e2e` green; manual full lifecycle via a real token — commit
 
 ## Phase 5 — Single-type support
 - [ ] Task 5.1 — Export 5 single-type services; SDL + resolvers (query/save/publish/unpublish, no `Id`); e2e extension
