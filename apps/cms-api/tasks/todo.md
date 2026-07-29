@@ -14,8 +14,8 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint (core implementation):** `bun run lint` / `bun run test:cov` / `bun run build` green — automated checks pass; manual `start:dev` walkthrough still outstanding — commit
 
 ## Phase 4 — Docs
-- [ ] Task 5 — `docs/documents/auth.md` updated (DTOs list, `RefreshTokenPayload`, TTL prose, endpoint table, `RefreshTokenService` note)
-- [ ] **Checkpoint:** doc read-through against SPEC.md + shipped code — commit
+- [x] Task 5 — `docs/documents/auth.md` updated (DTOs list, `RefreshTokenPayload`, TTL prose, endpoint table, `RefreshTokenService` note, gap note, verified-state entry)
+- [x] **Checkpoint:** doc read-through against SPEC.md + shipped code — commit
 
 ## Phase 5 — Review + close-out
 - [ ] Five-axis review (correctness / readability / architecture / security / performance)
