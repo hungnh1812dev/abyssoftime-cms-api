@@ -1,3 +1,5 @@
+import { JSONScalar } from "../domain/json-scalar";
+
 import { NotFoundException } from "@nestjs/common";
 
 import { SchemaLoaderService } from "@/modules/content-type/application/schema/schema-loader.service";
@@ -6,6 +8,8 @@ import { GetDocumentForEditService } from "@/modules/document/application/servic
 import { GetPublicDocumentService } from "@/modules/document/application/services/get-public-document.service";
 import { ListDocumentsFullService } from "@/modules/document/application/services/list-documents-full.service";
 import { DocumentEntity } from "@/modules/document/domain/entities/document.entity";
+import { MediaAssetEntity } from "@/modules/media/domain/entities/media-asset.entity";
+import { type IMediaAssetRepository } from "@/modules/media/domain/repositories/media-asset.repository";
 
 import { type GraphqlContext } from "./graphql-context.factory";
 import { ResolverFactoryService } from "./resolver-factory.service";
@@ -18,6 +22,17 @@ const cvPage: ContentTypeDefinition = {
   fields: [
     { name: "position", type: "text" },
     { name: "isMain", type: "boolean" },
+    { name: "coverImage", type: "media" },
+    {
+      name: "gallery",
+      type: "component",
+      component: "galleryItem",
+      repeatable: true,
+      fields: [
+        { name: "caption", type: "text" },
+        { name: "photo", type: "media" },
+      ],
+    },
   ],
 };
 
@@ -33,6 +48,7 @@ describe("ResolverFactoryService", () => {
   let getPublicDocument: jest.Mocked<GetPublicDocumentService>;
   let getDocumentForEdit: jest.Mocked<GetDocumentForEditService>;
   let listDocumentsFull: jest.Mocked<ListDocumentsFullService>;
+  let mediaAssets: jest.Mocked<IMediaAssetRepository>;
   let service: ResolverFactoryService;
 
   const noToken: GraphqlContext = { apiToken: null };
@@ -43,7 +59,8 @@ describe("ResolverFactoryService", () => {
     getPublicDocument = { execute: jest.fn() } as unknown as jest.Mocked<GetPublicDocumentService>;
     getDocumentForEdit = { execute: jest.fn() } as unknown as jest.Mocked<GetDocumentForEditService>;
     listDocumentsFull = { execute: jest.fn().mockResolvedValue({ items: [], total: 0, start: 0, size: 20 }) } as unknown as jest.Mocked<ListDocumentsFullService>;
-    service = new ResolverFactoryService(schemaLoader, getPublicDocument, getDocumentForEdit, listDocumentsFull);
+    mediaAssets = { findByDocumentId: jest.fn() } as unknown as jest.Mocked<IMediaAssetRepository>;
+    service = new ResolverFactoryService(schemaLoader, getPublicDocument, getDocumentForEdit, listDocumentsFull, mediaAssets);
   });
 
   it("builds single-item and list Query resolvers named after each collection-type's camelCase slug", async () => {
@@ -136,5 +153,67 @@ describe("ResolverFactoryService", () => {
     const resolvers = await service.buildResolvers();
 
     expect(resolvers.SortDirection).toEqual({ ASC: "asc", DESC: "desc" });
+  });
+
+  describe("media field resolution", () => {
+    const mediaAsset = new MediaAssetEntity(
+      "media-1",
+      "photo.png",
+      "image/png",
+      1024,
+      100,
+      100,
+      "https://cdn.example.com/photo.png",
+      "https://cdn.example.com/photo-thumb.png",
+      "public-id",
+      "hash",
+      null,
+      new Date(),
+      new Date(),
+    );
+
+    it("resolves a media-typed field's raw FK to the full MediaAsset via MEDIA_ASSET_REPOSITORY.findByDocumentId", async () => {
+      mediaAssets.findByDocumentId.mockResolvedValue(mediaAsset);
+      const resolvers = await service.buildResolvers();
+
+      const result = await (resolvers.CvPage as Record<string, (parent: unknown) => Promise<unknown>>).coverImage({ coverImage: "media-1" });
+
+      expect(mediaAssets.findByDocumentId).toHaveBeenCalledWith("media-1");
+      expect(result).toBe(mediaAsset);
+    });
+
+    it("resolves a null FK to null without calling the repository", async () => {
+      const resolvers = await service.buildResolvers();
+
+      const result = await (resolvers.CvPage as Record<string, (parent: unknown) => Promise<unknown>>).coverImage({ coverImage: null });
+
+      expect(mediaAssets.findByDocumentId).not.toHaveBeenCalled();
+      expect(result).toBeNull();
+    });
+
+    it("resolves a dangling (deleted) FK to null, never throws", async () => {
+      mediaAssets.findByDocumentId.mockResolvedValue(null);
+      const resolvers = await service.buildResolvers();
+
+      const result = await (resolvers.CvPage as Record<string, (parent: unknown) => Promise<unknown>>).coverImage({ coverImage: "gone" });
+
+      expect(result).toBeNull();
+    });
+
+    it("resolves a media-typed field nested inside a component type the same way, at any nesting depth", async () => {
+      mediaAssets.findByDocumentId.mockResolvedValue(mediaAsset);
+      const resolvers = await service.buildResolvers();
+
+      const result = await (resolvers.CvPageGalleryItem as Record<string, (parent: unknown) => Promise<unknown>>).photo({ photo: "media-1" });
+
+      expect(mediaAssets.findByDocumentId).toHaveBeenCalledWith("media-1");
+      expect(result).toBe(mediaAsset);
+    });
+  });
+
+  it("registers the JSON scalar resolver", async () => {
+    const resolvers = await service.buildResolvers();
+
+    expect(resolvers.JSON).toBe(JSONScalar);
   });
 });

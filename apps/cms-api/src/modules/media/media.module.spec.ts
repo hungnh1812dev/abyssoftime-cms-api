@@ -48,4 +48,8 @@ describe("MediaModule", () => {
 
     expect(providers).toEqual([UploadMediaService, ListMediaService, DeleteMediaService, { provide: MEDIA_ASSET_REPOSITORY, useClass: PrismaMediaRepository }]);
   });
+
+  it("exports MEDIA_ASSET_REPOSITORY for other modules to consume", () => {
+    expect(Reflect.getMetadata(MODULE_METADATA.EXPORTS, MediaModule)).toEqual([MEDIA_ASSET_REPOSITORY]);
+  });
 });

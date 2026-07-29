@@ -24,5 +24,6 @@ import { MediaController } from "./presentation/media.controller";
   ],
   controllers: [MediaController],
   providers: [UploadMediaService, ListMediaService, DeleteMediaService, { provide: MEDIA_ASSET_REPOSITORY, useClass: PrismaMediaRepository }],
+  exports: [MEDIA_ASSET_REPOSITORY],
 })
 export class MediaModule {}

@@ -23,8 +23,8 @@ describe("columnTypeFor", () => {
     expect(columnTypeFor(field("boolean"))).toBe("BOOLEAN");
   });
 
-  it("maps media to a UUID FK against media_assets", () => {
-    expect(columnTypeFor(field("media"))).toBe("UUID REFERENCES media_assets(document_id) ON DELETE SET NULL");
+  it("maps media to a TEXT FK against media_assets (media_assets.document_id is Prisma String/TEXT, not UUID)", () => {
+    expect(columnTypeFor(field("media"))).toBe("TEXT REFERENCES media_assets(document_id) ON DELETE SET NULL");
   });
 
   it("maps json to JSONB", () => {

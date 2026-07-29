@@ -11,6 +11,8 @@ import { GetDocumentForEditService } from "@/modules/document/application/servic
 import { GetPublicDocumentService } from "@/modules/document/application/services/get-public-document.service";
 import { ListDocumentsFullService } from "@/modules/document/application/services/list-documents-full.service";
 import { DocumentModule } from "@/modules/document/document.module";
+import { type IMediaAssetRepository } from "@/modules/media/domain/repositories/media-asset.repository";
+import { MediaModule } from "@/modules/media/media.module";
 
 // Import after the mock is registered — evaluating GraphqlModule's @Module decorator is what
 // triggers the (now mocked) forRootAsync call, letting us capture its options synchronously.
@@ -32,8 +34,8 @@ describe("GraphqlModule", () => {
     expect(options.driver).toBe(ApolloDriver);
   });
 
-  it("imports ContentTypeModule, DocumentModule, and AccessTokenModule for the async factory's DI scope", () => {
-    expect(options.imports).toEqual([ContentTypeModule, DocumentModule, AccessTokenModule]);
+  it("imports ContentTypeModule, DocumentModule, AccessTokenModule, and MediaModule for the async factory's DI scope", () => {
+    expect(options.imports).toEqual([ContentTypeModule, DocumentModule, AccessTokenModule, MediaModule]);
   });
 
   it("declares NestGraphQLModule.forRootAsync's dynamic module as GraphqlModule's only import", () => {
@@ -55,12 +57,13 @@ describe("GraphqlModule", () => {
       const getDocumentForEdit = {} as GetDocumentForEditService;
       const listDocumentsFull = {} as ListDocumentsFullService;
       const accessTokens = {} as IAccessTokenRepository;
+      const mediaAssets = {} as IMediaAssetRepository;
 
-      return options.useFactory(schemaLoader, getPublicDocument, getDocumentForEdit, listDocumentsFull, accessTokens);
+      return options.useFactory(schemaLoader, getPublicDocument, getDocumentForEdit, listDocumentsFull, accessTokens, mediaAssets);
     }
 
-    it("injects SchemaLoaderService, GetPublicDocumentService, GetDocumentForEditService, ListDocumentsFullService, and ACCESS_TOKEN_REPOSITORY", () => {
-      expect(options.inject).toHaveLength(5);
+    it("injects SchemaLoaderService, GetPublicDocumentService, GetDocumentForEditService, ListDocumentsFullService, ACCESS_TOKEN_REPOSITORY, and MEDIA_ASSET_REPOSITORY", () => {
+      expect(options.inject).toHaveLength(6);
     });
 
     it("builds real typeDefs via SchemaBuilderService", async () => {
