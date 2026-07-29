@@ -2,7 +2,6 @@ import { UnauthorizedException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 
 import { JwtTokenService } from "@/common/token/jwt-token.service";
-import { type RefreshTokenPayload } from "@/common/types/jwt-payload";
 import { RoleEntity } from "@/modules/roles/domain/entities/role.entiry";
 import { type IRoleRepository, ROLE_REPOSITORY } from "@/modules/roles/domain/repositories/role.repository";
 import { UserEntity } from "@/modules/users/domain/entities/user.entity";
@@ -118,9 +117,9 @@ describe("RefreshTokenService", () => {
   });
 
   it("falls back to rememberMe:false for a pre-change token that has no rememberMe field at all", async () => {
-    // Simulates a refresh token minted before this feature shipped: the type says `rememberMe`
-    // is required, but a real legacy JWT payload won't actually carry it at runtime.
-    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1" } as RefreshTokenPayload);
+    // Simulates a refresh token minted before this feature shipped — `rememberMe` is optional
+    // precisely because a real legacy JWT payload won't carry it at runtime.
+    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1" });
     users.findById.mockResolvedValue(verifiedUser);
     roles.findById.mockResolvedValue(adminRole);
     jwtTokenService.signAccessToken.mockReturnValue("new-access-token");

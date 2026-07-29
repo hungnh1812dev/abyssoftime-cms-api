@@ -7,5 +7,7 @@ export interface AccessTokenPayload {
 
 export interface RefreshTokenPayload {
   sub: string;
-  rememberMe: boolean;
+  // Optional, not required: a refresh token minted before this field existed won't carry it at
+  // runtime — readers must treat a missing value as `false` (see RefreshTokenService).
+  rememberMe?: boolean;
 }
