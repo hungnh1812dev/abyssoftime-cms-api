@@ -13,7 +13,8 @@ describe("JwtTokenService", () => {
   let service: JwtTokenService;
 
   const accessPayload: AccessTokenPayload = { sub: "user-1", roleSlug: "admin", level: 50, permissions: ["role:read"] };
-  const refreshPayload: RefreshTokenPayload = { sub: "user-1" };
+  const refreshPayload: RefreshTokenPayload = { sub: "user-1", rememberMe: false };
+  const rememberedRefreshPayload: RefreshTokenPayload = { sub: "user-1", rememberMe: true };
 
   beforeEach(() => {
     jwtService = { sign: jest.fn(), verify: jest.fn() };
@@ -37,13 +38,30 @@ describe("JwtTokenService", () => {
     expect(result).toBe("access-token");
   });
 
-  it("signRefreshToken() signs with the refresh secret and a 7d expiry", () => {
+  it("signRefreshToken() signs with the refresh secret and a 7d expiry when rememberMe is false", () => {
     jwtService.sign.mockReturnValue("refresh-token");
 
     const result = service.signRefreshToken(refreshPayload);
 
     expect(jwtService.sign).toHaveBeenCalledWith(refreshPayload, { secret: "refresh-secret", expiresIn: "7d" });
     expect(result).toBe("refresh-token");
+  });
+
+  it("signRefreshToken() signs with the refresh secret and a 30d expiry when rememberMe is true", () => {
+    jwtService.sign.mockReturnValue("remembered-refresh-token");
+
+    const result = service.signRefreshToken(rememberedRefreshPayload);
+
+    expect(jwtService.sign).toHaveBeenCalledWith(rememberedRefreshPayload, { secret: "refresh-secret", expiresIn: "30d" });
+    expect(result).toBe("remembered-refresh-token");
+  });
+
+  it("getRefreshTokenMaxAgeMs(false) returns the 7-day cookie maxAge", () => {
+    expect(service.getRefreshTokenMaxAgeMs(false)).toBe(7 * 24 * 60 * 60 * 1000);
+  });
+
+  it("getRefreshTokenMaxAgeMs(true) returns the 30-day cookie maxAge", () => {
+    expect(service.getRefreshTokenMaxAgeMs(true)).toBe(30 * 24 * 60 * 60 * 1000);
   });
 
   it("verifyAccessToken() verifies with the access secret", () => {

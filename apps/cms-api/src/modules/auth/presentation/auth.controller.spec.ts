@@ -120,29 +120,50 @@ describe("AuthController", () => {
     expect(result).toEqual({ hasUsers: false });
   });
 
-  it("login() delegates to LoginService with the passport-validated user and sets httpOnly auth cookies", () => {
+  it("login() defaults rememberMe to false when omitted and sets a 7-day refresh cookie", () => {
     const dto: LoginDto = { email: "jane@example.com", password: "s3cret" };
     const validatedUser = { user: { documentId: "user-1" }, role: { slug: "admin" } } as unknown as ValidatedLoginUser;
     const req = { user: validatedUser } as unknown as Request & { user: ValidatedLoginUser };
-    loginService.execute.mockReturnValue({ accessToken: "access-token", refreshToken: "refresh-token" });
+    loginService.execute.mockReturnValue({ accessToken: "access-token", refreshToken: "refresh-token", refreshTokenMaxAgeMs: 7 * 24 * 60 * 60 * 1000 });
 
     const result = controller.login(dto, req, res as unknown as Response);
 
-    expect(loginService.execute).toHaveBeenCalledWith(validatedUser);
-    expect(res.cookie).toHaveBeenCalledWith(ACCESS_TOKEN_COOKIE, "access-token", expect.objectContaining({ httpOnly: true, secure: true, sameSite: "lax" }));
-    expect(res.cookie).toHaveBeenCalledWith(REFRESH_TOKEN_COOKIE, "refresh-token", expect.objectContaining({ httpOnly: true, secure: true, sameSite: "lax" }));
+    expect(loginService.execute).toHaveBeenCalledWith(validatedUser, false);
+    expect(res.cookie).toHaveBeenCalledWith(
+      ACCESS_TOKEN_COOKIE,
+      "access-token",
+      expect.objectContaining({ httpOnly: true, secure: true, sameSite: "lax", maxAge: 15 * 60 * 1000 }),
+    );
+    expect(res.cookie).toHaveBeenCalledWith(
+      REFRESH_TOKEN_COOKIE,
+      "refresh-token",
+      expect.objectContaining({ httpOnly: true, secure: true, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000 }),
+    );
     expect(result).toEqual({ message: "Login successful." });
   });
 
-  it("refresh() reads the refresh cookie, delegates to RefreshTokenService, and rotates auth cookies", async () => {
+  it("login() passes rememberMe:true through and sets a 30-day refresh cookie", () => {
+    const dto: LoginDto = { email: "jane@example.com", password: "s3cret", rememberMe: true };
+    const validatedUser = { user: { documentId: "user-1" }, role: { slug: "admin" } } as unknown as ValidatedLoginUser;
+    const req = { user: validatedUser } as unknown as Request & { user: ValidatedLoginUser };
+    loginService.execute.mockReturnValue({ accessToken: "access-token", refreshToken: "refresh-token", refreshTokenMaxAgeMs: 30 * 24 * 60 * 60 * 1000 });
+
+    controller.login(dto, req, res as unknown as Response);
+
+    expect(loginService.execute).toHaveBeenCalledWith(validatedUser, true);
+    expect(res.cookie).toHaveBeenCalledWith(ACCESS_TOKEN_COOKIE, "access-token", expect.objectContaining({ maxAge: 15 * 60 * 1000 }));
+    expect(res.cookie).toHaveBeenCalledWith(REFRESH_TOKEN_COOKIE, "refresh-token", expect.objectContaining({ maxAge: 30 * 24 * 60 * 60 * 1000 }));
+  });
+
+  it("refresh() reads the refresh cookie, delegates to RefreshTokenService, and rotates auth cookies with the returned maxAge", async () => {
     const req = { cookies: { [REFRESH_TOKEN_COOKIE]: "old-refresh-token" } } as unknown as Request;
-    refreshTokenService.execute.mockResolvedValue({ accessToken: "new-access-token", refreshToken: "new-refresh-token" });
+    refreshTokenService.execute.mockResolvedValue({ accessToken: "new-access-token", refreshToken: "new-refresh-token", refreshTokenMaxAgeMs: 30 * 24 * 60 * 60 * 1000 });
 
     const result = await controller.refresh(req, res as unknown as Response);
 
     expect(refreshTokenService.execute).toHaveBeenCalledWith("old-refresh-token");
-    expect(res.cookie).toHaveBeenCalledWith(ACCESS_TOKEN_COOKIE, "new-access-token", expect.any(Object));
-    expect(res.cookie).toHaveBeenCalledWith(REFRESH_TOKEN_COOKIE, "new-refresh-token", expect.any(Object));
+    expect(res.cookie).toHaveBeenCalledWith(ACCESS_TOKEN_COOKIE, "new-access-token", expect.objectContaining({ maxAge: 15 * 60 * 1000 }));
+    expect(res.cookie).toHaveBeenCalledWith(REFRESH_TOKEN_COOKIE, "new-refresh-token", expect.objectContaining({ maxAge: 30 * 24 * 60 * 60 * 1000 }));
     expect(result).toEqual({ message: "Token refreshed." });
   });
 

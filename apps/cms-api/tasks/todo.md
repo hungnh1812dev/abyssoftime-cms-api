@@ -1,33 +1,24 @@
-# Todo — Configure-Columns backend support (`list-fields` PATCH + `updatedBy`)
+# Todo — `rememberMe` support in login
 
 See `tasks/plan.md` for full context and rationale.
 
-## Phase 1 — Foundational relocations
-- [x] Task 1 — relocate `LISTABLE_FIELD_TYPES`/`LISTABLE_SYSTEM_COLUMNS` into `content-type` module; `where-builder.ts` imports from there
-- [x] Task 2 — `IUserRepository.findByIds` + Prisma implementation
-- [x] Task 3 — `listFieldsOverride` column + migration + repository merge in `toEntity()`
-- [x] **Checkpoint 1:** build/lint/test green
+## Phase 1 — Foundation
+- [x] Task 1 — `RefreshTokenPayload` gains `rememberMe`; `JwtTokenService` dual-TTL signing (7d/30d) + `getRefreshTokenMaxAgeMs` helper
 
-## Phase 2 — Feature A: `PATCH .../list-fields`
-- [x] Task 4 — DTO + `UpdateListFieldsService` (validation) + controller route + `content_type:manager` permission (super_admin only)
-- [x] **Checkpoint 1 (Feature A core):** build/lint/test green; manual restart-survives-override check — commit
+## Phase 2 — Services
+- [x] Task 2 — `LoginService.execute` threads `rememberMe`; `LoginResult` gains `refreshTokenMaxAgeMs`
+- [x] Task 3 — `RefreshTokenService` re-applies `rememberMe` on rotation, `?? false` fallback for old tokens
 
-## Phase 3 — Feature B: `updatedBy`
-- [x] Task 5 — detail responses: `UserModule` import, mapper param, DTO field, both controllers resolve via `findById`, public controller untouched
-- [x] Task 6 — list responses: DTO field, batched `findByIds` resolution in `ListDocumentsService`
-- [x] **Checkpoint 2 (Feature B core):** build/lint/test green — commit
+## Phase 3 — Controller
+- [x] Task 4 — `LoginDto` field + `AuthController` handler plumbing + dynamic cookie `maxAge`
+- [x] **Checkpoint (core implementation):** `bun run lint` / `bun run test:cov` / `bun run build` green — automated checks pass; manual `start:dev` walkthrough still outstanding — commit
 
-## Phase 4 — Integration
-- [x] Task 7 — `projectFields` sources system columns (incl. resolved `updatedBy`) instead of only `row.fields`
-- [x] **Checkpoint 3 (final, full integration):** full test suite green; manual end-to-end walkthrough — commit
+## Phase 4 — Docs
+- [ ] Task 5 — `docs/documents/auth.md` updated (DTOs list, `RefreshTokenPayload`, TTL prose, endpoint table, `RefreshTokenService` note)
+- [ ] **Checkpoint:** doc read-through against SPEC.md + shipped code — commit
 
-## Phase 5 — Docs
-- [x] `SPEC.md` trimmed to pointer
-- [x] `docs/documents/content-type.md`, `document.md`, `users.md`, `docs/cms-admin-integration.md` updated
-- [x] New `docs/documents/content-type-list-fields-techstack.md` (decision-rationale table)
-- [x] **Checkpoint 4:** doc read-through — commit
-
-## Phase 6 — Review + close-out
-- [x] Five-axis review (correctness / readability / architecture / security / performance)
-- [x] Address findings
-- [x] **Checkpoint 5 (final):** all checks green — commit
+## Phase 5 — Review + close-out
+- [ ] Five-axis review (correctness / readability / architecture / security / performance)
+- [ ] Address findings
+- [ ] `SPEC.md` trimmed to a one-line pointer at `docs/documents/auth.md`
+- [ ] **Checkpoint (final):** all checks green — commit
