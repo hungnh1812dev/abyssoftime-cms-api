@@ -10,6 +10,7 @@ import {
   orderByTypeName,
   publishMutationName,
   queryName,
+  saveMutationName,
   typeName,
   unpublishMutationName,
   updateMutationName,
@@ -199,6 +200,22 @@ function buildListQueryField(definition: ContentTypeDefinition): string {
   return `  ${listQueryName(definition.slug)}(where: ${filterTypeName(definition.slug)}, orderBy: ${orderByTypeName(definition.slug)}, start: Int, size: Int): [${type}!]!`;
 }
 
+function buildSingleQueryField(definition: ContentTypeDefinition): string {
+  const type = typeName(definition.slug);
+  return `  ${queryName(definition.slug)}(status: String): ${type}`;
+}
+
+function buildSingleTypeMutationFields(definition: ContentTypeDefinition): string[] {
+  const type = typeName(definition.slug);
+  const input = inputTypeName(definition.slug);
+
+  return [
+    `  ${saveMutationName(definition.slug)}(data: ${input}!): ${type}!`,
+    `  ${publishMutationName(definition.slug)}: ${type}!`,
+    `  ${unpublishMutationName(definition.slug)}: ${type}!`,
+  ];
+}
+
 @Injectable()
 export class SchemaBuilderService {
   constructor(private readonly schemaLoader: SchemaLoaderService) {}
@@ -206,14 +223,20 @@ export class SchemaBuilderService {
   async buildTypeDefs(): Promise<string> {
     const definitions = await this.schemaLoader.load();
     const collectionDefinitions = definitions.filter((definition) => definition.kind === "collection");
+    const singleDefinitions = definitions.filter((definition) => definition.kind === "single");
 
-    const objectTypes = collectionDefinitions.flatMap((definition) => [buildObjectType(definition), ...buildComponentTypesFor(definition)]);
-    const inputTypes = collectionDefinitions.flatMap((definition) => [buildInputType(definition), ...buildComponentInputTypesFor(definition)]);
+    const objectTypes = [...collectionDefinitions, ...singleDefinitions].flatMap((definition) => [buildObjectType(definition), ...buildComponentTypesFor(definition)]);
+    const inputTypes = [...collectionDefinitions, ...singleDefinitions].flatMap((definition) => [buildInputType(definition), ...buildComponentInputTypesFor(definition)]);
     const filterTypes = collectionDefinitions.map(buildFilterType);
     const orderByTypes = collectionDefinitions.map(buildOrderByType);
-    const queryFields = ["  _empty: String", ...collectionDefinitions.map(buildQueryField), ...collectionDefinitions.map(buildListQueryField)];
+    const queryFields = [
+      "  _empty: String",
+      ...collectionDefinitions.map(buildQueryField),
+      ...collectionDefinitions.map(buildListQueryField),
+      ...singleDefinitions.map(buildSingleQueryField),
+    ];
     const queryType = `type Query {\n${queryFields.join("\n")}\n}`;
-    const mutationFields = ["  _empty: String", ...collectionDefinitions.flatMap(buildMutationFields)];
+    const mutationFields = ["  _empty: String", ...collectionDefinitions.flatMap(buildMutationFields), ...singleDefinitions.flatMap(buildSingleTypeMutationFields)];
     const mutationType = `type Mutation {\n${mutationFields.join("\n")}\n}`;
 
     return [MEDIA_ASSET_TYPE, JSON_SCALAR_TYPE, ...objectTypes, ...inputTypes, SHARED_FILTER_AND_ORDER_TYPES, ...filterTypes, ...orderByTypes, queryType, mutationType].join(

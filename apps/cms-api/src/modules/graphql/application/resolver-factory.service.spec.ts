@@ -7,10 +7,15 @@ import { ContentTypeDefinition } from "@/modules/content-type/domain/entities/co
 import { DeleteDocumentService } from "@/modules/document/application/services/delete-document.service";
 import { GetDocumentForEditService } from "@/modules/document/application/services/get-document-for-edit.service";
 import { GetPublicDocumentService } from "@/modules/document/application/services/get-public-document.service";
+import { GetPublicSingleTypeService } from "@/modules/document/application/services/get-public-single-type.service";
+import { GetSingleTypeService } from "@/modules/document/application/services/get-single-type.service";
 import { ListDocumentsFullService } from "@/modules/document/application/services/list-documents-full.service";
 import { PublishDocumentService } from "@/modules/document/application/services/publish-document.service";
+import { PublishSingleTypeService } from "@/modules/document/application/services/publish-single-type.service";
 import { SaveDocumentService } from "@/modules/document/application/services/save-document.service";
+import { SaveSingleTypeService } from "@/modules/document/application/services/save-single-type.service";
 import { UnpublishDocumentService } from "@/modules/document/application/services/unpublish-document.service";
+import { UnpublishSingleTypeService } from "@/modules/document/application/services/unpublish-single-type.service";
 import { DocumentEntity } from "@/modules/document/domain/entities/document.entity";
 import { MediaAssetEntity } from "@/modules/media/domain/entities/media-asset.entity";
 import { type IMediaAssetRepository } from "@/modules/media/domain/repositories/media-asset.repository";
@@ -40,6 +45,14 @@ const cvPage: ContentTypeDefinition = {
   ],
 };
 
+const homePage: ContentTypeDefinition = {
+  slug: "home-page",
+  name: "Home Page",
+  kind: "single",
+  draftToPublish: true,
+  fields: [{ name: "heroTitle", type: "text" }],
+};
+
 const validId = "5f8b1a3e-4d2c-4a1b-9e3f-2c1d4a5b6c7d";
 const anotherValidId = "6a9c2b4f-5e3d-4b2c-8f4a-3d2e5b6c7d8e";
 
@@ -57,6 +70,11 @@ describe("ResolverFactoryService", () => {
   let publishDocument: jest.Mocked<PublishDocumentService>;
   let unpublishDocument: jest.Mocked<UnpublishDocumentService>;
   let deleteDocument: jest.Mocked<DeleteDocumentService>;
+  let getPublicSingleType: jest.Mocked<GetPublicSingleTypeService>;
+  let getSingleType: jest.Mocked<GetSingleTypeService>;
+  let saveSingleType: jest.Mocked<SaveSingleTypeService>;
+  let publishSingleType: jest.Mocked<PublishSingleTypeService>;
+  let unpublishSingleType: jest.Mocked<UnpublishSingleTypeService>;
   let service: ResolverFactoryService;
 
   const noToken: GraphqlContext = { apiToken: null };
@@ -77,6 +95,11 @@ describe("ResolverFactoryService", () => {
     publishDocument = { execute: jest.fn() } as unknown as jest.Mocked<PublishDocumentService>;
     unpublishDocument = { execute: jest.fn() } as unknown as jest.Mocked<UnpublishDocumentService>;
     deleteDocument = { execute: jest.fn() } as unknown as jest.Mocked<DeleteDocumentService>;
+    getPublicSingleType = { execute: jest.fn() } as unknown as jest.Mocked<GetPublicSingleTypeService>;
+    getSingleType = { execute: jest.fn() } as unknown as jest.Mocked<GetSingleTypeService>;
+    saveSingleType = { execute: jest.fn() } as unknown as jest.Mocked<SaveSingleTypeService>;
+    publishSingleType = { execute: jest.fn() } as unknown as jest.Mocked<PublishSingleTypeService>;
+    unpublishSingleType = { execute: jest.fn() } as unknown as jest.Mocked<UnpublishSingleTypeService>;
     service = new ResolverFactoryService(
       schemaLoader,
       getPublicDocument,
@@ -87,6 +110,11 @@ describe("ResolverFactoryService", () => {
       publishDocument,
       unpublishDocument,
       deleteDocument,
+      getPublicSingleType,
+      getSingleType,
+      saveSingleType,
+      publishSingleType,
+      unpublishSingleType,
     );
   });
 
@@ -376,6 +404,133 @@ describe("ResolverFactoryService", () => {
 
         await expect(resolvers.Mutation.unpublishCvPage(undefined, { Id: validId }, noToken)).rejects.toMatchObject({ extensions: { code: "UNAUTHENTICATED" } });
         expect(unpublishDocument.execute).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("single-type (home-page)", () => {
+      beforeEach(() => {
+        schemaLoader.load.mockResolvedValue([homePage]);
+      });
+
+      it("builds a status-only Query resolver and save/publish/unpublish Mutation resolvers, no list/create/update/delete", async () => {
+        const resolvers = await service.buildResolvers();
+
+        expect(Object.keys(resolvers.Query)).toEqual(["homePage"]);
+        expect(Object.keys(resolvers.Mutation)).toEqual(["saveHomePage", "publishHomePage", "unpublishHomePage"]);
+      });
+
+      it("delegates a non-draft query to GetPublicSingleTypeService with (slug), no token required", async () => {
+        getPublicSingleType.execute.mockResolvedValue(buildDocument({ heroTitle: "Welcome" }));
+        const resolvers = await service.buildResolvers();
+
+        const result = await resolvers.Query.homePage(undefined, {}, noToken, undefined);
+
+        expect(getPublicSingleType.execute).toHaveBeenCalledWith("home-page");
+        expect(getSingleType.execute).not.toHaveBeenCalled();
+        expect(result).toEqual(expect.objectContaining({ heroTitle: "Welcome" }));
+      });
+
+      it("returns null (not an error) when the published document doesn't exist", async () => {
+        getPublicSingleType.execute.mockRejectedValue(new NotFoundException("not found"));
+        const resolvers = await service.buildResolvers();
+
+        const result = await resolvers.Query.homePage(undefined, {}, noToken, undefined);
+
+        expect(result).toBeNull();
+      });
+
+      it("requires document:read for status: draft and rejects when the context has no token", async () => {
+        const resolvers = await service.buildResolvers();
+
+        await expect(resolvers.Query.homePage(undefined, { status: "draft" }, noToken, undefined)).rejects.toMatchObject({
+          extensions: { code: "UNAUTHENTICATED" },
+        });
+        expect(getSingleType.execute).not.toHaveBeenCalled();
+      });
+
+      it("delegates a draft query to GetSingleTypeService when the token is document:read-scoped", async () => {
+        getSingleType.execute.mockResolvedValue({ document: buildDocument({ heroTitle: "Draft Welcome" }), status: "draft" });
+        const resolvers = await service.buildResolvers();
+
+        const result = await resolvers.Query.homePage(undefined, { status: "draft" }, readScopedToken, undefined);
+
+        expect(getSingleType.execute).toHaveBeenCalledWith("home-page");
+        expect(result).toEqual(expect.objectContaining({ heroTitle: "Draft Welcome" }));
+      });
+
+      describe("saveHomePage", () => {
+        it("requires document:update, saves then re-reads via GetSingleTypeService", async () => {
+          saveSingleType.execute.mockResolvedValue(buildDocument({ heroTitle: "Old" }));
+          getSingleType.execute.mockResolvedValue({ document: buildDocument({ heroTitle: "New" }), status: "modified" });
+          const resolvers = await service.buildResolvers();
+
+          const result = await resolvers.Mutation.saveHomePage(undefined, { data: { heroTitle: "New" } }, updateScopedToken);
+
+          expect(saveSingleType.execute).toHaveBeenCalledWith("home-page", { heroTitle: "New" }, "token-1");
+          expect(getSingleType.execute).toHaveBeenCalledWith("home-page");
+          expect(result).toEqual(expect.objectContaining({ heroTitle: "New" }));
+        });
+
+        it("rejects a missing token, never calling the service", async () => {
+          const resolvers = await service.buildResolvers();
+
+          await expect(resolvers.Mutation.saveHomePage(undefined, { data: {} }, noToken)).rejects.toMatchObject({ extensions: { code: "UNAUTHENTICATED" } });
+          expect(saveSingleType.execute).not.toHaveBeenCalled();
+        });
+      });
+
+      describe("publishHomePage", () => {
+        it("requires document:publish and delegates directly to PublishSingleTypeService.execute", async () => {
+          publishSingleType.execute.mockResolvedValue(buildDocument({ heroTitle: "Published" }));
+          const resolvers = await service.buildResolvers();
+
+          const result = await resolvers.Mutation.publishHomePage(undefined, {}, publishScopedToken);
+
+          expect(publishSingleType.execute).toHaveBeenCalledWith("home-page", "token-1");
+          expect(result).toEqual(expect.objectContaining({ heroTitle: "Published" }));
+        });
+
+        it("maps a BadRequestException (Mode B) to a BAD_USER_INPUT GraphQL error, not a 500", async () => {
+          publishSingleType.execute.mockRejectedValue(new BadRequestException("draft/publish disabled"));
+          const resolvers = await service.buildResolvers();
+
+          await expect(resolvers.Mutation.publishHomePage(undefined, {}, publishScopedToken)).rejects.toMatchObject({ extensions: { code: "BAD_USER_INPUT" } });
+        });
+
+        it("rejects a wrongly-scoped token, never calling the service", async () => {
+          const resolvers = await service.buildResolvers();
+
+          await expect(resolvers.Mutation.publishHomePage(undefined, {}, readScopedToken)).rejects.toMatchObject({ extensions: { code: "FORBIDDEN" } });
+          expect(publishSingleType.execute).not.toHaveBeenCalled();
+        });
+      });
+
+      describe("unpublishHomePage", () => {
+        it("requires document:unpublish, unpublishes then re-reads via GetSingleTypeService", async () => {
+          unpublishSingleType.execute.mockResolvedValue(undefined);
+          getSingleType.execute.mockResolvedValue({ document: buildDocument({ heroTitle: "Draft again" }), status: "draft" });
+          const resolvers = await service.buildResolvers();
+
+          const result = await resolvers.Mutation.unpublishHomePage(undefined, {}, unpublishScopedToken);
+
+          expect(unpublishSingleType.execute).toHaveBeenCalledWith("home-page");
+          expect(getSingleType.execute).toHaveBeenCalledWith("home-page");
+          expect(result).toEqual(expect.objectContaining({ heroTitle: "Draft again" }));
+        });
+
+        it("maps a BadRequestException (Mode B) to a BAD_USER_INPUT GraphQL error", async () => {
+          unpublishSingleType.execute.mockRejectedValue(new BadRequestException("draft/publish disabled"));
+          const resolvers = await service.buildResolvers();
+
+          await expect(resolvers.Mutation.unpublishHomePage(undefined, {}, unpublishScopedToken)).rejects.toMatchObject({ extensions: { code: "BAD_USER_INPUT" } });
+        });
+
+        it("rejects a missing token, never calling the service", async () => {
+          const resolvers = await service.buildResolvers();
+
+          await expect(resolvers.Mutation.unpublishHomePage(undefined, {}, noToken)).rejects.toMatchObject({ extensions: { code: "UNAUTHENTICATED" } });
+          expect(unpublishSingleType.execute).not.toHaveBeenCalled();
+        });
       });
     });
 

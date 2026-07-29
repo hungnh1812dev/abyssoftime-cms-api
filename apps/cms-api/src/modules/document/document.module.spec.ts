@@ -72,7 +72,7 @@ describe("DocumentModule", () => {
     );
   });
 
-  it("exports the collection-type services the graphql module delegates to", () => {
+  it("exports the collection-type and single-type services the graphql module delegates to", () => {
     const exportsMetadata = Reflect.getMetadata(MODULE_METADATA.EXPORTS, DocumentModule) as unknown[];
 
     expect(exportsMetadata).toEqual(
@@ -84,6 +84,11 @@ describe("DocumentModule", () => {
         PublishDocumentService,
         UnpublishDocumentService,
         DeleteDocumentService,
+        GetSingleTypeService,
+        SaveSingleTypeService,
+        PublishSingleTypeService,
+        UnpublishSingleTypeService,
+        GetPublicSingleTypeService,
       ]),
     );
   });

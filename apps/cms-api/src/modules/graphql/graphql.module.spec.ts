@@ -10,10 +10,15 @@ import { ContentTypeDefinition } from "@/modules/content-type/domain/entities/co
 import { DeleteDocumentService } from "@/modules/document/application/services/delete-document.service";
 import { GetDocumentForEditService } from "@/modules/document/application/services/get-document-for-edit.service";
 import { GetPublicDocumentService } from "@/modules/document/application/services/get-public-document.service";
+import { GetPublicSingleTypeService } from "@/modules/document/application/services/get-public-single-type.service";
+import { GetSingleTypeService } from "@/modules/document/application/services/get-single-type.service";
 import { ListDocumentsFullService } from "@/modules/document/application/services/list-documents-full.service";
 import { PublishDocumentService } from "@/modules/document/application/services/publish-document.service";
+import { PublishSingleTypeService } from "@/modules/document/application/services/publish-single-type.service";
 import { SaveDocumentService } from "@/modules/document/application/services/save-document.service";
+import { SaveSingleTypeService } from "@/modules/document/application/services/save-single-type.service";
 import { UnpublishDocumentService } from "@/modules/document/application/services/unpublish-document.service";
+import { UnpublishSingleTypeService } from "@/modules/document/application/services/unpublish-single-type.service";
 import { DocumentModule } from "@/modules/document/document.module";
 import { type IMediaAssetRepository } from "@/modules/media/domain/repositories/media-asset.repository";
 import { MediaModule } from "@/modules/media/media.module";
@@ -55,8 +60,16 @@ describe("GraphqlModule", () => {
       fields: [{ name: "position", type: "text" }],
     };
 
+    const homePage: ContentTypeDefinition = {
+      slug: "home-page",
+      name: "Home Page",
+      kind: "single",
+      draftToPublish: true,
+      fields: [{ name: "heroTitle", type: "text" }],
+    };
+
     async function invokeFactory() {
-      const schemaLoader = { load: jest.fn().mockResolvedValue([cvPage]) } as unknown as SchemaLoaderService;
+      const schemaLoader = { load: jest.fn().mockResolvedValue([cvPage, homePage]) } as unknown as SchemaLoaderService;
       const getPublicDocument = {} as GetPublicDocumentService;
       const getDocumentForEdit = {} as GetDocumentForEditService;
       const listDocumentsFull = {} as ListDocumentsFullService;
@@ -66,6 +79,11 @@ describe("GraphqlModule", () => {
       const publishDocument = {} as PublishDocumentService;
       const unpublishDocument = {} as UnpublishDocumentService;
       const deleteDocument = {} as DeleteDocumentService;
+      const getPublicSingleType = {} as GetPublicSingleTypeService;
+      const getSingleType = {} as GetSingleTypeService;
+      const saveSingleType = {} as SaveSingleTypeService;
+      const publishSingleType = {} as PublishSingleTypeService;
+      const unpublishSingleType = {} as UnpublishSingleTypeService;
 
       return options.useFactory(
         schemaLoader,
@@ -78,11 +96,16 @@ describe("GraphqlModule", () => {
         publishDocument,
         unpublishDocument,
         deleteDocument,
+        getPublicSingleType,
+        getSingleType,
+        saveSingleType,
+        publishSingleType,
+        unpublishSingleType,
       );
     }
 
-    it("injects SchemaLoaderService, GetPublicDocumentService, GetDocumentForEditService, ListDocumentsFullService, ACCESS_TOKEN_REPOSITORY, MEDIA_ASSET_REPOSITORY, and the 4 mutation-backing services", () => {
-      expect(options.inject).toHaveLength(10);
+    it("injects SchemaLoaderService, GetPublicDocumentService, GetDocumentForEditService, ListDocumentsFullService, ACCESS_TOKEN_REPOSITORY, MEDIA_ASSET_REPOSITORY, the 4 mutation-backing services, and the 5 single-type services", () => {
+      expect(options.inject).toHaveLength(15);
     });
 
     it("builds real typeDefs via SchemaBuilderService", async () => {
@@ -90,6 +113,8 @@ describe("GraphqlModule", () => {
 
       expect(config.typeDefs).toContain("type CvPage");
       expect(config.typeDefs).toContain("cvPage(Id: ID!, status: String): CvPage");
+      expect(config.typeDefs).toContain("type HomePage");
+      expect(config.typeDefs).toContain("homePage(status: String): HomePage");
     });
 
     it("builds real resolvers via ResolverFactoryService", async () => {
@@ -103,6 +128,10 @@ describe("GraphqlModule", () => {
       expect(resolvers.Mutation.deleteCvPage).toBeInstanceOf(Function);
       expect(resolvers.Mutation.publishCvPage).toBeInstanceOf(Function);
       expect(resolvers.Mutation.unpublishCvPage).toBeInstanceOf(Function);
+      expect(resolvers.Query.homePage).toBeInstanceOf(Function);
+      expect(resolvers.Mutation.saveHomePage).toBeInstanceOf(Function);
+      expect(resolvers.Mutation.publishHomePage).toBeInstanceOf(Function);
+      expect(resolvers.Mutation.unpublishHomePage).toBeInstanceOf(Function);
       expect(resolvers.SortDirection).toEqual({ ASC: "asc", DESC: "desc" });
     });
 

@@ -30,8 +30,8 @@ See `tasks/plan.md` for full context, dependency graph, and rationale.
 - [x] **Checkpoint 4:** `bun run test:e2e` green; manual full lifecycle via a real token — commit
 
 ## Phase 5 — Single-type support
-- [ ] Task 5.1 — Export 5 single-type services; SDL + resolvers (query/save/publish/unpublish, no `Id`); e2e extension
-- [ ] **Checkpoint 5:** full e2e suite + all automated checks green — commit
+- [x] Task 5.1 — Export 5 single-type services; SDL + resolvers (query/save/publish/unpublish, no `Id`); e2e extension
+- [x] **Checkpoint 5:** full e2e suite + all automated checks green — commit
 
 ## Phase 6 — Hardening
 - [ ] Task 6.1 — Error-shape audit (consistent `GraphQLError` codes); re-verify introspection gating; five-axis review; address findings

@@ -105,13 +105,30 @@ describe("SchemaBuilderService", () => {
     expect(queryFields.enItVocab.type.toString()).toBe("EnItVocab");
   });
 
-  it("skips single-kind definitions entirely", async () => {
+  it("emits an object type + status-only single query for a single-kind definition", async () => {
     const service = new SchemaBuilderService(buildSchemaLoader([singleTypeDef]));
 
     const schema = buildSchema(await service.buildTypeDefs());
 
-    expect(schema.getType("HomePage")).toBeUndefined();
-    expect(schema.getQueryType()!.getFields().homePage).toBeUndefined();
+    const homePageType = schema.getType("HomePage") as GraphQLObjectType;
+    expect(homePageType).toBeDefined();
+    expect(Object.keys(homePageType.getFields())).toEqual(["documentId", "title"]);
+
+    const queryFields = schema.getQueryType()!.getFields();
+    expect(queryFields.homePage).toBeDefined();
+    expect(queryFields.homePage.type.toString()).toBe("HomePage");
+    expect(queryFields.homePage.args.map((arg) => arg.name)).toEqual(["status"]);
+    expect(queryFields.homePage.args[0].type.toString()).toBe("String");
+  });
+
+  it("does not emit Filter/OrderBy input types or a list query for a single-kind definition", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([singleTypeDef]));
+
+    const schema = buildSchema(await service.buildTypeDefs());
+
+    expect(schema.getType("HomePageFilter")).toBeUndefined();
+    expect(schema.getType("HomePageOrderBy")).toBeUndefined();
+    expect(schema.getQueryType()!.getFields().homePageList).toBeUndefined();
   });
 
   it("returns identical SDL across repeated calls (deterministic ordering)", async () => {
@@ -303,13 +320,34 @@ describe("SchemaBuilderService", () => {
     expect(mutationFields.unpublishCvPage.type.toString()).toBe("CvPage!");
   });
 
-  it("skips mutations for single-kind definitions", async () => {
+  it("emits save/publish/unpublish mutations (no create/update/delete/Id) for a single-kind definition", async () => {
     const service = new SchemaBuilderService(buildSchemaLoader([singleTypeDef]));
 
     const schema = buildSchema(await service.buildTypeDefs());
 
     const mutationFields = schema.getMutationType()!.getFields();
     expect(mutationFields.createHomePage).toBeUndefined();
-    expect(mutationFields.saveHomePage).toBeUndefined();
+    expect(mutationFields.updateHomePage).toBeUndefined();
+    expect(mutationFields.deleteHomePage).toBeUndefined();
+
+    expect(mutationFields.saveHomePage.args.map((a) => a.name)).toEqual(["data"]);
+    expect(mutationFields.saveHomePage.args[0].type.toString()).toBe("HomePageInput!");
+    expect(mutationFields.saveHomePage.type.toString()).toBe("HomePage!");
+
+    expect(mutationFields.publishHomePage.args).toEqual([]);
+    expect(mutationFields.publishHomePage.type.toString()).toBe("HomePage!");
+
+    expect(mutationFields.unpublishHomePage.args).toEqual([]);
+    expect(mutationFields.unpublishHomePage.type.toString()).toBe("HomePage!");
+  });
+
+  it("emits <Type>Input for a single-kind definition too", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([singleTypeDef]));
+
+    const schema = buildSchema(await service.buildTypeDefs());
+
+    const inputType = schema.getType("HomePageInput") as GraphQLInputObjectType;
+    expect(inputType).toBeDefined();
+    expect(Object.keys(inputType.getFields())).toEqual(["title"]);
   });
 });

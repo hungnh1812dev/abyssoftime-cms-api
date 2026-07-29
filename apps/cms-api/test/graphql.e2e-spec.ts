@@ -12,7 +12,7 @@ import { ACCESS_TOKEN_REPOSITORY, type IAccessTokenRepository } from "@/modules/
 import { SchemaLoaderService } from "@/modules/content-type/application/schema/schema-loader.service";
 import { ContentTypeSyncService } from "@/modules/content-type/application/sync/content-type-sync.service";
 import { type ContentTypeDefinition } from "@/modules/content-type/domain/entities/content-type.entity";
-import { createMutationName, inputTypeName, queryName, updateMutationName } from "@/modules/graphql/domain/naming";
+import { createMutationName, inputTypeName, publishMutationName, queryName, saveMutationName, unpublishMutationName, updateMutationName } from "@/modules/graphql/domain/naming";
 import { STORAGE_ADAPTER } from "@/modules/storage/domain/repositories/storage-adapter.repository";
 import { PrismaService } from "@/prisma/application/prisma.service";
 
@@ -56,6 +56,8 @@ describe("GraphQL (e2e)", () => {
   const runId = randomUUID().slice(0, 8);
   const mediaSlug = `e2e-gql-media-${runId}`;
   const mediaQueryName = queryName(mediaSlug);
+  const singleSlug = `e2e-gql-single-${runId}`;
+  const singleQueryName = queryName(singleSlug);
   const storage = new NoopStorageAdapter();
 
   let app: INestApplication<App>;
@@ -97,6 +99,15 @@ describe("GraphQL (e2e)", () => {
     ],
   };
 
+  const singleDefPath = path.join(process.cwd(), "content-types", `${singleSlug}.json`);
+  const singleDefContents: ContentTypeDefinition = {
+    slug: singleSlug,
+    name: "E2E GraphQL Single",
+    kind: "single",
+    draftToPublish: true,
+    fields: [{ name: "heroTitle", type: "text" }],
+  };
+
   function gql(query: string, variables?: Record<string, unknown>, token?: string) {
     const req = request(app.getHttpServer()).post("/graphql").send({ query, variables });
     if (token) {
@@ -107,6 +118,7 @@ describe("GraphQL (e2e)", () => {
 
   beforeAll(async () => {
     await writeFile(mediaDefPath, JSON.stringify(mediaDefContents, null, 2));
+    await writeFile(singleDefPath, JSON.stringify(singleDefContents, null, 2));
 
     app = await bootTestApp((builder) => builder.overrideProvider(STORAGE_ADAPTER).useValue(storage));
 
@@ -118,7 +130,7 @@ describe("GraphQL (e2e)", () => {
     accessTokens = app.get(ACCESS_TOKEN_REPOSITORY);
 
     const allDefsOnDisk = await schemaLoader.load();
-    realDefs = allDefsOnDisk.filter((definition) => definition.slug !== mediaSlug);
+    realDefs = allDefsOnDisk.filter((definition) => definition.slug !== mediaSlug && definition.slug !== singleSlug);
 
     // Defensive, matching content-engine.e2e-spec.ts's own precedent: a pre-existing dev DB's
     // super_admin role may predate the document:* permission slugs.
@@ -185,9 +197,10 @@ describe("GraphQL (e2e)", () => {
       await prisma.mediaAsset.deleteMany({ where: { documentId: { in: createdMediaIds } } });
     }
 
-    // Remove the throwaway content type's file, then re-sync to only the real seeds — drops its
-    // table via the same sync() the boot process uses, keeping the two real seeds untouched.
+    // Remove the throwaway content types' files, then re-sync to only the real seeds — drops
+    // their tables via the same sync() the boot process uses, keeping the two real seeds untouched.
     await unlink(mediaDefPath).catch(() => undefined);
+    await unlink(singleDefPath).catch(() => undefined);
     await syncService.sync(realDefs);
 
     for (const tokenId of createdApiTokenIds) {
@@ -554,6 +567,68 @@ describe("GraphQL (e2e)", () => {
       expect(updateBody.errors).toBeUndefined();
       const updated = (updateBody.data as Record<string, { documentId: string; title: string; cover: { documentId: string; fileName: string } }>)[updateMutationField];
       expect(updated).toMatchObject({ documentId, title: `Mutation media updated ${runId}`, cover: { documentId: mutationMediaDocumentId, fileName: "mutation-cover.png" } });
+    });
+  });
+
+  describe(`single-type (${singleSlug})`, () => {
+    it("round-trips a full lifecycle — save, publish, unpublish — via a token scoped with exactly its required permission, no Id anywhere", async () => {
+      const saveField = saveMutationName(singleSlug);
+      const publishField = publishMutationName(singleSlug);
+      const unpublishField = unpublishMutationName(singleSlug);
+
+      const saveResult = await gql(
+        `mutation($data: ${inputTypeName(singleSlug)}!) { ${saveField}(data: $data) { documentId heroTitle } }`,
+        { data: { heroTitle: `Single Type ${runId}` } },
+        updateOnlyApiToken,
+      ).expect(200);
+      const saveBody = saveResult.body as GraphQLResponseBody;
+      expect(saveBody.errors).toBeUndefined();
+      const saved = (saveBody.data as Record<string, { documentId: string; heroTitle: string }>)[saveField];
+      expect(saved).toMatchObject({ heroTitle: `Single Type ${runId}` });
+
+      const publicReadBeforePublish = await gql(`{ ${singleQueryName} { heroTitle } }`).expect(200);
+      expect((publicReadBeforePublish.body as GraphQLResponseBody).data).toEqual({ [singleQueryName]: null });
+
+      const draftReadBeforePublish = await gql(`{ ${singleQueryName}(status: "draft") { heroTitle } }`, undefined, readScopedApiToken).expect(200);
+      expect((draftReadBeforePublish.body as GraphQLResponseBody).data).toEqual({ [singleQueryName]: { heroTitle: `Single Type ${runId}` } });
+
+      const publishResult = await gql(`mutation { ${publishField} { heroTitle } }`, undefined, publishOnlyApiToken).expect(200);
+      const publishBody = publishResult.body as GraphQLResponseBody;
+      expect(publishBody.errors).toBeUndefined();
+      expect(publishBody.data).toEqual({ [publishField]: { heroTitle: `Single Type ${runId}` } });
+
+      const publicReadAfterPublish = await gql(`{ ${singleQueryName} { heroTitle } }`).expect(200);
+      expect((publicReadAfterPublish.body as GraphQLResponseBody).data).toEqual({ [singleQueryName]: { heroTitle: `Single Type ${runId}` } });
+
+      const unpublishResult = await gql(`mutation { ${unpublishField} { heroTitle } }`, undefined, unpublishOnlyApiToken).expect(200);
+      const unpublishBody = unpublishResult.body as GraphQLResponseBody;
+      expect(unpublishBody.errors).toBeUndefined();
+      expect(unpublishBody.data).toEqual({ [unpublishField]: { heroTitle: `Single Type ${runId}` } });
+
+      const publicReadAfterUnpublish = await gql(`{ ${singleQueryName} { heroTitle } }`).expect(200);
+      expect((publicReadAfterUnpublish.body as GraphQLResponseBody).data).toEqual({ [singleQueryName]: null });
+    });
+
+    it(`${saveMutationName(singleSlug)} rejects a wrongly-scoped token with FORBIDDEN, never executing the mutation`, async () => {
+      const saveField = saveMutationName(singleSlug);
+      const response = await gql(
+        `mutation($data: ${inputTypeName(singleSlug)}!) { ${saveField}(data: $data) { documentId } }`,
+        { data: { heroTitle: "X" } },
+        readScopedApiToken,
+      ).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.data).toBeNull();
+      expect(body.errors?.[0].extensions?.code).toBe("FORBIDDEN");
+    });
+
+    it(`${saveMutationName(singleSlug)} rejects a missing token with UNAUTHENTICATED, never executing the mutation`, async () => {
+      const saveField = saveMutationName(singleSlug);
+      const response = await gql(`mutation($data: ${inputTypeName(singleSlug)}!) { ${saveField}(data: $data) { documentId } }`, { data: { heroTitle: "X" } }).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.data).toBeNull();
+      expect(body.errors?.[0].extensions?.code).toBe("UNAUTHENTICATED");
     });
   });
 
