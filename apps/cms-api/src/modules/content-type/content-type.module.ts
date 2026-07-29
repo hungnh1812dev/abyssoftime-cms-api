@@ -22,6 +22,6 @@ import { ContentTypeController } from "./presentation/content-type.controller";
     { provide: CONTENT_TYPE_REPOSITORY, useClass: PrismaContentTypeRepository },
     { provide: SCHEMA_TABLE_REPOSITORY, useClass: PrismaSchemaTableRepository },
   ],
-  exports: [GetContentTypeService, CONTENT_TYPE_REPOSITORY],
+  exports: [GetContentTypeService, CONTENT_TYPE_REPOSITORY, SchemaLoaderService],
 })
 export class ContentTypeModule {}

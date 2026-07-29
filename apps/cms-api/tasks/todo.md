@@ -1,24 +1,42 @@
-# Todo — `rememberMe` support in login
+# Todo — Dynamic GraphQL API
 
-See `tasks/plan.md` for full context and rationale.
+See `tasks/plan.md` for full context, dependency graph, and rationale.
 
-## Phase 1 — Foundation
-- [x] Task 1 — `RefreshTokenPayload` gains `rememberMe`; `JwtTokenService` dual-TTL signing (7d/30d) + `getRefreshTokenMaxAgeMs` helper
+## Phase 1 — Foundation + minimal single-query vertical slice
+- [x] Task 1.1 — Install `@nestjs/graphql`/`@nestjs/apollo`/`@apollo/server`/`graphql`; module skeleton + boot wiring + dev-only introspection gating
+- [x] Task 1.2 — `field-type-mapping.ts` + `naming.ts` (pure, unit-tested)
+- [x] Task 1.3 — Additive exports: `ContentTypeModule` (`SchemaLoaderService`), `DocumentModule` (`GetPublicDocumentService`, `GetDocumentForEditService`)
+- [x] Task 1.4 — `schema-builder.service.ts`: scalar-only SDL + single query
+- [x] Task 1.5 — `graphql-context.factory.ts` + `authorize.util.ts` (Bearer token, never throws on absent token)
+- [x] Task 1.6 — `resolver-factory.service.ts`: single-query resolver + real `graphql.module.ts` wiring
+- [x] **Checkpoint 1:** `bun run build` / `tsc --noEmit` / `bun run lint` / `test:cov` green; manual `start:dev` walkthrough (published/draft, with/without token) — commit
 
-## Phase 2 — Services
-- [x] Task 2 — `LoginService.execute` threads `rememberMe`; `LoginResult` gains `refreshTokenMaxAgeMs`
-- [x] Task 3 — `RefreshTokenService` re-applies `rememberMe` on rotation, `?? false` fallback for old tokens
+## Phase 2 — List query
+- [ ] Task 2.1 — `ListDocumentsFullService` (new file, `document` module) — full-hydration, published-only, no listFields projection
+- [ ] Task 2.2 — `list-args.translator.ts`: GraphQL `where`/`orderBy` → `ParsedFilter[]`
+- [ ] Task 2.3 — SDL: `<Type>Filter`/`<Type>OrderBy` + list query; resolver wiring
+- [ ] **Checkpoint 2:** automated checks green; manual filter+orderBy+pagination check — commit
 
-## Phase 3 — Controller
-- [x] Task 4 — `LoginDto` field + `AuthController` handler plumbing + dynamic cookie `maxAge`
-- [x] **Checkpoint (core implementation):** `bun run lint` / `bun run test:cov` / `bun run build` green — automated checks pass; manual `start:dev` walkthrough still outstanding — commit
+## Phase 3 — Media + component recursive resolution
+- [ ] Task 3.1 — `MediaModule` export + `MediaAsset` type + field resolver (dangling/null FK → `null`, never throws)
+- [ ] Task 3.2 — Recursive component SDL + resolvers (arbitrary nesting depth)
+- [ ] Task 3.3 — New `test/graphql.e2e-spec.ts`: full read-path e2e (real seeds + throwaway media-bearing content type)
+- [ ] **Checkpoint 3:** `bun run test:e2e` green; manual nested+media query — commit
 
-## Phase 4 — Docs
-- [x] Task 5 — `docs/documents/auth.md` updated (DTOs list, `RefreshTokenPayload`, TTL prose, endpoint table, `RefreshTokenService` note, gap note, verified-state entry)
-- [x] **Checkpoint:** doc read-through against SPEC.md + shipped code — commit
+## Phase 4 — Mutations (collection-type)
+- [ ] Task 4.1 — Export remaining collection services; SDL for `<Type>Input` + 5 mutations
+- [ ] Task 4.2 — Mutation resolvers + permission checks (create/update/delete/publish/unpublish; update re-reads after save)
+- [ ] Task 4.3 — e2e: full CRUD lifecycle + permission-denied cases
+- [ ] **Checkpoint 4:** `bun run test:e2e` green; manual full lifecycle via a real token — commit
 
-## Phase 5 — Review + close-out
-- [x] Five-axis review (correctness / readability / architecture / security / performance) — APPROVE, no critical/important findings
-- [x] Address findings — `RefreshTokenPayload.rememberMe` made optional (compiler-enforced fallback discipline); positional-boolean suggestion skipped as premature for a single call site
-- [x] `SPEC.md` trimmed to a one-line pointer at `docs/documents/auth.md`
-- [x] **Checkpoint (final):** all checks green — commit
+## Phase 5 — Single-type support
+- [ ] Task 5.1 — Export 5 single-type services; SDL + resolvers (query/save/publish/unpublish, no `Id`); e2e extension
+- [ ] **Checkpoint 5:** full e2e suite + all automated checks green — commit
+
+## Phase 6 — Hardening
+- [ ] Task 6.1 — Error-shape audit (consistent `GraphQLError` codes); re-verify introspection gating; five-axis review; address findings
+- [ ] **Checkpoint 6:** all checks green, findings addressed — commit
+
+## Phase 7 — Docs + close-out
+- [ ] Task 7.1 — `docs/documents/graphql.md` (new), confirm/update `graphql-techstack.md`, `docs/ENTRYPOINT.md` index entry, `SPEC.md` trimmed to pointer
+- [ ] **Checkpoint 7 (final):** all checks green — commit — feature complete

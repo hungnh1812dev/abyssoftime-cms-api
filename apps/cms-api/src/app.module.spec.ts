@@ -9,6 +9,7 @@ import { AccessTokenModule } from "./modules/access-tokens/access-token.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { ContentTypeModule } from "./modules/content-type/content-type.module";
 import { DocumentModule } from "./modules/document/document.module";
+import { GraphqlModule } from "./modules/graphql/graphql.module";
 import { MediaModule } from "./modules/media/media.module";
 import { PermissionModule } from "./modules/permissions/permission.module";
 import { RoleModule } from "./modules/roles/role.module";
@@ -33,6 +34,7 @@ describe("AppModule", () => {
       MediaModule,
       ContentTypeModule,
       DocumentModule,
+      GraphqlModule,
       SeedModule,
     ]);
   });

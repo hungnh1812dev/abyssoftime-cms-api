@@ -52,5 +52,6 @@ import { SingleTypeDocumentController } from "./presentation/single-type-documen
     { provide: DOCUMENT_REPOSITORY, useClass: PrismaDocumentRepository },
     { provide: COMPONENT_REPOSITORY, useClass: PrismaComponentRepository },
   ],
+  exports: [GetPublicDocumentService, GetDocumentForEditService],
 })
 export class DocumentModule {}

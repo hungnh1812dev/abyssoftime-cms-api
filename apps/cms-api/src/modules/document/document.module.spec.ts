@@ -69,4 +69,10 @@ describe("DocumentModule", () => {
       ]),
     );
   });
+
+  it("exports GetPublicDocumentService and GetDocumentForEditService for the graphql module", () => {
+    const exportsMetadata = Reflect.getMetadata(MODULE_METADATA.EXPORTS, DocumentModule) as unknown[];
+
+    expect(exportsMetadata).toEqual(expect.arrayContaining([GetPublicDocumentService, GetDocumentForEditService]));
+  });
 });
