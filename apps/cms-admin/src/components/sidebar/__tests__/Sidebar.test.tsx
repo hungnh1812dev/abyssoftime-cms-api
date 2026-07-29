@@ -168,6 +168,22 @@ describe("Sidebar — permission-based gating (CATALOG-T11)", () => {
     expect(screen.queryByText("Permissions")).not.toBeInTheDocument();
   });
 
+  it("shows Media Library and Users when the caller only holds the :manager equivalent, not the :read permission", () => {
+    mockUseAuth.mockReturnValue({
+      role: "super_admin",
+      permissions: ["media:manager", "user:manager", "user:role_manager"],
+      token: "x",
+      userId: "1",
+      loading: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+    });
+    renderSidebar();
+
+    expect(screen.getByText("Media Library")).toBeInTheDocument();
+    expect(screen.getByText("Users")).toBeInTheDocument();
+  });
+
   it("shows the Roles link only when role:manager is granted, independent of permission:manager", () => {
     mockUseAuth.mockReturnValue({ role: "role_manager_only", permissions: ["role:manager"], token: "x", userId: "1", loading: false, login: vi.fn(), logout: vi.fn() });
     renderSidebar();
