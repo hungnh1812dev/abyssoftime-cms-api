@@ -38,5 +38,5 @@ See `tasks/plan.md` for full context, dependency graph, and rationale.
 - [x] **Checkpoint 6:** all checks green, findings addressed — commit
 
 ## Phase 7 — Docs + close-out
-- [ ] Task 7.1 — `docs/documents/graphql.md` (new), confirm/update `graphql-techstack.md`, `docs/ENTRYPOINT.md` index entry, `SPEC.md` trimmed to pointer
-- [ ] **Checkpoint 7 (final):** all checks green — commit — feature complete
+- [x] Task 7.1 — `docs/documents/graphql.md` (new), confirm/update `graphql-techstack.md`, `docs/ENTRYPOINT.md` index entry, `SPEC.md` trimmed to pointer
+- [x] **Checkpoint 7 (final):** all checks green — commit — feature complete
