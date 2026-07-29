@@ -2,6 +2,7 @@ import { UnauthorizedException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 
 import { JwtTokenService } from "@/common/token/jwt-token.service";
+import { type RefreshTokenPayload } from "@/common/types/jwt-payload";
 import { RoleEntity } from "@/modules/roles/domain/entities/role.entiry";
 import { type IRoleRepository, ROLE_REPOSITORY } from "@/modules/roles/domain/repositories/role.repository";
 import { UserEntity } from "@/modules/users/domain/entities/user.entity";
@@ -13,7 +14,7 @@ describe("RefreshTokenService", () => {
   let service: RefreshTokenService;
   let users: jest.Mocked<IUserRepository>;
   let roles: jest.Mocked<IRoleRepository>;
-  let jwtTokenService: jest.Mocked<Pick<JwtTokenService, "signAccessToken" | "signRefreshToken" | "verifyRefreshToken">>;
+  let jwtTokenService: jest.Mocked<Pick<JwtTokenService, "signAccessToken" | "signRefreshToken" | "verifyRefreshToken" | "getRefreshTokenMaxAgeMs">>;
 
   const adminRole = new RoleEntity("role-admin", "Admin", "admin", ["user:read"], 50, true, new Date(), new Date(), null);
   const verifiedUser = new UserEntity("user-1", "jane@example.com", "Jane Doe", "janedoe", "hashed-password", true, true, "role-admin", new Date(), new Date());
@@ -42,7 +43,7 @@ describe("RefreshTokenService", () => {
       delete: jest.fn(),
       hasAny: jest.fn(),
     };
-    jwtTokenService = { signAccessToken: jest.fn(), signRefreshToken: jest.fn(), verifyRefreshToken: jest.fn() };
+    jwtTokenService = { signAccessToken: jest.fn(), signRefreshToken: jest.fn(), verifyRefreshToken: jest.fn(), getRefreshTokenMaxAgeMs: jest.fn() };
 
     const module = await Test.createTestingModule({
       providers: [
@@ -65,25 +66,26 @@ describe("RefreshTokenService", () => {
   });
 
   it("throws UnauthorizedException when the token's subject no longer exists", async () => {
-    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1" });
+    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1", rememberMe: false });
     users.findById.mockResolvedValue(null);
 
     await expect(service.execute("refresh-token")).rejects.toThrow(UnauthorizedException);
   });
 
   it("throws UnauthorizedException when the user has no role assigned", async () => {
-    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1" });
+    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1", rememberMe: false });
     users.findById.mockResolvedValue(new UserEntity("user-1", "jane@example.com", "Jane Doe", "janedoe", "hashed-password", true, true, null, new Date(), new Date()));
 
     await expect(service.execute("refresh-token")).rejects.toThrow(UnauthorizedException);
   });
 
-  it("re-fetches the user and role fresh from the database and rotates both tokens", async () => {
-    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1" });
+  it("re-fetches the user and role fresh from the database and rotates both tokens, preserving rememberMe:true", async () => {
+    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1", rememberMe: true });
     users.findById.mockResolvedValue(verifiedUser);
     roles.findById.mockResolvedValue(adminRole);
     jwtTokenService.signAccessToken.mockReturnValue("new-access-token");
     jwtTokenService.signRefreshToken.mockReturnValue("new-refresh-token");
+    jwtTokenService.getRefreshTokenMaxAgeMs.mockReturnValue(30 * 24 * 60 * 60 * 1000);
 
     const result = await service.execute("refresh-token");
 
@@ -95,7 +97,40 @@ describe("RefreshTokenService", () => {
       level: adminRole.level,
       permissions: adminRole.permissions,
     });
-    expect(jwtTokenService.signRefreshToken).toHaveBeenCalledWith({ sub: "user-1" });
-    expect(result).toEqual({ accessToken: "new-access-token", refreshToken: "new-refresh-token" });
+    expect(jwtTokenService.signRefreshToken).toHaveBeenCalledWith({ sub: "user-1", rememberMe: true });
+    expect(jwtTokenService.getRefreshTokenMaxAgeMs).toHaveBeenCalledWith(true);
+    expect(result).toEqual({ accessToken: "new-access-token", refreshToken: "new-refresh-token", refreshTokenMaxAgeMs: 30 * 24 * 60 * 60 * 1000 });
+  });
+
+  it("rotates both tokens preserving rememberMe:false", async () => {
+    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1", rememberMe: false });
+    users.findById.mockResolvedValue(verifiedUser);
+    roles.findById.mockResolvedValue(adminRole);
+    jwtTokenService.signAccessToken.mockReturnValue("new-access-token");
+    jwtTokenService.signRefreshToken.mockReturnValue("new-refresh-token");
+    jwtTokenService.getRefreshTokenMaxAgeMs.mockReturnValue(7 * 24 * 60 * 60 * 1000);
+
+    const result = await service.execute("refresh-token");
+
+    expect(jwtTokenService.signRefreshToken).toHaveBeenCalledWith({ sub: "user-1", rememberMe: false });
+    expect(jwtTokenService.getRefreshTokenMaxAgeMs).toHaveBeenCalledWith(false);
+    expect(result).toEqual({ accessToken: "new-access-token", refreshToken: "new-refresh-token", refreshTokenMaxAgeMs: 7 * 24 * 60 * 60 * 1000 });
+  });
+
+  it("falls back to rememberMe:false for a pre-change token that has no rememberMe field at all", async () => {
+    // Simulates a refresh token minted before this feature shipped: the type says `rememberMe`
+    // is required, but a real legacy JWT payload won't actually carry it at runtime.
+    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1" } as RefreshTokenPayload);
+    users.findById.mockResolvedValue(verifiedUser);
+    roles.findById.mockResolvedValue(adminRole);
+    jwtTokenService.signAccessToken.mockReturnValue("new-access-token");
+    jwtTokenService.signRefreshToken.mockReturnValue("new-refresh-token");
+    jwtTokenService.getRefreshTokenMaxAgeMs.mockReturnValue(7 * 24 * 60 * 60 * 1000);
+
+    const result = await service.execute("refresh-token");
+
+    expect(jwtTokenService.signRefreshToken).toHaveBeenCalledWith({ sub: "user-1", rememberMe: false });
+    expect(jwtTokenService.getRefreshTokenMaxAgeMs).toHaveBeenCalledWith(false);
+    expect(result).toEqual({ accessToken: "new-access-token", refreshToken: "new-refresh-token", refreshTokenMaxAgeMs: 7 * 24 * 60 * 60 * 1000 });
   });
 });

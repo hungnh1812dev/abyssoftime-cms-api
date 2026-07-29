@@ -31,7 +31,6 @@ import { MeResponseDto } from "./dto/me-response.dto";
 
 export const REFRESH_TOKEN_COOKIE = "refresh_token";
 const ACCESS_TOKEN_MAX_AGE_MS = 15 * 60 * 1000;
-const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Every route here is public by design (this module establishes identity), except `me` — the one
 // route that reads an existing session back. login/refresh set the access_token/refresh_token
@@ -106,8 +105,8 @@ export class AuthController {
   // reads the @Body()-decorated parameter's type) still documents the { email, password } shape.
   // The actual credential check now runs in LocalStrategy.validate() via AuthGuard("local").
   login(@Body() dto: LoginDto, @Req() req: Request & { user: ValidatedLoginUser }, @Res({ passthrough: true }) res: Response): { message: string } {
-    const { accessToken, refreshToken } = this.loginService.execute(req.user);
-    this.setAuthCookies(res, accessToken, refreshToken);
+    const { accessToken, refreshToken, refreshTokenMaxAgeMs } = this.loginService.execute(req.user, dto.rememberMe ?? false);
+    this.setAuthCookies(res, accessToken, refreshToken, refreshTokenMaxAgeMs);
     return { message: "Login successful." };
   }
 
@@ -122,8 +121,8 @@ export class AuthController {
       throw new UnauthorizedException("Missing refresh token");
     }
 
-    const { accessToken, refreshToken } = await this.refreshTokenService.execute(token);
-    this.setAuthCookies(res, accessToken, refreshToken);
+    const { accessToken, refreshToken, refreshTokenMaxAgeMs } = await this.refreshTokenService.execute(token);
+    this.setAuthCookies(res, accessToken, refreshToken, refreshTokenMaxAgeMs);
     return { message: "Token refreshed." };
   }
 
@@ -170,11 +169,11 @@ export class AuthController {
     return { message: "Password reset successfully." };
   }
 
-  private setAuthCookies(res: Response, accessToken: string, refreshToken: string): void {
+  private setAuthCookies(res: Response, accessToken: string, refreshToken: string, refreshTokenMaxAgeMs: number): void {
     const secure = this.configService.get("COOKIE_SECURE", { infer: true });
     const sameSite = this.configService.get("COOKIE_SAMESITE", { infer: true });
 
     res.cookie(ACCESS_TOKEN_COOKIE, accessToken, { httpOnly: true, secure, sameSite, maxAge: ACCESS_TOKEN_MAX_AGE_MS });
-    res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, { httpOnly: true, secure, sameSite, maxAge: REFRESH_TOKEN_MAX_AGE_MS });
+    res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, { httpOnly: true, secure, sameSite, maxAge: refreshTokenMaxAgeMs });
   }
 }
