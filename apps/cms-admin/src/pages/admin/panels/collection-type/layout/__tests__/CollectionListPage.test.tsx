@@ -36,6 +36,7 @@ const ct: ContentType = {
 };
 
 const doc1: ListedDocumentItem = {
+  id: 1,
   documentId: "doc-1",
   status: "draft",
   createdAt: "",
@@ -45,6 +46,7 @@ const doc1: ListedDocumentItem = {
 };
 
 const doc2: ListedDocumentItem = {
+  id: 2,
   documentId: "doc-2",
   status: "published",
   createdAt: "",
@@ -289,6 +291,7 @@ describe("CollectionListPage — column chooser", () => {
     expect(screen.queryByText("Created At")).not.toBeInTheDocument();
     expect(screen.queryByText("Updated At")).not.toBeInTheDocument();
     expect(screen.queryByText("Updated By")).not.toBeInTheDocument();
+    expect(screen.queryByText("ID")).not.toBeInTheDocument();
   });
 
   it("shows system columns when included in listFields", async () => {
@@ -297,7 +300,7 @@ describe("CollectionListPage — column chooser", () => {
 
     const ctWithListFields: ContentType = {
       ...ct,
-      listFields: ["title", "createdAt", "updatedBy"],
+      listFields: ["title", "createdAt", "updatedBy", "id"],
     };
     mock.onGet("/documents/collection-type/blog-posts").reply(200, { items: [doc1], total: 1, start: 0, size: 20 });
     renderWithProviders(<CollectionListPage contentType={ctWithListFields} />);
@@ -307,6 +310,15 @@ describe("CollectionListPage — column chooser", () => {
     expect(screen.getByText("Created At")).toBeInTheDocument();
     expect(screen.queryByText("Updated At")).not.toBeInTheDocument();
     expect(screen.getByText("Updated By")).toBeInTheDocument();
+    expect(screen.getByText("ID")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+  });
+
+  it("shows the ID column by default when listFields is empty", async () => {
+    mock.onGet("/documents/collection-type/blog-posts").reply(200, { items: [doc1], total: 1, start: 0, size: 20 });
+    renderWithProviders(<CollectionListPage contentType={ct} />);
+    await waitFor(() => expect(screen.getByText("First Post")).toBeInTheDocument());
+    expect(screen.getByText("ID")).toBeInTheDocument();
   });
 });
 

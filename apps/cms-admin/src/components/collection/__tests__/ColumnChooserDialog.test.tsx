@@ -52,6 +52,7 @@ describe("ColumnChooserDialog", () => {
   it("renders system fields section", async () => {
     renderDialog();
     await waitFor(() => {
+      expect(screen.getByText("ID")).toBeInTheDocument();
       expect(screen.getByText("Created At")).toBeInTheDocument();
       expect(screen.getByText("Updated At")).toBeInTheDocument();
       expect(screen.getByText("Updated By")).toBeInTheDocument();
@@ -73,6 +74,7 @@ describe("ColumnChooserDialog", () => {
       expect(checkedNames).toContain("slug");
       expect(checkedNames).toContain("body");
       expect(checkedNames).not.toContain("featured");
+      expect(checkedNames).toContain("ID");
       expect(checkedNames).toContain("Created At");
       expect(checkedNames).toContain("Updated At");
       expect(checkedNames).toContain("Updated By");
