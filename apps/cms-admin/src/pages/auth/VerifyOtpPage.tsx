@@ -1,5 +1,4 @@
 import { useMutation } from "@tanstack/react-query";
-import type { AxiosError } from "axios";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -9,16 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/errors";
 
 interface VerifyOtpFields {
   email: string;
   otp: string;
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  const data = (error as AxiosError<{ message?: string | string[] }>).response?.data;
-  if (!data?.message) return fallback;
-  return Array.isArray(data.message) ? data.message.join(", ") : data.message;
 }
 
 export function VerifyOtpPage() {
@@ -41,7 +35,7 @@ export function VerifyOtpPage() {
       navigate("/login");
     },
     onError: (error: unknown) => {
-      setErrorMsg(errorMessage(error, "Verification failed. Check the code and try again."));
+      setErrorMsg(apiErrorMessage(error, "Verification failed. Check the code and try again."));
     },
   });
 
@@ -51,7 +45,7 @@ export function VerifyOtpPage() {
       toast.success("A new code has been sent.");
     },
     onError: (error: unknown) => {
-      toast.error(errorMessage(error, "Failed to resend the code."));
+      toast.error(apiErrorMessage(error, "Failed to resend the code."));
     },
   });
 

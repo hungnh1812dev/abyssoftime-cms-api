@@ -92,7 +92,7 @@ describe("RolesPage", () => {
     await user.click(within(editorRow).getByText("Edit"));
 
     await waitFor(() => expect(screen.getByLabelText("Name")).toBeDisabled());
-    expect(screen.getByLabelText("Level (1-99)")).toBeDisabled();
+    expect(screen.getByLabelText("Level (0-100)")).toBeDisabled();
     expect(screen.getByLabelText("Slug")).toBeDisabled();
   });
 

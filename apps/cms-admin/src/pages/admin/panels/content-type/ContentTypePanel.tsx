@@ -136,8 +136,8 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
   const isPublishing = isSingle ? publishSingle.isPending : publishCollection.isPending;
   const isUnpublishing = isSingle ? unpublishSingle.isPending : unpublishCollection.isPending;
 
-  const canPublish = doc.data.status !== "published";
-  const canUnpublish = doc.data.status !== "draft";
+  const canPublish = contentType.draftToPublish && doc.data.status !== "published";
+  const canUnpublish = contentType.draftToPublish && doc.data.status !== "draft";
   const schema = contentType.fields ?? [];
 
   const apiBase = isSingle ? `/documents/single-type/${contentType.slug}` : `/documents/collection-type/${contentType.slug}/${doc.data.documentId}`;

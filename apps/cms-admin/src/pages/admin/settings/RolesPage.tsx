@@ -65,8 +65,8 @@ function RoleDialog({ open, onOpenChange, role, permissions }: RoleDialogProps) 
             </div>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="role-level">Level (1-99)</Label>
-            <Input id="role-level" type="number" min={1} max={99} value={level} onChange={(event) => setLevel(Number(event.target.value))} disabled={fieldsDisabled} />
+            <Label htmlFor="role-level">Level (0-100)</Label>
+            <Input id="role-level" type="number" min={0} max={100} value={level} onChange={(event) => setLevel(Number(event.target.value))} disabled={fieldsDisabled} />
           </div>
           <div className="space-y-1">
             <Label>Permissions</Label>
