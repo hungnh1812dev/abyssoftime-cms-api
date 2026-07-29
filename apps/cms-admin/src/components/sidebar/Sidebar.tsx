@@ -2,6 +2,7 @@ import { FileText, LogOut, Settings } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useContentTypes } from "@/hooks/useContentTypes";
+import { hasPermission } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 import { SidebarBrand } from "./SidebarBrand";
@@ -23,7 +24,9 @@ export function Sidebar() {
   // fully replaces the former roleLevel-tier checks. Items are omitted from
   // the render tree entirely when the permission is absent, not just
   // disabled, so a role without a permission never sees the link at all.
-  const hasPermission = (permission: string) => permissions.includes(permission);
+  // `hasPermission` treats the matching `:manager` permission as satisfying
+  // a `:read` requirement, mirroring the backend's PermissionsGuard.
+  const can = (permission: string) => hasPermission(permissions, permission);
 
   return (
     <aside
@@ -54,11 +57,11 @@ export function Sidebar() {
         </SidebarGroup>
 
         <SidebarGroup icon={Settings} label="Settings" storageKey="settings" defaultOpen>
-          {hasPermission("media:read") && <SidebarItem to="/admin/settings/media">Media Library</SidebarItem>}
-          {hasPermission("user:read") && <SidebarItem to="/admin/settings/users">Users</SidebarItem>}
-          {hasPermission("api_token:manager") && <SidebarItem to="/admin/settings/access-tokens">Access Tokens</SidebarItem>}
-          {hasPermission("role:manager") && <SidebarItem to="/admin/settings/roles">Roles</SidebarItem>}
-          {hasPermission("permission:manager") && <SidebarItem to="/admin/settings/permissions">Permissions</SidebarItem>}
+          {can("media:read") && <SidebarItem to="/admin/settings/media">Media Library</SidebarItem>}
+          {can("user:read") && <SidebarItem to="/admin/settings/users">Users</SidebarItem>}
+          {can("api_token:manager") && <SidebarItem to="/admin/settings/access-tokens">Access Tokens</SidebarItem>}
+          {can("role:manager") && <SidebarItem to="/admin/settings/roles">Roles</SidebarItem>}
+          {can("permission:manager") && <SidebarItem to="/admin/settings/permissions">Permissions</SidebarItem>}
         </SidebarGroup>
       </nav>
 
