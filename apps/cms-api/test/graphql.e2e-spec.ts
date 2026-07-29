@@ -12,7 +12,16 @@ import { ACCESS_TOKEN_REPOSITORY, type IAccessTokenRepository } from "@/modules/
 import { SchemaLoaderService } from "@/modules/content-type/application/schema/schema-loader.service";
 import { ContentTypeSyncService } from "@/modules/content-type/application/sync/content-type-sync.service";
 import { type ContentTypeDefinition } from "@/modules/content-type/domain/entities/content-type.entity";
-import { createMutationName, inputTypeName, publishMutationName, queryName, saveMutationName, unpublishMutationName, updateMutationName } from "@/modules/graphql/domain/naming";
+import {
+  createMutationName,
+  inputTypeName,
+  publishMutationName,
+  queryName,
+  saveMutationName,
+  typeName,
+  unpublishMutationName,
+  updateMutationName,
+} from "@/modules/graphql/domain/naming";
 import { STORAGE_ADAPTER } from "@/modules/storage/domain/repositories/storage-adapter.repository";
 import { PrismaService } from "@/prisma/application/prisma.service";
 
@@ -638,6 +647,23 @@ describe("GraphQL (e2e)", () => {
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
+    });
+
+    // NODE_ENV isn't "production" while running the test suite, so introspection is enabled here
+    // (Task 1.1's dev-only gate) — this proves the wiring actually reaches Apollo Server and
+    // reflects the full generated schema (every real + throwaway content type registered above),
+    // not just Task 1.1's original placeholder `_empty` schema. The gate itself (disabled when
+    // NODE_ENV=production) is unit-tested behaviorally in graphql.module.spec.ts, since flipping
+    // NODE_ENV inside a live e2e app would require a second full app boot.
+    it("serves a real introspection query reflecting the full generated schema, proving the dev-only gate is wired end-to-end", async () => {
+      const response = await gql(`{ __schema { queryType { name } types { name } } }`).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.errors).toBeUndefined();
+      const schema = (body.data as { __schema: { queryType: { name: string }; types: { name: string }[] } }).__schema;
+      expect(schema.queryType.name).toBe("Query");
+      const typeNames = schema.types.map((type) => type.name);
+      expect(typeNames).toEqual(expect.arrayContaining(["CvPage", "EnItVocab", typeName(singleSlug), "MediaAsset"]));
     });
   });
 });

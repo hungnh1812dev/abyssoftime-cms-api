@@ -89,9 +89,12 @@ async function resolveOrNull<T>(load: () => Promise<T>): Promise<T | null> {
   }
 }
 
-// Mutations return a non-null <Type>!/Boolean!, so a missing document can't resolve to null the
-// way queries do — it and a disabled draft/publish mode (Mode B) both surface as real GraphQL errors.
-async function withMutationErrorMapping<T>(run: () => Promise<T>): Promise<T> {
+// Mutations (and list queries — a missing content type there is schema/DB drift, not an absent
+// row) return a non-null result, so it can't resolve to null the way single-item queries do — a
+// missing document, a missing content type, and a disabled draft/publish mode (Mode B) all surface
+// as real GraphQL errors instead of silently reaching @nestjs/apollo's generic INTERNAL_SERVER_ERROR
+// fallback (which doesn't map 404s to NOT_FOUND).
+async function withErrorMapping<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run();
   } catch (error) {
@@ -187,43 +190,43 @@ export class ResolverFactoryService {
 
       query[listQueryName(definition.slug)] = async (_parent: unknown, args: ListArgsInput) => {
         const options = translateListArgs(definition, args);
-        const result = await this.listDocumentsFull.execute(definition.slug, options);
+        const result = await withErrorMapping(() => this.listDocumentsFull.execute(definition.slug, options));
         return result.items;
       };
 
       mutation[createMutationName(definition.slug)] = async (_parent: unknown, args: CreateMutationArgs, context: GraphqlContext) => {
         assertApiTokenPermission(context, "document:create");
-        const document = await withMutationErrorMapping(() => this.saveDocument.execute(definition.slug, args.data, undefined, context.apiToken!.documentId));
+        const document = await withErrorMapping(() => this.saveDocument.execute(definition.slug, args.data, undefined, context.apiToken!.documentId));
         return toResolverValue(document);
       };
 
       mutation[updateMutationName(definition.slug)] = async (_parent: unknown, args: UpdateMutationArgs, context: GraphqlContext) => {
         assertValidDocumentId(args.Id);
         assertApiTokenPermission(context, "document:update");
-        await withMutationErrorMapping(() => this.saveDocument.execute(definition.slug, args.data, args.Id, context.apiToken!.documentId));
-        const result = await withMutationErrorMapping(() => this.getDocumentForEdit.execute(definition.slug, args.Id));
+        await withErrorMapping(() => this.saveDocument.execute(definition.slug, args.data, args.Id, context.apiToken!.documentId));
+        const result = await withErrorMapping(() => this.getDocumentForEdit.execute(definition.slug, args.Id));
         return toResolverValue(result.document);
       };
 
       mutation[deleteMutationName(definition.slug)] = async (_parent: unknown, args: IdMutationArgs, context: GraphqlContext) => {
         assertValidDocumentId(args.Id);
         assertApiTokenPermission(context, "document:delete");
-        await withMutationErrorMapping(() => this.deleteDocument.execute(definition.slug, args.Id));
+        await withErrorMapping(() => this.deleteDocument.execute(definition.slug, args.Id));
         return true;
       };
 
       mutation[publishMutationName(definition.slug)] = async (_parent: unknown, args: IdMutationArgs, context: GraphqlContext) => {
         assertValidDocumentId(args.Id);
         assertApiTokenPermission(context, "document:publish");
-        const published = await withMutationErrorMapping(() => this.publishDocument.execute(definition.slug, args.Id, context.apiToken!.documentId));
+        const published = await withErrorMapping(() => this.publishDocument.execute(definition.slug, args.Id, context.apiToken!.documentId));
         return toResolverValue(published);
       };
 
       mutation[unpublishMutationName(definition.slug)] = async (_parent: unknown, args: IdMutationArgs, context: GraphqlContext) => {
         assertValidDocumentId(args.Id);
         assertApiTokenPermission(context, "document:unpublish");
-        await withMutationErrorMapping(() => this.unpublishDocument.execute(definition.slug, args.Id));
-        const result = await withMutationErrorMapping(() => this.getDocumentForEdit.execute(definition.slug, args.Id));
+        await withErrorMapping(() => this.unpublishDocument.execute(definition.slug, args.Id));
+        const result = await withErrorMapping(() => this.getDocumentForEdit.execute(definition.slug, args.Id));
         return toResolverValue(result.document);
       };
     }
@@ -244,21 +247,21 @@ export class ResolverFactoryService {
 
       mutation[saveMutationName(definition.slug)] = async (_parent: unknown, args: CreateMutationArgs, context: GraphqlContext) => {
         assertApiTokenPermission(context, "document:update");
-        await withMutationErrorMapping(() => this.saveSingleType.execute(definition.slug, args.data, context.apiToken!.documentId));
-        const result = await withMutationErrorMapping(() => this.getSingleType.execute(definition.slug));
+        await withErrorMapping(() => this.saveSingleType.execute(definition.slug, args.data, context.apiToken!.documentId));
+        const result = await withErrorMapping(() => this.getSingleType.execute(definition.slug));
         return toResolverValue(result.document);
       };
 
       mutation[publishMutationName(definition.slug)] = async (_parent: unknown, _args: Record<string, never>, context: GraphqlContext) => {
         assertApiTokenPermission(context, "document:publish");
-        const published = await withMutationErrorMapping(() => this.publishSingleType.execute(definition.slug, context.apiToken!.documentId));
+        const published = await withErrorMapping(() => this.publishSingleType.execute(definition.slug, context.apiToken!.documentId));
         return toResolverValue(published);
       };
 
       mutation[unpublishMutationName(definition.slug)] = async (_parent: unknown, _args: Record<string, never>, context: GraphqlContext) => {
         assertApiTokenPermission(context, "document:unpublish");
-        await withMutationErrorMapping(() => this.unpublishSingleType.execute(definition.slug));
-        const result = await withMutationErrorMapping(() => this.getSingleType.execute(definition.slug));
+        await withErrorMapping(() => this.unpublishSingleType.execute(definition.slug));
+        const result = await withErrorMapping(() => this.getSingleType.execute(definition.slug));
         return toResolverValue(result.document);
       };
     }

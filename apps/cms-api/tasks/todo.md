@@ -34,8 +34,8 @@ See `tasks/plan.md` for full context, dependency graph, and rationale.
 - [x] **Checkpoint 5:** full e2e suite + all automated checks green — commit
 
 ## Phase 6 — Hardening
-- [ ] Task 6.1 — Error-shape audit (consistent `GraphQLError` codes); re-verify introspection gating; five-axis review; address findings
-- [ ] **Checkpoint 6:** all checks green, findings addressed — commit
+- [x] Task 6.1 — Error-shape audit (consistent `GraphQLError` codes); re-verify introspection gating; five-axis review; address findings
+- [x] **Checkpoint 6:** all checks green, findings addressed — commit
 
 ## Phase 7 — Docs + close-out
 - [ ] Task 7.1 — `docs/documents/graphql.md` (new), confirm/update `graphql-techstack.md`, `docs/ENTRYPOINT.md` index entry, `SPEC.md` trimmed to pointer
