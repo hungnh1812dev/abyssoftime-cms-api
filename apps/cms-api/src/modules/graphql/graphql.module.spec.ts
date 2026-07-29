@@ -9,6 +9,7 @@ import { ContentTypeModule } from "@/modules/content-type/content-type.module";
 import { ContentTypeDefinition } from "@/modules/content-type/domain/entities/content-type.entity";
 import { GetDocumentForEditService } from "@/modules/document/application/services/get-document-for-edit.service";
 import { GetPublicDocumentService } from "@/modules/document/application/services/get-public-document.service";
+import { ListDocumentsFullService } from "@/modules/document/application/services/list-documents-full.service";
 import { DocumentModule } from "@/modules/document/document.module";
 
 // Import after the mock is registered — evaluating GraphqlModule's @Module decorator is what
@@ -52,13 +53,14 @@ describe("GraphqlModule", () => {
       const schemaLoader = { load: jest.fn().mockResolvedValue([cvPage]) } as unknown as SchemaLoaderService;
       const getPublicDocument = {} as GetPublicDocumentService;
       const getDocumentForEdit = {} as GetDocumentForEditService;
+      const listDocumentsFull = {} as ListDocumentsFullService;
       const accessTokens = {} as IAccessTokenRepository;
 
-      return options.useFactory(schemaLoader, getPublicDocument, getDocumentForEdit, accessTokens);
+      return options.useFactory(schemaLoader, getPublicDocument, getDocumentForEdit, listDocumentsFull, accessTokens);
     }
 
-    it("injects SchemaLoaderService, GetPublicDocumentService, GetDocumentForEditService, and ACCESS_TOKEN_REPOSITORY", () => {
-      expect(options.inject).toHaveLength(4);
+    it("injects SchemaLoaderService, GetPublicDocumentService, GetDocumentForEditService, ListDocumentsFullService, and ACCESS_TOKEN_REPOSITORY", () => {
+      expect(options.inject).toHaveLength(5);
     });
 
     it("builds real typeDefs via SchemaBuilderService", async () => {
@@ -71,7 +73,10 @@ describe("GraphqlModule", () => {
     it("builds real resolvers via ResolverFactoryService", async () => {
       const config = await invokeFactory();
 
-      expect((config.resolvers as { Query: Record<string, unknown> }).Query.cvPage).toBeInstanceOf(Function);
+      const resolvers = config.resolvers as { Query: Record<string, unknown>; SortDirection: Record<string, string> };
+      expect(resolvers.Query.cvPage).toBeInstanceOf(Function);
+      expect(resolvers.Query.cvPageList).toBeInstanceOf(Function);
+      expect(resolvers.SortDirection).toEqual({ ASC: "asc", DESC: "desc" });
     });
 
     it("gates introspection/playground to non-production", async () => {

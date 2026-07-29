@@ -10,6 +10,7 @@ import { SchemaLoaderService } from "@/modules/content-type/application/schema/s
 import { ContentTypeModule } from "@/modules/content-type/content-type.module";
 import { GetDocumentForEditService } from "@/modules/document/application/services/get-document-for-edit.service";
 import { GetPublicDocumentService } from "@/modules/document/application/services/get-public-document.service";
+import { ListDocumentsFullService } from "@/modules/document/application/services/list-documents-full.service";
 import { DocumentModule } from "@/modules/document/document.module";
 
 import { GraphqlContextFactory } from "./application/graphql-context.factory";
@@ -21,15 +22,16 @@ import { SchemaBuilderService } from "./application/schema-builder.service";
     NestGraphQLModule.forRootAsync<ApolloDriverConfig>({
       imports: [ContentTypeModule, DocumentModule, AccessTokenModule],
       driver: ApolloDriver,
-      inject: [SchemaLoaderService, GetPublicDocumentService, GetDocumentForEditService, ACCESS_TOKEN_REPOSITORY],
+      inject: [SchemaLoaderService, GetPublicDocumentService, GetDocumentForEditService, ListDocumentsFullService, ACCESS_TOKEN_REPOSITORY],
       useFactory: async (
         schemaLoader: SchemaLoaderService,
         getPublicDocument: GetPublicDocumentService,
         getDocumentForEdit: GetDocumentForEditService,
+        listDocumentsFull: ListDocumentsFullService,
         accessTokens: IAccessTokenRepository,
       ) => {
         const schemaBuilder = new SchemaBuilderService(schemaLoader);
-        const resolverFactory = new ResolverFactoryService(schemaLoader, getPublicDocument, getDocumentForEdit);
+        const resolverFactory = new ResolverFactoryService(schemaLoader, getPublicDocument, getDocumentForEdit, listDocumentsFull);
         const contextFactory = new GraphqlContextFactory(accessTokens);
 
         return {

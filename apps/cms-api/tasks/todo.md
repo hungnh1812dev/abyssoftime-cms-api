@@ -12,10 +12,10 @@ See `tasks/plan.md` for full context, dependency graph, and rationale.
 - [x] **Checkpoint 1:** `bun run build` / `tsc --noEmit` / `bun run lint` / `test:cov` green; manual `start:dev` walkthrough (published/draft, with/without token) — commit
 
 ## Phase 2 — List query
-- [ ] Task 2.1 — `ListDocumentsFullService` (new file, `document` module) — full-hydration, published-only, no listFields projection
-- [ ] Task 2.2 — `list-args.translator.ts`: GraphQL `where`/`orderBy` → `ParsedFilter[]`
-- [ ] Task 2.3 — SDL: `<Type>Filter`/`<Type>OrderBy` + list query; resolver wiring
-- [ ] **Checkpoint 2:** automated checks green; manual filter+orderBy+pagination check — commit
+- [x] Task 2.1 — `ListDocumentsFullService` (new file, `document` module) — full-hydration, published-only, no listFields projection
+- [x] Task 2.2 — `list-args.translator.ts`: GraphQL `where`/`orderBy` → `ParsedFilter[]`
+- [x] Task 2.3 — SDL: `<Type>Filter`/`<Type>OrderBy` + list query; resolver wiring
+- [x] **Checkpoint 2:** automated checks green; manual filter+orderBy+pagination check — commit
 
 ## Phase 3 — Media + component recursive resolution
 - [ ] Task 3.1 — `MediaModule` export + `MediaAsset` type + field resolver (dangling/null FK → `null`, never throws)
