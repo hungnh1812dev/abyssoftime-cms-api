@@ -74,7 +74,8 @@ describe("SchemaBuilderService", () => {
     const cvPageType = schema.getType("CvPage") as GraphQLObjectType;
     expect(cvPageType).toBeDefined();
     const fields = cvPageType.getFields();
-    expect(Object.keys(fields)).toEqual(["position", "isMain", "company", "summary", "coverImage", "skills", "experiences"]);
+    expect(Object.keys(fields)).toEqual(["documentId", "position", "isMain", "company", "summary", "coverImage", "skills", "experiences"]);
+    expect(fields.documentId.type.toString()).toBe("ID!");
     expect(fields.position.type).toBe(GraphQLString);
     expect(fields.company.type).toBe(GraphQLString);
     expect(fields.summary.type).toBe(GraphQLString);
@@ -97,7 +98,7 @@ describe("SchemaBuilderService", () => {
     const schema = buildSchema(await service.buildTypeDefs());
 
     const type = schema.getType("EnItVocab") as GraphQLObjectType;
-    expect(Object.keys(type.getFields())).toEqual(["wordGroup", "word", "synonyms", "phonetics"]);
+    expect(Object.keys(type.getFields())).toEqual(["documentId", "wordGroup", "word", "synonyms", "phonetics"]);
 
     const queryFields = schema.getQueryType()!.getFields();
     expect(queryFields.enItVocab).toBeDefined();
@@ -239,5 +240,76 @@ describe("SchemaBuilderService", () => {
     expect(listField.args.find((a) => a.name === "orderBy")!.type.toString()).toBe("CvPageOrderBy");
     expect(listField.args.find((a) => a.name === "start")!.type.toString()).toBe("Int");
     expect(listField.args.find((a) => a.name === "size")!.type.toString()).toBe("Int");
+  });
+
+  it("emits <Type>Input mirroring the object type's shape, with media fields as ID and repeatable components as an optional list", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
+
+    const schema = buildSchema(await service.buildTypeDefs());
+
+    const inputType = schema.getType("CvPageInput") as GraphQLInputObjectType;
+    expect(inputType).toBeDefined();
+    const fields = inputType.getFields();
+    expect(Object.keys(fields)).toEqual(["position", "isMain", "company", "summary", "coverImage", "skills", "experiences"]);
+    expect(fields.position.type).toBe(GraphQLString);
+    expect(fields.coverImage.type.toString()).toBe("ID");
+    // Nullable list (not [X!]!): a partial <Type>Input submitting only some fields must not be
+    // forced to also submit every other repeatable component as an empty array.
+    expect(fields.skills.type.toString()).toBe("[CvPageSkillInput!]");
+    expect(fields.experiences.type.toString()).toBe("[CvPageExperienceInput!]");
+  });
+
+  it("recursively emits <ContentType><Component>Input for nested components", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
+
+    const schema = buildSchema(await service.buildTypeDefs());
+
+    const skillInput = schema.getType("CvPageSkillInput") as GraphQLInputObjectType;
+    expect(skillInput).toBeDefined();
+    expect(Object.keys(skillInput.getFields())).toEqual(["level"]);
+
+    const experienceInput = schema.getType("CvPageExperienceInput") as GraphQLInputObjectType;
+    expect(Object.keys(experienceInput.getFields())).toEqual(["company", "roles"]);
+    expect(experienceInput.getFields().roles.type.toString()).toBe("[CvPageRoleInput!]");
+
+    const roleInput = schema.getType("CvPageRoleInput") as GraphQLInputObjectType;
+    expect(Object.keys(roleInput.getFields())).toEqual(["position", "techStack"]);
+    expect(roleInput.getFields().techStack.type.toString()).toBe("JSON");
+  });
+
+  it("emits the 5 collection-type mutations with SPEC.md's arg/return types", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
+
+    const schema = buildSchema(await service.buildTypeDefs());
+
+    const mutationFields = schema.getMutationType()!.getFields();
+
+    expect(mutationFields.createCvPage.args.map((a) => a.name)).toEqual(["data"]);
+    expect(mutationFields.createCvPage.args[0].type.toString()).toBe("CvPageInput!");
+    expect(mutationFields.createCvPage.type.toString()).toBe("CvPage!");
+
+    expect(mutationFields.updateCvPage.args.map((a) => a.name)).toEqual(["Id", "data"]);
+    expect(mutationFields.updateCvPage.args[0].type.toString()).toBe("ID!");
+    expect(mutationFields.updateCvPage.args[1].type.toString()).toBe("CvPageInput!");
+    expect(mutationFields.updateCvPage.type.toString()).toBe("CvPage!");
+
+    expect(mutationFields.deleteCvPage.args.map((a) => a.name)).toEqual(["Id"]);
+    expect(mutationFields.deleteCvPage.type.toString()).toBe("Boolean!");
+
+    expect(mutationFields.publishCvPage.args.map((a) => a.name)).toEqual(["Id"]);
+    expect(mutationFields.publishCvPage.type.toString()).toBe("CvPage!");
+
+    expect(mutationFields.unpublishCvPage.args.map((a) => a.name)).toEqual(["Id"]);
+    expect(mutationFields.unpublishCvPage.type.toString()).toBe("CvPage!");
+  });
+
+  it("skips mutations for single-kind definitions", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([singleTypeDef]));
+
+    const schema = buildSchema(await service.buildTypeDefs());
+
+    const mutationFields = schema.getMutationType()!.getFields();
+    expect(mutationFields.createHomePage).toBeUndefined();
+    expect(mutationFields.saveHomePage).toBeUndefined();
   });
 });

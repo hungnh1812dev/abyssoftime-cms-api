@@ -7,9 +7,13 @@ import { type IAccessTokenRepository } from "@/modules/access-tokens/domain/repo
 import { SchemaLoaderService } from "@/modules/content-type/application/schema/schema-loader.service";
 import { ContentTypeModule } from "@/modules/content-type/content-type.module";
 import { ContentTypeDefinition } from "@/modules/content-type/domain/entities/content-type.entity";
+import { DeleteDocumentService } from "@/modules/document/application/services/delete-document.service";
 import { GetDocumentForEditService } from "@/modules/document/application/services/get-document-for-edit.service";
 import { GetPublicDocumentService } from "@/modules/document/application/services/get-public-document.service";
 import { ListDocumentsFullService } from "@/modules/document/application/services/list-documents-full.service";
+import { PublishDocumentService } from "@/modules/document/application/services/publish-document.service";
+import { SaveDocumentService } from "@/modules/document/application/services/save-document.service";
+import { UnpublishDocumentService } from "@/modules/document/application/services/unpublish-document.service";
 import { DocumentModule } from "@/modules/document/document.module";
 import { type IMediaAssetRepository } from "@/modules/media/domain/repositories/media-asset.repository";
 import { MediaModule } from "@/modules/media/media.module";
@@ -58,12 +62,27 @@ describe("GraphqlModule", () => {
       const listDocumentsFull = {} as ListDocumentsFullService;
       const accessTokens = {} as IAccessTokenRepository;
       const mediaAssets = {} as IMediaAssetRepository;
+      const saveDocument = {} as SaveDocumentService;
+      const publishDocument = {} as PublishDocumentService;
+      const unpublishDocument = {} as UnpublishDocumentService;
+      const deleteDocument = {} as DeleteDocumentService;
 
-      return options.useFactory(schemaLoader, getPublicDocument, getDocumentForEdit, listDocumentsFull, accessTokens, mediaAssets);
+      return options.useFactory(
+        schemaLoader,
+        getPublicDocument,
+        getDocumentForEdit,
+        listDocumentsFull,
+        accessTokens,
+        mediaAssets,
+        saveDocument,
+        publishDocument,
+        unpublishDocument,
+        deleteDocument,
+      );
     }
 
-    it("injects SchemaLoaderService, GetPublicDocumentService, GetDocumentForEditService, ListDocumentsFullService, ACCESS_TOKEN_REPOSITORY, and MEDIA_ASSET_REPOSITORY", () => {
-      expect(options.inject).toHaveLength(6);
+    it("injects SchemaLoaderService, GetPublicDocumentService, GetDocumentForEditService, ListDocumentsFullService, ACCESS_TOKEN_REPOSITORY, MEDIA_ASSET_REPOSITORY, and the 4 mutation-backing services", () => {
+      expect(options.inject).toHaveLength(10);
     });
 
     it("builds real typeDefs via SchemaBuilderService", async () => {
@@ -76,9 +95,14 @@ describe("GraphqlModule", () => {
     it("builds real resolvers via ResolverFactoryService", async () => {
       const config = await invokeFactory();
 
-      const resolvers = config.resolvers as { Query: Record<string, unknown>; SortDirection: Record<string, string> };
+      const resolvers = config.resolvers as { Query: Record<string, unknown>; Mutation: Record<string, unknown>; SortDirection: Record<string, string> };
       expect(resolvers.Query.cvPage).toBeInstanceOf(Function);
       expect(resolvers.Query.cvPageList).toBeInstanceOf(Function);
+      expect(resolvers.Mutation.createCvPage).toBeInstanceOf(Function);
+      expect(resolvers.Mutation.updateCvPage).toBeInstanceOf(Function);
+      expect(resolvers.Mutation.deleteCvPage).toBeInstanceOf(Function);
+      expect(resolvers.Mutation.publishCvPage).toBeInstanceOf(Function);
+      expect(resolvers.Mutation.unpublishCvPage).toBeInstanceOf(Function);
       expect(resolvers.SortDirection).toEqual({ ASC: "asc", DESC: "desc" });
     });
 
