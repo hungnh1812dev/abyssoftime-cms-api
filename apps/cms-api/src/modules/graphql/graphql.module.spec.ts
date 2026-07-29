@@ -142,11 +142,37 @@ describe("GraphqlModule", () => {
       expect(config.playground).toBe(process.env.NODE_ENV !== "production");
     });
 
+    it("actually flips introspection/playground off when NODE_ENV is production, not just passthrough of whatever env happens to be set", async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = "production";
+      try {
+        const config = await invokeFactory();
+
+        expect(config.introspection).toBe(false);
+        expect(config.playground).toBe(false);
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+    });
+
     it("builds a context function that resolves { req } to a GraphqlContext", async () => {
       const config = await invokeFactory();
       const context = config.context as (arg: { req: unknown }) => Promise<{ apiToken: unknown }>;
 
       await expect(context({ req: { headers: {} } })).resolves.toEqual({ apiToken: null });
+    });
+
+    it("wires formatGraphqlError as formatError, so unmapped errors never leak internal details to a client", async () => {
+      const config = await invokeFactory();
+      const formatError = config.formatError as (formattedError: { message: string; extensions?: { code?: string } }) => { message: string; extensions?: { code?: string } };
+
+      expect(formatError({ message: 'relation "documents" does not exist' })).toEqual({
+        message: "Internal server error",
+        locations: undefined,
+        path: undefined,
+        extensions: { code: "INTERNAL_SERVER_ERROR" },
+      });
+      expect(formatError({ message: "safe", extensions: { code: "NOT_FOUND" } })).toEqual({ message: "safe", extensions: { code: "NOT_FOUND" } });
     });
   });
 });

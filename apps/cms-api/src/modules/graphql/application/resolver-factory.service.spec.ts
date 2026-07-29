@@ -204,6 +204,15 @@ describe("ResolverFactoryService", () => {
     expect(listDocumentsFull.execute).not.toHaveBeenCalled();
   });
 
+  it("maps a NotFoundException from ListDocumentsFullService to a NOT_FOUND GraphQL error, never a bare Nest exception", async () => {
+    listDocumentsFull.execute.mockRejectedValue(new NotFoundException("not found"));
+    const resolvers = await service.buildResolvers();
+
+    await expect(resolvers.Query.cvPageList(undefined, {}, noToken, undefined)).rejects.toMatchObject({
+      extensions: { code: "NOT_FOUND" },
+    });
+  });
+
   it("returns a SortDirection enum value map (ASC/DESC -> asc/desc) alongside Query", async () => {
     const resolvers = await service.buildResolvers();
 
@@ -477,6 +486,13 @@ describe("ResolverFactoryService", () => {
           await expect(resolvers.Mutation.saveHomePage(undefined, { data: {} }, noToken)).rejects.toMatchObject({ extensions: { code: "UNAUTHENTICATED" } });
           expect(saveSingleType.execute).not.toHaveBeenCalled();
         });
+
+        it("rejects a wrongly-scoped token with FORBIDDEN, never calling the service", async () => {
+          const resolvers = await service.buildResolvers();
+
+          await expect(resolvers.Mutation.saveHomePage(undefined, { data: {} }, readScopedToken)).rejects.toMatchObject({ extensions: { code: "FORBIDDEN" } });
+          expect(saveSingleType.execute).not.toHaveBeenCalled();
+        });
       });
 
       describe("publishHomePage", () => {
@@ -529,6 +545,13 @@ describe("ResolverFactoryService", () => {
           const resolvers = await service.buildResolvers();
 
           await expect(resolvers.Mutation.unpublishHomePage(undefined, {}, noToken)).rejects.toMatchObject({ extensions: { code: "UNAUTHENTICATED" } });
+          expect(unpublishSingleType.execute).not.toHaveBeenCalled();
+        });
+
+        it("rejects a wrongly-scoped token with FORBIDDEN, never calling the service", async () => {
+          const resolvers = await service.buildResolvers();
+
+          await expect(resolvers.Mutation.unpublishHomePage(undefined, {}, readScopedToken)).rejects.toMatchObject({ extensions: { code: "FORBIDDEN" } });
           expect(unpublishSingleType.execute).not.toHaveBeenCalled();
         });
       });

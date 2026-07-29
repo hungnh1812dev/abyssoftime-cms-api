@@ -24,6 +24,7 @@ import { DocumentModule } from "@/modules/document/document.module";
 import { type IMediaAssetRepository, MEDIA_ASSET_REPOSITORY } from "@/modules/media/domain/repositories/media-asset.repository";
 import { MediaModule } from "@/modules/media/media.module";
 
+import { formatGraphqlError } from "./application/format-error.util";
 import { GraphqlContextFactory } from "./application/graphql-context.factory";
 import { ResolverFactoryService } from "./application/resolver-factory.service";
 import { SchemaBuilderService } from "./application/schema-builder.service";
@@ -92,6 +93,7 @@ import { SchemaBuilderService } from "./application/schema-builder.service";
           introspection: process.env.NODE_ENV !== "production",
           playground: process.env.NODE_ENV !== "production",
           context: ({ req }: { req: Request }) => contextFactory.createContext(req),
+          formatError: formatGraphqlError,
         };
       },
     }),

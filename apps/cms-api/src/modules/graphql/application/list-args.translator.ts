@@ -79,6 +79,9 @@ function resolveOrderBy(orderBy: Record<string, "asc" | "desc"> | undefined, con
   if (entries.length === 0) {
     return { orderBy: DEFAULT_ORDER_BY, sortDir: DEFAULT_SORT_DIR };
   }
+  if (entries.length > 1) {
+    throw badUserInput(`"orderBy" accepts exactly one field in v1, got ${entries.length}: ${entries.map(([field]) => field).join(", ")}`);
+  }
 
   const [field, direction] = entries[0];
   const column = SYSTEM_ORDER_BY_ALIASES[field] ?? field;

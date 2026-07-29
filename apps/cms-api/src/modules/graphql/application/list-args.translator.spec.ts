@@ -138,4 +138,15 @@ describe("translateListArgs", () => {
 
     expect(() => translateListArgs(contentType, { orderBy: { nope: "asc" } })).toThrow(GraphQLError);
   });
+
+  it("throws BAD_USER_INPUT for a multi-field orderBy instead of silently applying only the first field", () => {
+    const contentType = buildContentType();
+
+    try {
+      translateListArgs(contentType, { orderBy: { position: "asc", teamSize: "desc" } });
+      fail("expected translateListArgs to throw");
+    } catch (error) {
+      expect((error as GraphQLError).extensions?.code).toBe("BAD_USER_INPUT");
+    }
+  });
 });
