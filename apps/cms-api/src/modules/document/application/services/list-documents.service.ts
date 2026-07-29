@@ -16,6 +16,7 @@ export interface ResolvedUpdatedBy {
 }
 
 export interface ListedDocumentItem {
+  id: number;
   documentId: string;
   data: Record<string, unknown>;
   status: DocumentStatus;
@@ -65,6 +66,10 @@ export class ListDocumentsService {
       const status = statuses.get(row.documentId) ?? "draft";
       const updatedBy = row.updatedBy ? (updatedByMap.get(row.updatedBy) ?? null) : null;
       return {
+        // Rows come from listPaginated, which always maps through
+        // row-mapper.ts and so always sets id — unlike an in-memory entity
+        // built before its first insert.
+        id: row.id as number,
         documentId: row.documentId,
         data: projectFields(row, status, updatedBy, options.listFields),
         status,
@@ -88,6 +93,8 @@ function projectFields(row: DocumentEntity, status: DocumentStatus, updatedBy: R
 
 function systemColumnValue(name: string, row: DocumentEntity, status: DocumentStatus, updatedBy: ResolvedUpdatedBy | null): unknown {
   switch (name) {
+    case "id":
+      return row.id;
     case "documentId":
       return row.documentId;
     case "status":

@@ -43,6 +43,24 @@ describe("mapRowToDocument", () => {
     expect(doc.publishedBy).toBe("user-3");
   });
 
+  it("converts the numeric id column to a JS number, including when the driver returns it as a string", () => {
+    const baseRow = {
+      document_id: "doc-1",
+      version: "draft",
+      created_at: new Date(),
+      updated_at: new Date(),
+      published_at: null,
+      created_by: null,
+      updated_by: null,
+      published_by: null,
+    };
+
+    // node-postgres parses BIGINT/BIGSERIAL columns as strings by default to
+    // avoid silent precision loss, so row.id can arrive as "42", not 42.
+    expect(mapRowToDocument({ ...baseRow, id: "42" }, FIELDS).id).toBe(42);
+    expect(mapRowToDocument({ ...baseRow, id: 7 }, FIELDS).id).toBe(7);
+  });
+
   it("skips component fields when extracting the fields map", () => {
     const doc = mapRowToDocument(
       {
