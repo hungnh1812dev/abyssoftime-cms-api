@@ -12,6 +12,8 @@ import { GetDocumentForEditService } from "@/modules/document/application/servic
 import { GetPublicDocumentService } from "@/modules/document/application/services/get-public-document.service";
 import { ListDocumentsFullService } from "@/modules/document/application/services/list-documents-full.service";
 import { DocumentModule } from "@/modules/document/document.module";
+import { type IMediaAssetRepository, MEDIA_ASSET_REPOSITORY } from "@/modules/media/domain/repositories/media-asset.repository";
+import { MediaModule } from "@/modules/media/media.module";
 
 import { GraphqlContextFactory } from "./application/graphql-context.factory";
 import { ResolverFactoryService } from "./application/resolver-factory.service";
@@ -20,23 +22,24 @@ import { SchemaBuilderService } from "./application/schema-builder.service";
 @Module({
   imports: [
     NestGraphQLModule.forRootAsync<ApolloDriverConfig>({
-      imports: [ContentTypeModule, DocumentModule, AccessTokenModule],
+      imports: [ContentTypeModule, DocumentModule, AccessTokenModule, MediaModule],
       driver: ApolloDriver,
-      inject: [SchemaLoaderService, GetPublicDocumentService, GetDocumentForEditService, ListDocumentsFullService, ACCESS_TOKEN_REPOSITORY],
+      inject: [SchemaLoaderService, GetPublicDocumentService, GetDocumentForEditService, ListDocumentsFullService, ACCESS_TOKEN_REPOSITORY, MEDIA_ASSET_REPOSITORY],
       useFactory: async (
         schemaLoader: SchemaLoaderService,
         getPublicDocument: GetPublicDocumentService,
         getDocumentForEdit: GetDocumentForEditService,
         listDocumentsFull: ListDocumentsFullService,
         accessTokens: IAccessTokenRepository,
+        mediaAssets: IMediaAssetRepository,
       ) => {
         const schemaBuilder = new SchemaBuilderService(schemaLoader);
-        const resolverFactory = new ResolverFactoryService(schemaLoader, getPublicDocument, getDocumentForEdit, listDocumentsFull);
+        const resolverFactory = new ResolverFactoryService(schemaLoader, getPublicDocument, getDocumentForEdit, listDocumentsFull, mediaAssets);
         const contextFactory = new GraphqlContextFactory(accessTokens);
 
         return {
           typeDefs: await schemaBuilder.buildTypeDefs(),
-          resolvers: await resolverFactory.buildResolvers(),
+          resolvers: (await resolverFactory.buildResolvers()) as ApolloDriverConfig["resolvers"],
           introspection: process.env.NODE_ENV !== "production",
           playground: process.env.NODE_ENV !== "production",
           context: ({ req }: { req: Request }) => contextFactory.createContext(req),

@@ -18,10 +18,10 @@ See `tasks/plan.md` for full context, dependency graph, and rationale.
 - [x] **Checkpoint 2:** automated checks green; manual filter+orderBy+pagination check — commit
 
 ## Phase 3 — Media + component recursive resolution
-- [ ] Task 3.1 — `MediaModule` export + `MediaAsset` type + field resolver (dangling/null FK → `null`, never throws)
-- [ ] Task 3.2 — Recursive component SDL + resolvers (arbitrary nesting depth)
-- [ ] Task 3.3 — New `test/graphql.e2e-spec.ts`: full read-path e2e (real seeds + throwaway media-bearing content type)
-- [ ] **Checkpoint 3:** `bun run test:e2e` green; manual nested+media query — commit
+- [x] Task 3.1 — `MediaModule` export + `MediaAsset` type + field resolver (dangling/null FK → `null`, never throws)
+- [x] Task 3.2 — Recursive component SDL + resolvers (arbitrary nesting depth)
+- [x] Task 3.3 — New `test/graphql.e2e-spec.ts`: full read-path e2e (real seeds + throwaway media-bearing content type)
+- [x] **Checkpoint 3:** `bun run test:e2e` green; manual nested+media query — commit
 
 ## Phase 4 — Mutations (collection-type)
 - [ ] Task 4.1 — Export remaining collection services; SDL for `<Type>Input` + 5 mutations

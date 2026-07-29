@@ -234,7 +234,7 @@ Each phase leaves `bun run build` / `bunx tsc --noEmit` / `bun run lint` / `bun 
 **Description:** `MediaModule`: add `exports: [MEDIA_ASSET_REPOSITORY]` (currently has none). `schema-builder.service.ts`: emit the static `type MediaAsset { documentId: ID! url: String! thumbnailUrl: String! fileName: String! width: Int! height: Int! }` once per schema (not per content type), and map `media`-typed fields to it. `resolver-factory.service.ts`: for every `media`-typed field (document root — nested components come in Task 3.2), a field resolver on the parent type that takes the raw UUID FK string already present on the hydrated object and resolves it via `MEDIA_ASSET_REPOSITORY.findByDocumentId`, returning `null` for a `null`/dangling FK (never throws — matches `document.md`'s "dangling id resolves to null, never throw" precedent for `updatedBy`).
 
 **Acceptance criteria:**
-- [ ] A `media`-typed field with a valid FK resolves to the full `MediaAsset` object; `null` FK or a dangling (deleted) FK resolves to `null`, not an error.
+- [x] A `media`-typed field with a valid FK resolves to the full `MediaAsset` object; `null` FK or a dangling (deleted) FK resolves to `null`, not an error.
 
 **Verification:** `resolver-factory.service.spec.ts` extended (mocked `MEDIA_ASSET_REPOSITORY`) — `bun run test:cov`. Real e2e coverage needs a throwaway content type with a `media` field (neither real seed has one) — noted for Phase 3's e2e task.
 
@@ -251,8 +251,8 @@ Each phase leaves `bun run build` / `bunx tsc --noEmit` / `bun run lint` / `bun 
 **Description:** Extend `schema-builder.service.ts` to recurse into `component`-typed fields: emit `<ContentType><ComponentName>` PascalCase nested object types (per Task 1.2's naming), field type = the nested type (array-wrapped if `repeatable`), recursing through every nesting level (real seeds exercise 2–3 levels, e.g. `cv-page`'s `experiences → roles`, `en-it-vocab`'s `phonetics → syllableParts`). `resolver-factory.service.ts`: since `ComponentIoService.hydrateComponents` already returns nested plain objects/arrays matching this exact shape (per `document.md`), no extra resolver logic is needed for component fields themselves — only their own `media`-typed sub-fields need the Task 3.1 field-resolver pattern, applied recursively at every level.
 
 **Acceptance criteria:**
-- [ ] `cv-page`'s full 3-level shape (`experiences → roles`) round-trips through a GraphQL query selecting nested fields at every level, matching the REST API's existing e2e assertions for the same document.
-- [ ] A `json`-typed nested field (e.g. `techStack`) returns a real array via the `JSON` scalar, not a string (parity with `document.md`'s existing REST assertion).
+- [x] `cv-page`'s full 3-level shape (`experiences → roles`) round-trips through a GraphQL query selecting nested fields at every level, matching the REST API's existing e2e assertions for the same document.
+- [x] A `json`-typed nested field (e.g. `techStack`) returns a real array via the `JSON` scalar, not a string (parity with `document.md`'s existing REST assertion).
 
 **Verification:** `schema-builder.service.spec.ts` extended (both real seeds' full nested shape) — `bun run test:cov`.
 
@@ -269,8 +269,8 @@ Each phase leaves `bun run build` / `bunx tsc --noEmit` / `bun run lint` / `bun 
 **Description:** New e2e file, `bootTestApp` infra (matching `content-engine.e2e-spec.ts`'s pattern). Covers Phases 1–3's full read path against real Postgres: single query (published/draft, with/without token), list query (filter/orderBy/pagination), the real seeds' 3-level component nesting, and a throwaway content type (built the same in-memory `ContentTypeSyncService.sync([...realDefs, throwawayDef])` way `content-engine.e2e-spec.ts` uses for its Mode-B case) with a real `media`-typed field, exercising Task 3.1's `MediaAsset` resolution against an uploaded asset. Creates its own API tokens via `ACCESS_TOKEN_REPOSITORY` directly (or `CreateAccessTokenService`) scoped `document:read`, cleaned up in `afterAll` alongside any throwaway content type/documents/tokens, `runId`-suffixed to avoid cross-run collisions — same discipline `content-engine.e2e-spec.ts` already documents.
 
 **Acceptance criteria:**
-- [ ] All of Phases 1–3's acceptance criteria proven against real Postgres, not mocks.
-- [ ] `afterAll` leaves no throwaway content type, table, token, or document behind.
+- [x] All of Phases 1–3's acceptance criteria proven against real Postgres, not mocks.
+- [x] `afterAll` leaves no throwaway content type, table, token, or document behind.
 
 **Verification:** `bun run test:e2e` green.
 

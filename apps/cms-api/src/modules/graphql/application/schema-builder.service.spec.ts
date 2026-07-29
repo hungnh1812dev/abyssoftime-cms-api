@@ -19,7 +19,27 @@ const cvPage: ContentTypeDefinition = {
     { name: "isMain", type: "boolean" },
     { name: "company", type: "text" },
     { name: "summary", type: "richtext" },
+    { name: "coverImage", type: "media" },
     { name: "skills", type: "component", component: "skill", repeatable: true, fields: [{ name: "level", type: "text" }] },
+    {
+      name: "experiences",
+      type: "component",
+      component: "experience",
+      repeatable: true,
+      fields: [
+        { name: "company", type: "text" },
+        {
+          name: "roles",
+          type: "component",
+          component: "role",
+          repeatable: true,
+          fields: [
+            { name: "position", type: "text" },
+            { name: "techStack", type: "json" },
+          ],
+        },
+      ],
+    },
   ],
 };
 
@@ -45,7 +65,7 @@ const singleTypeDef: ContentTypeDefinition = {
 };
 
 describe("SchemaBuilderService", () => {
-  it("emits a scalar-only object type + single query for a collection-type definition", async () => {
+  it("emits a scalar-and-media object type + single query for a collection-type definition", async () => {
     const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
 
     const typeDefs = await service.buildTypeDefs();
@@ -54,11 +74,12 @@ describe("SchemaBuilderService", () => {
     const cvPageType = schema.getType("CvPage") as GraphQLObjectType;
     expect(cvPageType).toBeDefined();
     const fields = cvPageType.getFields();
-    expect(Object.keys(fields)).toEqual(["position", "isMain", "company", "summary"]);
+    expect(Object.keys(fields)).toEqual(["position", "isMain", "company", "summary", "coverImage", "skills", "experiences"]);
     expect(fields.position.type).toBe(GraphQLString);
     expect(fields.company.type).toBe(GraphQLString);
     expect(fields.summary.type).toBe(GraphQLString);
     expect(fields.isMain.type.toString()).toBe("Boolean");
+    expect(fields.coverImage.type.toString()).toBe("MediaAsset");
 
     const queryFields = schema.getQueryType()!.getFields();
     expect(queryFields.cvPage).toBeDefined();
@@ -76,7 +97,7 @@ describe("SchemaBuilderService", () => {
     const schema = buildSchema(await service.buildTypeDefs());
 
     const type = schema.getType("EnItVocab") as GraphQLObjectType;
-    expect(Object.keys(type.getFields())).toEqual(["wordGroup", "word", "synonyms"]);
+    expect(Object.keys(type.getFields())).toEqual(["wordGroup", "word", "synonyms", "phonetics"]);
 
     const queryFields = schema.getQueryType()!.getFields();
     expect(queryFields.enItVocab).toBeDefined();
@@ -144,6 +165,60 @@ describe("SchemaBuilderService", () => {
 
     const sortDirection = schema.getType("SortDirection") as GraphQLEnumType;
     expect(sortDirection.getValues().map((v) => v.name)).toEqual(["ASC", "DESC"]);
+  });
+
+  it("emits a single shared MediaAsset type, regardless of how many content types have media fields", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([cvPage, enItVocab]));
+
+    const typeDefs = await service.buildTypeDefs();
+    const schema = buildSchema(typeDefs);
+
+    const mediaAssetType = schema.getType("MediaAsset") as GraphQLObjectType;
+    expect(mediaAssetType).toBeDefined();
+    const fields = mediaAssetType.getFields();
+    expect(Object.keys(fields)).toEqual(["documentId", "url", "thumbnailUrl", "fileName", "width", "height"]);
+    expect(fields.documentId.type.toString()).toBe("ID!");
+    expect(fields.url.type.toString()).toBe("String!");
+    expect(fields.thumbnailUrl.type.toString()).toBe("String!");
+    expect(fields.fileName.type.toString()).toBe("String!");
+    expect(fields.width.type.toString()).toBe("Int!");
+    expect(fields.height.type.toString()).toBe("Int!");
+
+    expect(typeDefs.match(/type MediaAsset /g)).toHaveLength(1);
+  });
+
+  it("recursively emits nested component types, named <ContentType><Component>, array-wrapped when repeatable", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
+
+    const schema = buildSchema(await service.buildTypeDefs());
+
+    const cvPageType = schema.getType("CvPage") as GraphQLObjectType;
+    expect(cvPageType.getFields().skills.type.toString()).toBe("[CvPageSkill!]!");
+    expect(cvPageType.getFields().experiences.type.toString()).toBe("[CvPageExperience!]!");
+
+    const skillType = schema.getType("CvPageSkill") as GraphQLObjectType;
+    expect(skillType).toBeDefined();
+    expect(Object.keys(skillType.getFields())).toEqual(["level"]);
+
+    const experienceType = schema.getType("CvPageExperience") as GraphQLObjectType;
+    expect(experienceType).toBeDefined();
+    expect(Object.keys(experienceType.getFields())).toEqual(["company", "roles"]);
+    expect(experienceType.getFields().roles.type.toString()).toBe("[CvPageRole!]!");
+
+    const roleType = schema.getType("CvPageRole") as GraphQLObjectType;
+    expect(roleType).toBeDefined();
+    expect(Object.keys(roleType.getFields())).toEqual(["position", "techStack"]);
+  });
+
+  it("emits a shared JSON scalar once and maps json-typed nested fields to it", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
+
+    const typeDefs = await service.buildTypeDefs();
+    const schema = buildSchema(typeDefs);
+
+    const roleType = schema.getType("CvPageRole") as GraphQLObjectType;
+    expect(roleType.getFields().techStack.type.toString()).toBe("JSON");
+    expect(typeDefs.match(/scalar JSON/g)).toHaveLength(1);
   });
 
   it("emits <slug>List returning a non-null list of non-null items, with where/orderBy/start/size args", async () => {

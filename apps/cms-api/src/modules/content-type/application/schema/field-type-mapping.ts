@@ -7,7 +7,7 @@ const COLUMN_TYPE_BY_FIELD_TYPE: Record<NonComponentFieldType, string> = {
   richtext: "TEXT",
   number: "DOUBLE PRECISION",
   boolean: "BOOLEAN",
-  media: "UUID REFERENCES media_assets(document_id) ON DELETE SET NULL",
+  media: "TEXT REFERENCES media_assets(document_id) ON DELETE SET NULL",
   json: "JSONB",
 };
 
