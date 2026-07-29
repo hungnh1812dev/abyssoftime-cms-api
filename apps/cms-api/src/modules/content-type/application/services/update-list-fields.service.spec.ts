@@ -49,6 +49,17 @@ describe("UpdateListFieldsService", () => {
     expect(contentTypes.updateListFields).toHaveBeenCalledWith("cv-page", ["updatedAt"]);
   });
 
+  it("accepts the id system column", async () => {
+    const contentTypes = buildRepository();
+    contentTypes.findBySlug.mockResolvedValue(entity);
+    contentTypes.updateListFields.mockResolvedValue(entity);
+    const service = new UpdateListFieldsService(contentTypes);
+
+    await service.execute("cv-page", ["id"]);
+
+    expect(contentTypes.updateListFields).toHaveBeenCalledWith("cv-page", ["id"]);
+  });
+
   it("accepts a field with an eligible kind (text/number/boolean)", async () => {
     const contentTypes = buildRepository();
     contentTypes.findBySlug.mockResolvedValue(entity);

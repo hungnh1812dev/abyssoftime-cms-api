@@ -31,6 +31,8 @@ export function mapRowToDocument(row: Record<string, unknown>, fields: FieldDefi
     (row.created_by as string | null) ?? null,
     (row.updated_by as string | null) ?? null,
     (row.published_by as string | null) ?? null,
+    // node-postgres parses BIGINT/BIGSERIAL as a string by default.
+    Number(row.id),
   );
 }
 

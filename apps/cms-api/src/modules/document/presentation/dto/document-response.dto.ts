@@ -42,6 +42,9 @@ export class PublishStatusResponseDto {
 }
 
 export class ListedDocumentItemResponseDto {
+  @ApiProperty({ description: "DB-generated autoincrement id — internal ordering key, not a stable public identifier (use documentId for that)." })
+  id!: number;
+
   @ApiProperty()
   documentId!: string;
 

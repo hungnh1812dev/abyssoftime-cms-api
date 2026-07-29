@@ -12,5 +12,8 @@ export class DocumentEntity {
     public readonly createdBy: string | null,
     public readonly updatedBy: string | null,
     public readonly publishedBy: string | null,
+    // DB-generated (BIGSERIAL) — undefined for an entity built in memory
+    // before its first insert; always populated once mapped from a row.
+    public readonly id?: number,
   ) {}
 }

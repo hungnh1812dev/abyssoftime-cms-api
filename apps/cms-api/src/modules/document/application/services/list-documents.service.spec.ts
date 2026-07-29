@@ -76,6 +76,19 @@ describe("ListDocumentsService", () => {
     ]);
   });
 
+  it("includes each row's numeric id in the listed item", async () => {
+    const contentType = buildContentType(true);
+    const { schemaResolver, documents, users } = buildDeps(contentType);
+
+    const draft1 = new DocumentEntity("doc-1", "draft", { wordGroup: "Networking", bio: "long text" }, new Date("2026-01-03"), new Date("2026-01-03"), null, null, null, null, 42);
+    documents.listPaginated.mockResolvedValue({ rows: [draft1], total: 1 });
+
+    const service = new ListDocumentsService(schemaResolver, documents, users);
+    const result = await service.execute("en-it-vocab", {});
+
+    expect(result.items[0].id).toBe(42);
+  });
+
   it("projects data to only the listFields, excluding fields not listed", async () => {
     const contentType = buildContentType(true);
     const { schemaResolver, documents, users } = buildDeps(contentType);

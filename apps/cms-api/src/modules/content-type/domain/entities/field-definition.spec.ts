@@ -22,6 +22,6 @@ describe("LISTABLE_FIELD_TYPES", () => {
 
 describe("LISTABLE_SYSTEM_COLUMNS", () => {
   it("contains exactly the response-DTO-facing system column names", () => {
-    expect(LISTABLE_SYSTEM_COLUMNS).toEqual(["documentId", "status", "createdAt", "updatedAt", "publishedAt", "updatedBy"]);
+    expect(LISTABLE_SYSTEM_COLUMNS).toEqual(["id", "documentId", "status", "createdAt", "updatedAt", "publishedAt", "updatedBy"]);
   });
 });
