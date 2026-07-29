@@ -25,7 +25,14 @@ const usersResponse = [
 ];
 
 beforeEach(() => {
-  mockUseAuth.mockReturnValue({ role: superAdminRole, permissions: [], userId: "u1", loading: false, login: vi.fn(), logout: vi.fn() });
+  mockUseAuth.mockReturnValue({
+    role: superAdminRole,
+    permissions: ["user:manager", "user:role_manager"],
+    userId: "u1",
+    loading: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+  });
   mock = new MockAdapter(api);
   mock.onGet("/users").reply(200, usersResponse);
   mock.onGet("/roles").reply(200, rolesResponse);
@@ -102,6 +109,33 @@ describe("UsersPage — dynamic role hierarchy (canManage gating)", () => {
     await waitFor(() => expect(screen.getByRole("option", { name: "Editor" })).toBeInTheDocument());
     expect(screen.getByRole("option", { name: "Guest" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Super Admin" })).not.toBeInTheDocument();
+  });
+
+  it("hides both controls for a manageable row when the caller holds neither permission slug", async () => {
+    mockUseAuth.mockReturnValue({ role: superAdminRole, permissions: [], userId: "u1", loading: false, login: vi.fn(), logout: vi.fn() });
+    renderWithProviders(<UsersPage />);
+    await waitFor(() => expect(screen.getByText("Bob Editor")).toBeInTheDocument());
+    const bobRow = screen.getByText("Bob Editor").closest("tr")!;
+    expect(bobRow.querySelector("[role='combobox']")).toBeNull();
+    expect(bobRow.querySelector("button")).toBeNull();
+  });
+
+  it("shows only the role-change dropdown when the caller holds user:role_manager but not user:manager", async () => {
+    mockUseAuth.mockReturnValue({ role: superAdminRole, permissions: ["user:role_manager"], userId: "u1", loading: false, login: vi.fn(), logout: vi.fn() });
+    renderWithProviders(<UsersPage />);
+    await waitFor(() => expect(screen.getByText("Bob Editor")).toBeInTheDocument());
+    const bobRow = screen.getByText("Bob Editor").closest("tr")!;
+    expect(bobRow.querySelector("[role='combobox']")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
+  });
+
+  it("shows only the Delete button when the caller holds user:manager but not user:role_manager", async () => {
+    mockUseAuth.mockReturnValue({ role: superAdminRole, permissions: ["user:manager"], userId: "u1", loading: false, login: vi.fn(), logout: vi.fn() });
+    renderWithProviders(<UsersPage />);
+    await waitFor(() => expect(screen.getByText("Bob Editor")).toBeInTheDocument());
+    const bobRow = screen.getByText("Bob Editor").closest("tr")!;
+    expect(bobRow.querySelector("[role='combobox']")).toBeNull();
+    expect(screen.getByRole("button", { name: /delete/i })).toBeInTheDocument();
   });
 
   it("sends PATCH /users/:id/role with the selected roleId on role change", async () => {

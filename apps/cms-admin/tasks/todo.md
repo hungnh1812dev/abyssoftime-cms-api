@@ -64,5 +64,14 @@ each task completes.
       re-validated success-criteria date; corrected the stale `specs/access-token-auth-mismatch.md`
       pointer's actual current location (`Sidebar.tsx`, still a nonexistent file). 338/338 tests,
       lint, build green
-- [ ] 6.5 Five-axis code review
+- [x] 6.5 Five-axis code review — `code-reviewer` agent over the full Phase 1-6 diff
+      (`09ee853^..2e77776`); two Important correctness findings fixed with tests:
+      `ContentTypePanel` publish/unpublish buttons now gate on `contentType.draftToPublish`
+      (previously always visible, would 400 for any content type with it disabled), and
+      `UsersPage` role-change/delete controls now additionally require the `user:role_manager`/
+      `user:manager` permission slugs the backend enforces (previously gated on role level alone,
+      so an outranking caller without the grant saw controls that always 403'd). Also applied two
+      Suggestion-level fixes: `VerifyOtpPage` now uses the shared `apiErrorMessage` helper instead
+      of a duplicate local copy, and `RolesPage`'s level label/min/max corrected from 1-99 to the
+      real 0-100 API range. 342/342 tests, lint (1 pre-existing unrelated warning), build green.
 - [ ] 6.6 Clean-up — delete `specs/cms-api-integration.md` and `tasks/plan.md`/`tasks/todo.md`

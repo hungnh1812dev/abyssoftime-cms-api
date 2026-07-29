@@ -82,6 +82,16 @@ describe("ContentTypePanel", () => {
     expect(screen.queryByRole("button", { name: /unpublish/i })).not.toBeInTheDocument();
   });
 
+  it("hides Publish and Unpublish when the content type has draftToPublish disabled", async () => {
+    mock.onGet("/documents/collection-type/homepage/entry-99").reply(200, { data: { ...doc.data, documentId: "entry-99", status: "published" } });
+
+    renderWithProviders(<ContentTypePanel contentType={{ ...ct, kind: "collection", draftToPublish: false }} id="entry-99" />);
+
+    await waitFor(() => expect(screen.getByLabelText("title")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /publish/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /unpublish/i })).not.toBeInTheDocument();
+  });
+
   it("shows the last-updated-by line when updatedBy is present", async () => {
     mock.onGet("/documents/single-type/homepage").reply(200, { data: { ...doc.data, updatedBy: { documentId: "u1", name: "Jane Admin" } } });
 

@@ -7,7 +7,7 @@ import { type RoleItem, useRoleList } from "@/hooks/useRoles";
 import { useDeleteUser, useUpdateUserRole, useUserList } from "@/hooks/useUsers";
 
 export function UsersPage() {
-  const { role: myRole, userId } = useAuth();
+  const { role: myRole, permissions, userId } = useAuth();
 
   const { data: users = [], isLoading } = useUserList();
   const { data: roles = [] } = useRoleList();
@@ -45,6 +45,11 @@ export function UsersPage() {
               const isMe = user.documentId === userId;
               const userRole: RoleItem | undefined = user.roleId ? roleById.get(user.roleId) : undefined;
               const canManage = !isMe && myLevel > (userRole?.level ?? 0);
+              // Level outranking mirrors the server's hierarchy check, but the
+              // server also requires these permission slugs on top of it — a
+              // caller can outrank a row by level and still lack the grant.
+              const canChangeRole = canManage && permissions.includes("user:role_manager");
+              const canDelete = canManage && permissions.includes("user:manager");
               return (
                 <TableRow key={user.documentId} className={isMe ? "bg-accent/30" : undefined}>
                   <TableCell>
@@ -56,33 +61,37 @@ export function UsersPage() {
                     <Badge variant="secondary">{userRole?.name ?? "No role"}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {canManage && (
+                    {(canChangeRole || canDelete) && (
                       <div className="flex justify-end gap-2">
-                        <Select
-                          onValueChange={(roleId: string | null) => {
-                            if (roleId) updateRole.mutate({ id: user.documentId, roleId });
-                          }}>
-                          <SelectTrigger className="h-8 w-32 text-xs">
-                            <SelectValue placeholder="Change role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableRoles.map((role) => (
-                              <SelectItem key={role.documentId} value={role.documentId}>
-                                {role.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => {
-                            if (confirm(`Delete user ${user.email}?`)) {
-                              deleteUser.mutate(user.documentId);
-                            }
-                          }}>
-                          Delete
-                        </Button>
+                        {canChangeRole && (
+                          <Select
+                            onValueChange={(roleId: string | null) => {
+                              if (roleId) updateRole.mutate({ id: user.documentId, roleId });
+                            }}>
+                            <SelectTrigger className="h-8 w-32 text-xs">
+                              <SelectValue placeholder="Change role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableRoles.map((role) => (
+                                <SelectItem key={role.documentId} value={role.documentId}>
+                                  {role.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {canDelete && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => {
+                              if (confirm(`Delete user ${user.email}?`)) {
+                                deleteUser.mutate(user.documentId);
+                              }
+                            }}>
+                            Delete
+                          </Button>
+                        )}
                       </div>
                     )}
                   </TableCell>
