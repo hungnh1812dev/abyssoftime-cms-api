@@ -18,7 +18,7 @@ See `tasks/plan.md` for full context and rationale.
 - [x] **Checkpoint:** doc read-through against SPEC.md + shipped code — commit
 
 ## Phase 5 — Review + close-out
-- [ ] Five-axis review (correctness / readability / architecture / security / performance)
-- [ ] Address findings
-- [ ] `SPEC.md` trimmed to a one-line pointer at `docs/documents/auth.md`
-- [ ] **Checkpoint (final):** all checks green — commit
+- [x] Five-axis review (correctness / readability / architecture / security / performance) — APPROVE, no critical/important findings
+- [x] Address findings — `RefreshTokenPayload.rememberMe` made optional (compiler-enforced fallback discipline); positional-boolean suggestion skipped as premature for a single call site
+- [x] `SPEC.md` trimmed to a one-line pointer at `docs/documents/auth.md`
+- [x] **Checkpoint (final):** all checks green — commit
