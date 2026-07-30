@@ -1,3 +1,0 @@
-# Spec
-
-No active spec. The previous cycle (schema-as-code content types — JSON definitions under `content-types/*.json` reconciled against Postgres on every boot by a diff-based sync engine, never `DROP TABLE` on a field-level change — plus a generic Document engine serving full CRUD, draft/publish (Mode A/B via `draftToPublish`), recursive nested components, list/search/sort/pagination, bulk create+publish/delete, and single-type/collection-type/public REST surfaces over *any* declared content type with zero per-content-type backend code) is implemented and documented in `/docs/documents/{content-type,document}.md` — see those for module details, not here (per `/docs/rules/workflow.md`'s "Root docs" rule).
