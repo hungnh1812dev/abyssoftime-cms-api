@@ -1,0 +1,35 @@
+# Auth & Session
+
+`src/context/AuthContext.tsx`, `src/context/HealthContext.tsx`, `src/components/ProtectedRoute.tsx`, `src/pages/auth/*` — client-side session state, mount-time silent refresh, API-health gating, and the login/register/verify/password-reset screens. Depends on the cookie-refresh logic in `lib/api.ts` (see [app-shell.md](./app-shell.md)). This is a **cookie-session model**, not Bearer-token — see `docs/cms-admin-integration.md` §2 for the full backend contract.
+
+## `AuthContext` (`src/context/AuthContext.tsx`)
+
+State: `{ user, loading }` where `user: MeUser | null` (`documentId`, `email`, `name`, `username`, `accountType`, `verified`, `roleId`, `role: RoleItem | null`, timestamps), plus derived `role`/`userId`/`displayName`/`permissions` (`user.role?.permissions ?? []`), and `login()` / `logout()`. There is **no client-readable token** — both `access_token` and `refresh_token` are httpOnly cookies the browser sends automatically (`withCredentials: true` in `lib/api.ts`); identity is hydrated purely by calling the API.
+
+**Mount-time session** (`attemptMountSession`): since there's no way to tell client-side whether a session exists, every mount does `POST /auth/refresh` (deduped via `_retried: true` so the response interceptor doesn't double-handle a `401` from it) followed by `GET /auth/me` to populate `user`. A `401` from either call is a definitive "no session" and logs out immediately; any other failure (network error, 5xx, 429 — most commonly a cold-start backend) retries with backoff delays `MOUNT_REFRESH_RETRY_DELAYS_MS = [2000, 5000, 10000]` before giving up, so a live session isn't discarded just because the server was briefly unreachable.
+
+`login()` is called after a successful `POST /auth/login` (which itself returns only `{ message }`, no token/user) — it just re-runs the `GET /auth/me` fetch to hydrate `user`. `logout()` optimistically clears local state, then best-effort calls `POST /auth/logout` (cookies cleared server-side).
+
+`onSessionExpired` (registered here, invoked from `lib/api.ts`'s response interceptor) clears `user` when a mid-session refresh fails — this is what actually logs a user out after a `401` that the axios-level silent refresh couldn't recover from.
+
+## `HealthContext` (`src/context/HealthContext.tsx`)
+
+Independent of auth — polls `GET {VITE_API_URL}/health` (unprefixed, no `/api/v1`, no credentials) on an adaptive interval: 14 minutes while healthy, 10 seconds while unhealthy, 5s fetch timeout via `AbortController`. Pauses polling when the tab is hidden (`visibilitychange`) and re-pings immediately on becoming visible. Renders `ConnectionOverlay` (full-screen blocking spinner, "Connecting to service...") as a sibling to `children` whenever unhealthy — this is what covers a cold backend start for the whole app, login screen included, hence why `HealthProvider` wraps `BrowserRouter` in `main.tsx` (see [app-shell.md](./app-shell.md)).
+
+## `ProtectedRoute` (`src/components/ProtectedRoute.tsx`)
+
+Used by `router.tsx` to gate everything under `/admin` and individual settings routes. While `loading` (auth context still resolving its mount-time session), renders nothing. If no `user`: fetches `GET /auth/has-users` (`{ hasUsers: boolean }`, `enabled: !loading && !user`) to decide whether to redirect to `/login` or `/register` — first-run detection. If `minLevel` (a number) is passed and the caller's `role?.level ?? 0` is below it, redirects to `/403`. `router.tsx` defines `ROLE_LEVEL.ADMIN = 50` / `ROLE_LEVEL.SUPER_ADMIN = 100` named constants rather than bare literals at each route (see [app-shell.md](./app-shell.md)). The former `AdminRoute.tsx` (string-role-only guard, `role !== "admin"`) has been **deleted** — it was already dead code before this rewrite, and `role` becoming a `RoleItem | null` object (not a string) would have broken it anyway.
+
+## Pages
+
+- **`LoginPage`** (`/login`) — checks `GET /auth/has-users` first; redirects to `/register` if none exist yet. `react-hook-form` with email/password/`rememberMe` (collected but not read anywhere else — a refresh-token-lifetime hint the backend controls), plus a "Forgot password?" link to `/forgot-password`. A `403` response is shown as "email isn't verified yet"; any other failure as "invalid email or password". On success, calls `AuthContext.login()` (no token argument — cookies are already set) and navigates to `/admin`.
+- **`RegisterPage`** (`/register`) — same `auth-has-users` query; shows "Set up admin account" when no users exist yet (first registrant becomes admin per backend rules — this page doesn't choose the role). Collects `name`/`username`/`email`/`password` (`username`: 3–32 chars, `/^[a-zA-Z0-9_.-]+$/`) and sends a fixed `accountType: true` (its real semantics aren't documented and don't affect who becomes admin). On success, navigates to `/verify-otp` with the email in router state — no auto-login, registration requires OTP verification first.
+- **`VerifyOtpPage`** (`/verify-otp`) — email (prefilled from `RegisterPage`'s router state) + 6-digit OTP via `POST /auth/verify-otp`; a "Resend code" button calls `POST /auth/resend-otp`. On success, navigates to `/login`.
+- **`ForgotPasswordPage`** (`/forgot-password`) — email via `POST /auth/forgot-password`, which always returns success regardless of whether the email exists (enumeration prevention) — the UI has no error branch, just a generic "check your inbox" state after submit.
+- **`ResetPasswordPage`** (`/reset-password?token=...`) — reads `token` from the query string; missing token or a `400` response (expired/invalid) renders a "Link expired" state with a link back to `/forgot-password`. Otherwise a new-password + confirm-password form (`useWatch` for the client-side match check) via `POST /auth/reset-password`, navigating to `/login` on success.
+
+There is no invite flow — self-registration + OTP verification is the only onboarding path (see [locales-and-invites.md](./locales-and-invites.md)).
+
+## Known gaps
+
+- `lib/api.ts`'s response interceptor and `AuthContext`'s mount-time retry both call `POST /auth/refresh` independently with their own dedup — `lib/api.ts` dedupes concurrent mid-session `401`s via a module-level `_refreshPromise`; `AuthContext`'s mount-time call passes `_retried: true` on its own request so the interceptor doesn't also intercept *that* call's `401`. The two paths don't share the dedup promise, so a `401` at the exact moment of mount could theoretically trigger two refresh calls — not observed in practice, not covered by a dedicated regression test.

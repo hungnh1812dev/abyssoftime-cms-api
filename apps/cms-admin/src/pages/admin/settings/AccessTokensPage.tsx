@@ -1,0 +1,203 @@
+import { useState } from "react";
+
+import { PermissionTree } from "@/components/permissions/PermissionTree";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { type ExpiresIn, useAccessTokenList, useCreateAccessToken, useDeleteAccessToken, useRevokeAccessToken } from "@/hooks/useAccessTokens";
+import { usePermissions } from "@/hooks/usePermissions";
+
+const EXPIRY_OPTIONS: Array<{ label: string; value: ExpiresIn }> = [
+  { label: "30 minutes", value: "30m" },
+  { label: "1 hour", value: "1h" },
+  { label: "1 day", value: "1d" },
+  { label: "1 month", value: "1m" },
+  { label: "1 year", value: "1y" },
+  { label: "Never", value: "never" },
+];
+
+function TokenRevealDialog({ open, onOpenChange, token }: { open: boolean; onOpenChange: (open: boolean) => void; token: string | null }) {
+  function copyToken() {
+    if (token) navigator.clipboard.writeText(token);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Token</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-muted-foreground text-sm">Copy this token now. It will not be shown again.</p>
+          <div className="bg-muted rounded-md border p-3">
+            <code className="text-xs break-all">{token}</code>
+          </div>
+          <Button size="sm" onClick={copyToken} className="w-full">
+            Copy Token
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function AccessTokensPage() {
+  const [createOpen, setCreateOpen] = useState(false);
+  const [tokenName, setTokenName] = useState("");
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [expiresIn, setExpiresIn] = useState<ExpiresIn>("never");
+  const [revealedToken, setRevealedToken] = useState<string | null>(null);
+
+  const { data: tokens = [], isLoading } = useAccessTokenList();
+  const { data: permissions = [] } = usePermissions();
+  const createToken = useCreateAccessToken();
+  const revokeToken = useRevokeAccessToken();
+  const deleteToken = useDeleteAccessToken();
+
+  const permissionNameBySlug = new Map(permissions.map((permission) => [permission.slug, permission.name]));
+
+  function resetCreateForm() {
+    setTokenName("");
+    setSelectedPermissions([]);
+    setExpiresIn("never");
+  }
+
+  function handleCreate() {
+    if (!tokenName) return;
+    createToken.mutate(
+      { name: tokenName, permissions: selectedPermissions, expiresIn },
+      {
+        onSuccess: (response) => {
+          setCreateOpen(false);
+          resetCreateForm();
+          setRevealedToken(response.token);
+        },
+      },
+    );
+  }
+
+  function handleRevoke(id: string, name: string) {
+    if (!confirm(`Revoke and rotate the secret for "${name}"? The current token will stop working immediately.`)) return;
+    revokeToken.mutate(
+      { id },
+      {
+        onSuccess: (response) => {
+          setRevealedToken(response.token);
+        },
+      },
+    );
+  }
+
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Access Tokens</h1>
+        <Dialog
+          open={createOpen}
+          onOpenChange={(open: boolean) => {
+            setCreateOpen(open);
+            if (!open) resetCreateForm();
+          }}>
+          <DialogTrigger render={<Button size="sm" />}>Create new token</DialogTrigger>
+          <DialogContent className="max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create Access Token</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label htmlFor="token-name">Name</Label>
+                <Input id="token-name" value={tokenName} onChange={(event) => setTokenName(event.target.value)} placeholder="e.g. Frontend production" />
+              </div>
+              <div className="space-y-1">
+                <Label>Permissions</Label>
+                <p className="text-muted-foreground text-xs">Leave empty for a token with no scoped permissions.</p>
+                <PermissionTree permissions={permissions} selected={selectedPermissions} onChange={setSelectedPermissions} />
+              </div>
+              <div className="space-y-1">
+                <Label>Expiration</Label>
+                <Select value={expiresIn} onValueChange={(value: string | null) => setExpiresIn((value as ExpiresIn) ?? "never")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select expiration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXPIRY_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button className="w-full" onClick={handleCreate} disabled={createToken.isPending || !tokenName}>
+                {createToken.isPending ? "Creating…" : "Create Token"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {isLoading ? (
+        <p className="text-muted-foreground">Loading…</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Permissions</TableHead>
+              <TableHead>Expires</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tokens.map((token) => (
+              <TableRow key={token.documentId}>
+                <TableCell className="font-medium">{token.name}</TableCell>
+                <TableCell>
+                  {token.permissions.length === 0 ? (
+                    <span className="text-muted-foreground text-xs">No permissions</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {token.permissions.map((slug) => (
+                        <Badge key={slug} variant="secondary" className="text-xs">
+                          {permissionNameBySlug.get(slug) ?? slug}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </TableCell>
+                <TableCell className="text-muted-foreground text-sm">{token.expiresAt ? new Date(token.expiresAt).toLocaleDateString() : "Never"}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleRevoke(token.documentId, token.name)}>
+                      Revoke
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm(`Delete token "${token.name}"?`)) {
+                          deleteToken.mutate(token.documentId);
+                        }
+                      }}>
+                      Delete
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
+      <p className="text-muted-foreground text-sm">
+        {tokens.length} token{tokens.length !== 1 ? "s" : ""}
+      </p>
+
+      <TokenRevealDialog open={revealedToken !== null} onOpenChange={(open) => !open && setRevealedToken(null)} token={revealedToken} />
+    </div>
+  );
+}
