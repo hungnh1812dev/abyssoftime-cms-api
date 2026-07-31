@@ -262,10 +262,10 @@ describe("ResolverFactoryService", () => {
     });
   });
 
-  it("returns a SortDirection enum value map (ASC/DESC -> asc/desc) alongside Query", async () => {
+  it("returns a SortDirection enum value map (upper- and lowercase ASC/DESC -> asc/desc) alongside Query", async () => {
     const resolvers = await service.buildResolvers();
 
-    expect(resolvers.SortDirection).toEqual({ ASC: "asc", DESC: "desc" });
+    expect(resolvers.SortDirection).toEqual({ ASC: "asc", DESC: "desc", asc: "asc", desc: "desc" });
   });
 
   describe("media field resolution", () => {

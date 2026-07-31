@@ -350,6 +350,24 @@ describe("GraphQL (e2e)", () => {
       expect(result.meta.pagination).toEqual({ page: 1, pageSize: 10, total: 2 });
     });
 
+    it("exposes the numeric id field and sorts by it, accepting the lowercase sort-direction enum value too", async () => {
+      const query = `
+        query($where: CvPageFilter, $orderBy: CvPageOrderBy) {
+          cvPages(where: $where, orderBy: $orderBy, pagination: { limit: -1 }) {
+            items { id position }
+          }
+        }
+      `;
+      const response = await gql(query, { where: { company: { eq: `${filterTag}-Co` } }, orderBy: { id: "asc" } }, readScopedApiToken).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.errors).toBeUndefined();
+      const items = (body.data as { cvPages: { items: { id: number; position: string }[] } }).cvPages.items;
+      expect(items.map(({ position }) => position)).toEqual([`${filterTag} Primary`, `${filterTag} Secondary`]);
+      items.forEach((item) => expect(typeof item.id).toBe("number"));
+      expect(items[0].id).toBeLessThan(items[1].id);
+    });
+
     it("limit: -1 returns every matching row, unlimited, with pageSize == total (SPEC.md §3.3 rule 11)", async () => {
       const query = `
         query($where: CvPageFilter) {

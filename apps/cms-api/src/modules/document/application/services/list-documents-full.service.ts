@@ -44,6 +44,7 @@ export class ListDocumentsFullService {
     const items = await Promise.all(
       rows.map(async (row) => ({
         documentId: row.documentId,
+        id: row.id,
         ...row.fields,
         ...(await this.componentIo.hydrateComponents(slug, row.documentId, "published", contentType.fields)),
         createdAt: row.createdAt,

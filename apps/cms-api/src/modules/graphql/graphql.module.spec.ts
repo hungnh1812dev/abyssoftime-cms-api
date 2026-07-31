@@ -132,7 +132,7 @@ describe("GraphqlModule", () => {
       expect(resolvers.Mutation.saveHomePage).toBeInstanceOf(Function);
       expect(resolvers.Mutation.publishHomePage).toBeInstanceOf(Function);
       expect(resolvers.Mutation.unpublishHomePage).toBeInstanceOf(Function);
-      expect(resolvers.SortDirection).toEqual({ ASC: "asc", DESC: "desc" });
+      expect(resolvers.SortDirection).toEqual({ ASC: "asc", DESC: "desc", asc: "asc", desc: "desc" });
     });
 
     it("gates introspection/playground to non-production", async () => {

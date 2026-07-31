@@ -43,7 +43,7 @@ const FILTER_INPUT_TYPE_BY_FIELD_TYPE: Partial<Record<FieldType, string>> = {
   boolean: "BooleanFilter",
 };
 
-const SYSTEM_ORDER_BY_FIELDS = ["createdAt", "updatedAt", "publishedAt"];
+const SYSTEM_ORDER_BY_FIELDS = ["id", "createdAt", "updatedAt", "publishedAt"];
 
 const FILTER_INPUT_TYPES = `input TextFilter {
   eq: String
@@ -84,9 +84,13 @@ input TimeFilter {
 // content-field entries, regardless of content type.
 const SYSTEM_FILTER_FIELDS = ["  documentId: IDFilter", "  createdAt: TimeFilter", "  updatedAt: TimeFilter", "  publishedAt: TimeFilter"];
 
+// Both cases are accepted as distinct enum values (not normalized) so a client can send either
+// SortDirection: { ASC DESC asc desc } — resolver-factory.service.ts maps all four to "asc"/"desc".
 const ORDER_BY_TYPES = `enum SortDirection {
   ASC
   DESC
+  asc
+  desc
 }`;
 
 const PAGINATION_TYPES = `input PaginationInput {
@@ -125,6 +129,10 @@ function buildObjectType(definition: ContentTypeDefinition): string {
   // created document's id, since create<Type>'s caller doesn't know it up front.
   const fieldLines = [
     "  documentId: ID!",
+    // Auto-increment record id (BIGSERIAL), distinct from documentId (UUID). Only the list query
+    // resolver populates it (ListDocumentsFullService reads it straight off the DB row); other
+    // resolvers resolve it to null.
+    "  id: Int",
     ...definition.fields.map((field) => buildFieldLine(definition.slug, field)),
     "  createdAt: DateTime!",
     "  updatedAt: DateTime!",
