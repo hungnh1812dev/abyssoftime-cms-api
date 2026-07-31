@@ -123,6 +123,24 @@ describe("buildFilterWhere", () => {
 
     expect(() => buildFilterWhere(filters, 1)).toThrow(UnsafeSqlIdentifierError);
   });
+
+  it("builds an = ANY($n) clause for $in with an array param", () => {
+    const filters: ParsedFilter[] = [{ column: "documentId", operator: "$in", value: ["a", "b"] }];
+
+    expect(buildFilterWhere(filters, 1)).toEqual({
+      sql: '("documentId" = ANY($1))',
+      params: [["a", "b"]],
+    });
+  });
+
+  it("builds a NOT (= ANY($n)) clause for $notIn with an array param", () => {
+    const filters: ParsedFilter[] = [{ column: "documentId", operator: "$notIn", value: ["a", "b"] }];
+
+    expect(buildFilterWhere(filters, 1)).toEqual({
+      sql: '(NOT ("documentId" = ANY($1)))',
+      params: [["a", "b"]],
+    });
+  });
 });
 
 describe("sortableColumnsFor", () => {

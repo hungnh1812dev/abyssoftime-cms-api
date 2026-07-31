@@ -16,11 +16,12 @@ const MAX_LIMIT = 100;
 const UNLIMITED = -1;
 const DEFAULT_SORT_DIR = "desc";
 
-// SPEC.md decision #7: GraphQL v1 ships REST's operator set minus boolean `ne` — narrower than
-// document's own filter-query.parser.ts, which allows `ne` on booleans too.
+// SPEC.md decision #7 + SPEC.md §3.2 area 5: GraphQL v1 ships REST's operator set minus boolean
+// `ne`, plus `in`/`notIn` on text/number (Go parity) — narrower than document's own
+// filter-query.parser.ts, which allows `ne` on booleans too.
 const OPERATORS_BY_FIELD_TYPE: Partial<Record<FieldType, readonly FilterOperator[]>> = {
-  text: ["$eq", "$ne", "$contains"],
-  number: ["$eq", "$ne", "$gt", "$gte", "$lt", "$lte"],
+  text: ["$eq", "$ne", "$contains", "$in", "$notIn"],
+  number: ["$eq", "$ne", "$gt", "$gte", "$lt", "$lte", "$in", "$notIn"],
   boolean: ["$eq"],
 };
 
@@ -32,6 +33,8 @@ const OPERATOR_ARG_TO_FILTER_OPERATOR: Record<string, FilterOperator> = {
   gte: "$gte",
   lt: "$lt",
   lte: "$lte",
+  in: "$in",
+  notIn: "$notIn",
 };
 
 // The sync engine names content-field columns after `field.name` verbatim (camelCase), but the
@@ -41,6 +44,21 @@ const SYSTEM_ORDER_BY_ALIASES: Record<string, string> = {
   createdAt: "created_at",
   updatedAt: "updated_at",
   publishedAt: "published_at",
+};
+
+// SPEC.md §3.2 area 7: every <Type>Filter carries these 4 system-field filters (documentId:
+// IDFilter, timestamps: TimeFilter) ahead of content fields — same snake_case column mapping as
+// SYSTEM_ORDER_BY_ALIASES, plus documentId itself which orderBy doesn't need.
+const SYSTEM_FILTER_FIELD_ALIASES: Record<string, string> = {
+  documentId: "document_id",
+  ...SYSTEM_ORDER_BY_ALIASES,
+};
+
+const SYSTEM_FILTER_OPERATORS: Record<string, readonly FilterOperator[]> = {
+  documentId: ["$eq", "$ne", "$in", "$notIn"],
+  createdAt: ["$eq", "$ne"],
+  updatedAt: ["$eq", "$ne"],
+  publishedAt: ["$eq", "$ne"],
 };
 
 // SPEC.md §3.4: default sort column is now the system createdAt column, not id.
@@ -132,18 +150,20 @@ function resolveFilters(where: Record<string, Record<string, unknown>> | undefin
 
   const filters: ParsedFilter[] = [];
   for (const [column, operators] of Object.entries(where)) {
+    const systemColumn = SYSTEM_FILTER_FIELD_ALIASES[column];
     const fieldType = fieldTypeByName.get(column);
-    if (!fieldType) {
+    if (!systemColumn && !fieldType) {
       throw badUserInput(`Invalid filter field: "${column}"`);
     }
-    const legalOperators = OPERATORS_BY_FIELD_TYPE[fieldType] ?? [];
+    const legalOperators = systemColumn ? SYSTEM_FILTER_OPERATORS[column] : (OPERATORS_BY_FIELD_TYPE[fieldType!] ?? []);
+    const resolvedColumn = systemColumn ?? column;
 
     for (const [operatorArg, value] of Object.entries(operators)) {
       const operator = OPERATOR_ARG_TO_FILTER_OPERATOR[operatorArg];
       if (!operator || !legalOperators.includes(operator)) {
         throw badUserInput(`Operator "${operatorArg}" is not supported for filter field "${column}"`);
       }
-      filters.push({ column, operator, value: value as string | number | boolean });
+      filters.push({ column: resolvedColumn, operator, value: value as ParsedFilter["value"] });
     }
   }
 

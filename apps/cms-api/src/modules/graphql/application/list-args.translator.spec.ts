@@ -86,6 +86,52 @@ describe("translateListArgs", () => {
     expect(() => translateListArgs(contentType, { where: { position: { gt: "z" } } })).toThrow(GraphQLError);
   });
 
+  it("translates in/notIn on a text field", () => {
+    const contentType = buildContentType();
+
+    const result = translateListArgs(contentType, { where: { position: { in: ["Eng", "Ops"] } } });
+
+    expect(result.filters).toEqual([{ column: "position", operator: "$in", value: ["Eng", "Ops"] }]);
+  });
+
+  it("translates in/notIn on a number field", () => {
+    const contentType = buildContentType();
+
+    const result = translateListArgs(contentType, { where: { teamSize: { notIn: [1, 2] } } });
+
+    expect(result.filters).toEqual([{ column: "teamSize", operator: "$notIn", value: [1, 2] }]);
+  });
+
+  it("throws BAD_USER_INPUT for in/notIn on a boolean field (not in the v1 operator set)", () => {
+    const contentType = buildContentType();
+
+    expect(() => translateListArgs(contentType, { where: { featured: { in: [true] } } })).toThrow(GraphQLError);
+  });
+
+  describe("system-field filters (SPEC.md §3.2)", () => {
+    it("resolves documentId (IDFilter) to the raw document_id column, supporting eq/ne/in/notIn", () => {
+      const contentType = buildContentType();
+
+      expect(translateListArgs(contentType, { where: { documentId: { eq: "abc" } } }).filters).toEqual([{ column: "document_id", operator: "$eq", value: "abc" }]);
+      expect(translateListArgs(contentType, { where: { documentId: { in: ["a", "b"] } } }).filters).toEqual([{ column: "document_id", operator: "$in", value: ["a", "b"] }]);
+    });
+
+    it("resolves createdAt/updatedAt/publishedAt (TimeFilter) to their raw snake_case columns, supporting eq/ne", () => {
+      const contentType = buildContentType();
+      const when = new Date("2024-01-01T00:00:00.000Z");
+
+      expect(translateListArgs(contentType, { where: { createdAt: { eq: when } } }).filters).toEqual([{ column: "created_at", operator: "$eq", value: when }]);
+      expect(translateListArgs(contentType, { where: { updatedAt: { ne: when } } }).filters).toEqual([{ column: "updated_at", operator: "$ne", value: when }]);
+      expect(translateListArgs(contentType, { where: { publishedAt: { eq: when } } }).filters).toEqual([{ column: "published_at", operator: "$eq", value: when }]);
+    });
+
+    it("throws BAD_USER_INPUT for in/notIn on a TimeFilter field (not in its operator set)", () => {
+      const contentType = buildContentType();
+
+      expect(() => translateListArgs(contentType, { where: { createdAt: { in: [new Date()] } } })).toThrow(GraphQLError);
+    });
+  });
+
   it("defaults start to 0, size to 10, orderBy to created_at desc when omitted (SPEC.md §3.3 rule 1)", () => {
     const contentType = buildContentType();
 

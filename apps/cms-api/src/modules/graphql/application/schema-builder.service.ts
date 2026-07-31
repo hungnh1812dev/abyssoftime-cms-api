@@ -49,6 +49,8 @@ const FILTER_INPUT_TYPES = `input TextFilter {
   eq: String
   ne: String
   contains: String
+  in: [String!]
+  notIn: [String!]
 }
 
 input NumberFilter {
@@ -58,11 +60,29 @@ input NumberFilter {
   gte: Float
   lt: Float
   lte: Float
+  in: [Float!]
+  notIn: [Float!]
 }
 
 input BooleanFilter {
   eq: Boolean
+}
+
+input IDFilter {
+  eq: ID
+  ne: ID
+  in: [ID!]
+  notIn: [ID!]
+}
+
+input TimeFilter {
+  eq: DateTime
+  ne: DateTime
 }`;
+
+// SPEC.md §3.2: every <Type>Filter carries these 4 system-field filters ahead of its
+// content-field entries, regardless of content type.
+const SYSTEM_FILTER_FIELDS = ["  documentId: IDFilter", "  createdAt: TimeFilter", "  updatedAt: TimeFilter", "  publishedAt: TimeFilter"];
 
 const ORDER_BY_TYPES = `enum SortDirection {
   ASC
@@ -203,7 +223,7 @@ function buildMutationFields(definition: ContentTypeDefinition): string[] {
 }
 
 function buildFilterType(definition: ContentTypeDefinition): string {
-  const fieldLines = listableFields(definition.fields).map((field) => `  ${field.name}: ${FILTER_INPUT_TYPE_BY_FIELD_TYPE[field.type]}`);
+  const fieldLines = [...SYSTEM_FILTER_FIELDS, ...listableFields(definition.fields).map((field) => `  ${field.name}: ${FILTER_INPUT_TYPE_BY_FIELD_TYPE[field.type]}`)];
 
   return `input ${filterTypeName(definition.slug)} {\n${fieldLines.join("\n")}\n}`;
 }

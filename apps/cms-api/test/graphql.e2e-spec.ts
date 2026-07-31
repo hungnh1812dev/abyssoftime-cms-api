@@ -293,6 +293,8 @@ describe("GraphQL (e2e)", () => {
 
   describe("list query (cv-page)", () => {
     const filterTag = `GqlList-${runId}`;
+    let primaryId: string;
+    let secondaryId: string;
 
     beforeAll(async () => {
       async function createAndPublish(position: string, isMain: boolean): Promise<string> {
@@ -308,8 +310,8 @@ describe("GraphQL (e2e)", () => {
         return documentId;
       }
 
-      await createAndPublish(`${filterTag} Primary`, true);
-      await createAndPublish(`${filterTag} Secondary`, false);
+      primaryId = await createAndPublish(`${filterTag} Primary`, true);
+      secondaryId = await createAndPublish(`${filterTag} Secondary`, false);
     });
 
     it("rejects a list query with no token, UNAUTHENTICATED", async () => {
@@ -379,6 +381,61 @@ describe("GraphQL (e2e)", () => {
       const result = (body.data as { cvPages: { items: { position: string }[]; meta: { pagination: { page: number; pageSize: number; total: number } } } }).cvPages;
       expect(result.items).toEqual([{ position: `${filterTag} Secondary` }]);
       expect(result.meta.pagination).toEqual({ page: 2, pageSize: 1, total: 2 });
+    });
+
+    it("filters with in/notIn on a text field (SPEC.md area 5)", async () => {
+      const query = `
+        query($where: CvPageFilter) {
+          cvPages(where: $where, pagination: { limit: -1 }) { items { position } }
+        }
+      `;
+
+      const inResponse = await gql(query, { where: { company: { eq: `${filterTag}-Co` }, position: { in: [`${filterTag} Primary`] } } }, readScopedApiToken).expect(200);
+      const inBody = inResponse.body as GraphQLResponseBody;
+      expect(inBody.errors).toBeUndefined();
+      expect((inBody.data as { cvPages: { items: { position: string }[] } }).cvPages.items).toEqual([{ position: `${filterTag} Primary` }]);
+
+      const notInResponse = await gql(query, { where: { company: { eq: `${filterTag}-Co` }, position: { notIn: [`${filterTag} Primary`] } } }, readScopedApiToken).expect(200);
+      const notInBody = notInResponse.body as GraphQLResponseBody;
+      expect(notInBody.errors).toBeUndefined();
+      expect((notInBody.data as { cvPages: { items: { position: string }[] } }).cvPages.items).toEqual([{ position: `${filterTag} Secondary` }]);
+    });
+
+    it("filters by the documentId system field (IDFilter) with eq and in (SPEC.md area 7)", async () => {
+      const query = `
+        query($where: CvPageFilter) {
+          cvPages(where: $where, pagination: { limit: -1 }) { items { position } }
+        }
+      `;
+
+      const eqResponse = await gql(query, { where: { documentId: { eq: primaryId } } }, readScopedApiToken).expect(200);
+      const eqBody = eqResponse.body as GraphQLResponseBody;
+      expect(eqBody.errors).toBeUndefined();
+      expect((eqBody.data as { cvPages: { items: { position: string }[] } }).cvPages.items).toEqual([{ position: `${filterTag} Primary` }]);
+
+      const inResponse = await gql(query, { where: { documentId: { in: [primaryId, secondaryId] } } }, readScopedApiToken).expect(200);
+      const inBody = inResponse.body as GraphQLResponseBody;
+      expect(inBody.errors).toBeUndefined();
+      expect((inBody.data as { cvPages: { items: { position: string }[] } }).cvPages.items.map((item) => item.position).sort()).toEqual(
+        [`${filterTag} Primary`, `${filterTag} Secondary`].sort(),
+      );
+    });
+
+    it("filters by the createdAt system field (TimeFilter) with eq, against the row's own real timestamp (SPEC.md area 7)", async () => {
+      const singleResponse = await gql(`{ cvPage(documentId: "${primaryId}") { createdAt } }`, undefined, readScopedApiToken).expect(200);
+      const createdAt =
+        (singleResponse.body as GraphQLResponseBody).data && ((singleResponse.body as GraphQLResponseBody).data as { cvPage: { createdAt: string } }).cvPage.createdAt;
+      expect(createdAt).toEqual(expect.any(String));
+
+      const query = `
+        query($where: CvPageFilter) {
+          cvPages(where: $where, pagination: { limit: -1 }) { items { position } }
+        }
+      `;
+      const response = await gql(query, { where: { createdAt: { eq: createdAt } } }, readScopedApiToken).expect(200);
+      const body = response.body as GraphQLResponseBody;
+      expect(body.errors).toBeUndefined();
+      expect((body.data as { cvPages: { items: { position: string }[] } }).cvPages.items).toEqual([{ position: `${filterTag} Primary` }]);
     });
 
     describe("pagination validation (SPEC.md §3.3, all 13 rules)", () => {

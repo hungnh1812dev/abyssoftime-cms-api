@@ -36,7 +36,7 @@ export function buildSearchWhere(search: string | undefined, searchableColumns: 
 
 export type { FilterOperator, ParsedFilter };
 
-const SQL_COMPARATOR_BY_OPERATOR: Record<Exclude<FilterOperator, "$contains">, string> = {
+const SQL_COMPARATOR_BY_OPERATOR: Record<Exclude<FilterOperator, "$contains" | "$in" | "$notIn">, string> = {
   $eq: "=",
   $ne: "<>",
   $gt: ">",
@@ -60,6 +60,12 @@ export function buildFilterWhere(filters: ParsedFilter[], paramIndex: number): {
     if (filter.operator === "$contains") {
       clauses.push(`${column} ILIKE ${placeholder} ESCAPE '\\'`);
       params.push(`%${escapeSearchValue(String(filter.value))}%`);
+    } else if (filter.operator === "$in") {
+      clauses.push(`${column} = ANY(${placeholder})`);
+      params.push(filter.value);
+    } else if (filter.operator === "$notIn") {
+      clauses.push(`NOT (${column} = ANY(${placeholder}))`);
+      params.push(filter.value);
     } else {
       clauses.push(`${column} ${SQL_COMPARATOR_BY_OPERATOR[filter.operator]} ${placeholder}`);
       params.push(filter.value);

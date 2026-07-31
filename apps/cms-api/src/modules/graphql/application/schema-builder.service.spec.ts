@@ -143,7 +143,7 @@ describe("SchemaBuilderService", () => {
     expect(first).toBe(second);
   });
 
-  it("emits <Type>Filter with one entry per listable scalar field, typed by field kind (text/number/boolean only)", async () => {
+  it("emits <Type>Filter with system-field filters first, then one entry per listable scalar field, typed by field kind (text/number/boolean only)", async () => {
     const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
 
     const schema = buildSchema(await service.buildTypeDefs());
@@ -152,25 +152,38 @@ describe("SchemaBuilderService", () => {
     expect(filterType).toBeDefined();
     const fields = filterType.getFields();
     // richtext ("summary") and component ("skills") fields are not listable/filterable in v1.
-    expect(Object.keys(fields)).toEqual(["position", "isMain", "company"]);
+    expect(Object.keys(fields)).toEqual(["documentId", "createdAt", "updatedAt", "publishedAt", "position", "isMain", "company"]);
+    expect(fields.documentId.type.toString()).toBe("IDFilter");
+    expect(fields.createdAt.type.toString()).toBe("TimeFilter");
+    expect(fields.updatedAt.type.toString()).toBe("TimeFilter");
+    expect(fields.publishedAt.type.toString()).toBe("TimeFilter");
     expect(fields.position.type.toString()).toBe("TextFilter");
     expect(fields.isMain.type.toString()).toBe("BooleanFilter");
     expect(fields.company.type.toString()).toBe("TextFilter");
   });
 
-  it("emits shared TextFilter/NumberFilter/BooleanFilter input types once, with SPEC.md's v1 operator set", async () => {
+  it("emits shared TextFilter/NumberFilter/BooleanFilter/IDFilter/TimeFilter input types once, with SPEC.md's v1 operator set", async () => {
     const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
 
     const schema = buildSchema(await service.buildTypeDefs());
 
     const textFilter = schema.getType("TextFilter") as GraphQLInputObjectType;
-    expect(Object.keys(textFilter.getFields())).toEqual(["eq", "ne", "contains"]);
+    expect(Object.keys(textFilter.getFields())).toEqual(["eq", "ne", "contains", "in", "notIn"]);
 
     const numberFilter = schema.getType("NumberFilter") as GraphQLInputObjectType;
-    expect(Object.keys(numberFilter.getFields())).toEqual(["eq", "ne", "gt", "gte", "lt", "lte"]);
+    expect(Object.keys(numberFilter.getFields())).toEqual(["eq", "ne", "gt", "gte", "lt", "lte", "in", "notIn"]);
 
     const booleanFilter = schema.getType("BooleanFilter") as GraphQLInputObjectType;
     expect(Object.keys(booleanFilter.getFields())).toEqual(["eq"]);
+
+    const idFilter = schema.getType("IDFilter") as GraphQLInputObjectType;
+    expect(Object.keys(idFilter.getFields())).toEqual(["eq", "ne", "in", "notIn"]);
+    expect(idFilter.getFields().eq.type.toString()).toBe("ID");
+    expect(idFilter.getFields().in.type.toString()).toBe("[ID!]");
+
+    const timeFilter = schema.getType("TimeFilter") as GraphQLInputObjectType;
+    expect(Object.keys(timeFilter.getFields())).toEqual(["eq", "ne"]);
+    expect(timeFilter.getFields().eq.type.toString()).toBe("DateTime");
   });
 
   it("emits <Type>OrderBy with sortable scalar fields plus the three system timestamps, enum-valued", async () => {
