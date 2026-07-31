@@ -1,7 +1,7 @@
 import { DocumentEntity, DocumentVersion } from "../entities/document.entity";
 
 import { FieldDefinition } from "@/modules/content-type/domain/entities/field-definition";
-import { ParsedFilter } from "@/modules/document/domain/entities/filter";
+import { FilterNode, ParsedFilter } from "@/modules/document/domain/entities/filter";
 import { Prisma } from "@/prisma/application/client";
 
 export interface ListOptions {
@@ -13,6 +13,10 @@ export interface ListOptions {
   listFields: string[];
   searchableFields: string[];
   filters: ParsedFilter[];
+  // SPEC.md §3.5's `and`/`or`/`not` combinators — additive, GraphQL-only. REST's own filter-query
+  // endpoints never populate this, so `listPaginated` must treat it as an optional extra AND-onto
+  // the existing flat `filters` clause, not a replacement for it.
+  filterTree?: FilterNode;
 }
 
 export interface IDocumentRepository {

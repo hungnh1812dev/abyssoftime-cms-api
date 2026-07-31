@@ -227,7 +227,7 @@ describe("ResolverFactoryService", () => {
 
     expect(listDocumentsFull.execute).toHaveBeenCalledWith(
       "cv-page",
-      expect.objectContaining({ start: 0, size: 10, filters: [{ column: "isMain", operator: "$eq", value: true }] }),
+      expect.objectContaining({ start: 0, size: 10, filterTree: { column: "isMain", operator: "$eq", value: true } }),
     );
     expect(result).toEqual({ items, meta: { pagination: { page: 1, pageSize: 10, total: 1 } } });
   });

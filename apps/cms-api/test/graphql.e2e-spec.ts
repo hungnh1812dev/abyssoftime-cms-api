@@ -438,6 +438,33 @@ describe("GraphQL (e2e)", () => {
       expect((body.data as { cvPages: { items: { position: string }[] } }).cvPages.items).toEqual([{ position: `${filterTag} Primary` }]);
     });
 
+    it("resolves and/or/not combinators against real seeded rows (SPEC.md §3.5)", async () => {
+      const query = `
+        query($where: CvPageFilter) {
+          cvPages(where: $where, pagination: { limit: -1 }) { items { position } }
+        }
+      `;
+
+      // SPEC.md §3.5's example shape: and[ documentId in, or[ isMain eq true, position contains "Secondary" ] ]
+      // — both seeded rows satisfy the "and", each via a different branch of the nested "or".
+      const andOrResponse = await gql(
+        query,
+        { where: { and: [{ documentId: { in: [primaryId, secondaryId] } }, { or: [{ isMain: { eq: true } }, { position: { contains: "Secondary" } }] }] } },
+        readScopedApiToken,
+      ).expect(200);
+      const andOrBody = andOrResponse.body as GraphQLResponseBody;
+      expect(andOrBody.errors).toBeUndefined();
+      expect((andOrBody.data as { cvPages: { items: { position: string }[] } }).cvPages.items.map((item) => item.position).sort()).toEqual(
+        [`${filterTag} Primary`, `${filterTag} Secondary`].sort(),
+      );
+
+      // not negates isMain: eq true, leaving only the secondary (non-main) row.
+      const notResponse = await gql(query, { where: { documentId: { in: [primaryId, secondaryId] }, not: { isMain: { eq: true } } } }, readScopedApiToken).expect(200);
+      const notBody = notResponse.body as GraphQLResponseBody;
+      expect(notBody.errors).toBeUndefined();
+      expect((notBody.data as { cvPages: { items: { position: string }[] } }).cvPages.items).toEqual([{ position: `${filterTag} Secondary` }]);
+    });
+
     describe("pagination validation (SPEC.md §3.3, all 13 rules)", () => {
       async function expectPaginationError(pagination: Record<string, number>, message: string): Promise<void> {
         const response = await gql(`query($pagination: PaginationInput) { cvPages(pagination: $pagination) { items { position } } }`, { pagination }, readScopedApiToken).expect(

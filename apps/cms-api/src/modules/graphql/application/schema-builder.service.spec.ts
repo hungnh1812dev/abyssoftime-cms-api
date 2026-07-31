@@ -152,7 +152,7 @@ describe("SchemaBuilderService", () => {
     expect(filterType).toBeDefined();
     const fields = filterType.getFields();
     // richtext ("summary") and component ("skills") fields are not listable/filterable in v1.
-    expect(Object.keys(fields)).toEqual(["documentId", "createdAt", "updatedAt", "publishedAt", "position", "isMain", "company"]);
+    expect(Object.keys(fields)).toEqual(["documentId", "createdAt", "updatedAt", "publishedAt", "position", "isMain", "company", "and", "or", "not"]);
     expect(fields.documentId.type.toString()).toBe("IDFilter");
     expect(fields.createdAt.type.toString()).toBe("TimeFilter");
     expect(fields.updatedAt.type.toString()).toBe("TimeFilter");
@@ -160,6 +160,19 @@ describe("SchemaBuilderService", () => {
     expect(fields.position.type.toString()).toBe("TextFilter");
     expect(fields.isMain.type.toString()).toBe("BooleanFilter");
     expect(fields.company.type.toString()).toBe("TextFilter");
+  });
+
+  it("makes <Type>Filter self-referencing via and/or/not (SPEC.md §3.5 combinators)", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
+
+    const schema = buildSchema(await service.buildTypeDefs());
+
+    const filterType = schema.getType("CvPageFilter") as GraphQLInputObjectType;
+    const fields = filterType.getFields();
+
+    expect(fields.and.type.toString()).toBe("[CvPageFilter!]");
+    expect(fields.or.type.toString()).toBe("[CvPageFilter!]");
+    expect(fields.not.type.toString()).toBe("CvPageFilter");
   });
 
   it("emits shared TextFilter/NumberFilter/BooleanFilter/IDFilter/TimeFilter input types once, with SPEC.md's v1 operator set", async () => {

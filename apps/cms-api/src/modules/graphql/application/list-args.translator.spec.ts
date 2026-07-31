@@ -17,34 +17,36 @@ function buildContentType(): ContentTypeEntity {
 }
 
 describe("translateListArgs", () => {
-  it("translates a single boolean eq filter into a ParsedFilter", () => {
+  it("translates a single boolean eq filter into a bare leaf FilterNode", () => {
     const contentType = buildContentType();
 
     const result = translateListArgs(contentType, { where: { featured: { eq: true } } });
 
-    expect(result.filters).toEqual([{ column: "featured", operator: "$eq", value: true }]);
+    expect(result.filterTree).toEqual({ column: "featured", operator: "$eq", value: true });
   });
 
-  it("translates multiple operators on the same field into separate ParsedFilter entries (range query)", () => {
+  it("translates multiple operators on the same field into an implicitly-ANDed FilterNode (range query)", () => {
     const contentType = buildContentType();
 
     const result = translateListArgs(contentType, { where: { teamSize: { gt: 2, lte: 10 } } });
 
-    expect(result.filters).toEqual(
+    const node = result.filterTree as { and: unknown[] };
+    expect(node.and).toEqual(
       expect.arrayContaining([
         { column: "teamSize", operator: "$gt", value: 2 },
         { column: "teamSize", operator: "$lte", value: 10 },
       ]),
     );
-    expect(result.filters).toHaveLength(2);
+    expect(node.and).toHaveLength(2);
   });
 
-  it("translates multiple filtered fields into one ParsedFilter per field", () => {
+  it("translates multiple filtered fields into one implicitly-ANDed FilterNode per field", () => {
     const contentType = buildContentType();
 
     const result = translateListArgs(contentType, { where: { featured: { eq: true }, position: { contains: "Eng" } } });
 
-    expect(result.filters).toEqual(
+    const node = result.filterTree as { and: unknown[] };
+    expect(node.and).toEqual(
       expect.arrayContaining([
         { column: "featured", operator: "$eq", value: true },
         { column: "position", operator: "$contains", value: "Eng" },
@@ -91,7 +93,7 @@ describe("translateListArgs", () => {
 
     const result = translateListArgs(contentType, { where: { position: { in: ["Eng", "Ops"] } } });
 
-    expect(result.filters).toEqual([{ column: "position", operator: "$in", value: ["Eng", "Ops"] }]);
+    expect(result.filterTree).toEqual({ column: "position", operator: "$in", value: ["Eng", "Ops"] });
   });
 
   it("translates in/notIn on a number field", () => {
@@ -99,7 +101,7 @@ describe("translateListArgs", () => {
 
     const result = translateListArgs(contentType, { where: { teamSize: { notIn: [1, 2] } } });
 
-    expect(result.filters).toEqual([{ column: "teamSize", operator: "$notIn", value: [1, 2] }]);
+    expect(result.filterTree).toEqual({ column: "teamSize", operator: "$notIn", value: [1, 2] });
   });
 
   it("throws BAD_USER_INPUT for in/notIn on a boolean field (not in the v1 operator set)", () => {
@@ -112,17 +114,17 @@ describe("translateListArgs", () => {
     it("resolves documentId (IDFilter) to the raw document_id column, supporting eq/ne/in/notIn", () => {
       const contentType = buildContentType();
 
-      expect(translateListArgs(contentType, { where: { documentId: { eq: "abc" } } }).filters).toEqual([{ column: "document_id", operator: "$eq", value: "abc" }]);
-      expect(translateListArgs(contentType, { where: { documentId: { in: ["a", "b"] } } }).filters).toEqual([{ column: "document_id", operator: "$in", value: ["a", "b"] }]);
+      expect(translateListArgs(contentType, { where: { documentId: { eq: "abc" } } }).filterTree).toEqual({ column: "document_id", operator: "$eq", value: "abc" });
+      expect(translateListArgs(contentType, { where: { documentId: { in: ["a", "b"] } } }).filterTree).toEqual({ column: "document_id", operator: "$in", value: ["a", "b"] });
     });
 
     it("resolves createdAt/updatedAt/publishedAt (TimeFilter) to their raw snake_case columns, supporting eq/ne", () => {
       const contentType = buildContentType();
       const when = new Date("2024-01-01T00:00:00.000Z");
 
-      expect(translateListArgs(contentType, { where: { createdAt: { eq: when } } }).filters).toEqual([{ column: "created_at", operator: "$eq", value: when }]);
-      expect(translateListArgs(contentType, { where: { updatedAt: { ne: when } } }).filters).toEqual([{ column: "updated_at", operator: "$ne", value: when }]);
-      expect(translateListArgs(contentType, { where: { publishedAt: { eq: when } } }).filters).toEqual([{ column: "published_at", operator: "$eq", value: when }]);
+      expect(translateListArgs(contentType, { where: { createdAt: { eq: when } } }).filterTree).toEqual({ column: "created_at", operator: "$eq", value: when });
+      expect(translateListArgs(contentType, { where: { updatedAt: { ne: when } } }).filterTree).toEqual({ column: "updated_at", operator: "$ne", value: when });
+      expect(translateListArgs(contentType, { where: { publishedAt: { eq: when } } }).filterTree).toEqual({ column: "published_at", operator: "$eq", value: when });
     });
 
     it("throws BAD_USER_INPUT for in/notIn on a TimeFilter field (not in its operator set)", () => {
@@ -141,7 +143,79 @@ describe("translateListArgs", () => {
     expect(result.size).toBe(10);
     expect(result.orderBy).toBe("created_at");
     expect(result.sortDir).toBe("desc");
-    expect(result.filters).toEqual([]);
+    expect(result.filterTree).toBeUndefined();
+  });
+
+  describe("filter combinators and/or/not (SPEC.md §3.5)", () => {
+    it("recurses and[] into an ANDed FilterNode array", () => {
+      const contentType = buildContentType();
+
+      const result = translateListArgs(contentType, { where: { and: [{ featured: { eq: true } }, { position: { contains: "Eng" } }] } });
+
+      expect(result.filterTree).toEqual({
+        and: [
+          { column: "featured", operator: "$eq", value: true },
+          { column: "position", operator: "$contains", value: "Eng" },
+        ],
+      });
+    });
+
+    it("recurses or[] into an ORed FilterNode array", () => {
+      const contentType = buildContentType();
+
+      const result = translateListArgs(contentType, { where: { or: [{ featured: { eq: true } }, { position: { contains: "Eng" } }] } });
+
+      expect(result.filterTree).toEqual({
+        or: [
+          { column: "featured", operator: "$eq", value: true },
+          { column: "position", operator: "$contains", value: "Eng" },
+        ],
+      });
+    });
+
+    it("recurses not into a negated single FilterNode", () => {
+      const contentType = buildContentType();
+
+      const result = translateListArgs(contentType, { where: { not: { featured: { eq: true } } } });
+
+      expect(result.filterTree).toEqual({ not: { column: "featured", operator: "$eq", value: true } });
+    });
+
+    it("reproduces SPEC.md §3.5's example: and[ documentId in, or[ featured eq, title contains ] ]", () => {
+      const contentType = buildContentType();
+
+      const result = translateListArgs(contentType, {
+        where: { and: [{ documentId: { in: ["a", "b"] } }, { or: [{ featured: { eq: true } }, { position: { contains: "launch" } }] }] },
+      });
+
+      expect(result.filterTree).toEqual({
+        and: [
+          { column: "document_id", operator: "$in", value: ["a", "b"] },
+          {
+            or: [
+              { column: "featured", operator: "$eq", value: true },
+              { column: "position", operator: "$contains", value: "launch" },
+            ],
+          },
+        ],
+      });
+    });
+
+    it("ANDs direct field conditions together with and/or/not present at the same level", () => {
+      const contentType = buildContentType();
+
+      const result = translateListArgs(contentType, { where: { featured: { eq: true }, or: [{ position: { contains: "Eng" } }] } });
+
+      expect(result.filterTree).toEqual({
+        and: [{ column: "featured", operator: "$eq", value: true }, { or: [{ column: "position", operator: "$contains", value: "Eng" }] }],
+      });
+    });
+
+    it("propagates BAD_USER_INPUT from a leaf nested inside a combinator", () => {
+      const contentType = buildContentType();
+
+      expect(() => translateListArgs(contentType, { where: { and: [{ nope: { eq: "x" } }] } })).toThrow(GraphQLError);
+    });
   });
 
   describe("pagination (SPEC.md §3.3)", () => {

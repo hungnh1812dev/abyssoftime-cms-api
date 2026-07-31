@@ -32,14 +32,14 @@ See `tasks/plan.md` for full context, dependency graph, and rationale. See `SPEC
 - [x] **Checkpoint:** all checks green — commit
 
 ## Phase 5 — Filter combinators `and`/`or`/`not` (Area 6)
-- [ ] `filter.ts`: add `FilterNode` discriminated union
-- [ ] `where-builder.ts`: new additive `buildFilterTree` (existing flat builder untouched)
-- [ ] `document.repository.ts`: `ListOptions` gains optional `filterTree` (REST never populates it)
-- [ ] `prisma-document.repository.ts`: additive AND-onto-existing branch in `listPaginated` when `filterTree` present
-- [ ] `list-documents-full.service.ts`: `FullListOptions` gains `filterTree`
-- [ ] `list-args.translator.ts`: `resolveFilters` → recursive `resolveFilterNode`, single root `FilterNode` always returned
-- [ ] `schema-builder.service.ts`: `buildFilterType` appends self-referencing `and`/`or`/`not`
-- [ ] New unit spec for `buildFilterTree` (nested AND/OR/NOT parenthesization)
-- [ ] e2e: SPEC §3.5 example combinator query against real seeded rows
-- [ ] Explicit re-run confirming REST's document e2e/unit suites unaffected
-- [ ] **Final checkpoint:** `bun run build && bun run lint && bun run test:cov && bun run test:e2e` green; walk SPEC §7 checklist bullet-by-bullet — commit
+- [x] `filter.ts`: add `FilterNode` discriminated union
+- [x] `where-builder.ts`: new additive `buildFilterTree` (existing flat builder untouched)
+- [x] `document.repository.ts`: `ListOptions` gains optional `filterTree` (REST never populates it)
+- [x] `prisma-document.repository.ts`: additive AND-onto-existing branch in `listPaginated` when `filterTree` present
+- [x] `list-documents-full.service.ts`: `FullListOptions` gains `filterTree`
+- [x] `list-args.translator.ts`: `resolveFilters` → recursive `resolveFilterNode`, single root `FilterNode` always returned
+- [x] `schema-builder.service.ts`: `buildFilterType` appends self-referencing `and`/`or`/`not`
+- [x] New unit spec for `buildFilterTree` (nested AND/OR/NOT parenthesization)
+- [x] e2e: SPEC §3.5 example combinator query against real seeded rows
+- [x] Explicit re-run confirming REST's document e2e/unit suites unaffected
+- [x] **Final checkpoint:** `bun run build && bun run lint && bun run test:cov && bun run test:e2e` green; walk SPEC §7 checklist bullet-by-bullet — commit

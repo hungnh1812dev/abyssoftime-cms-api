@@ -223,9 +223,18 @@ function buildMutationFields(definition: ContentTypeDefinition): string[] {
 }
 
 function buildFilterType(definition: ContentTypeDefinition): string {
-  const fieldLines = [...SYSTEM_FILTER_FIELDS, ...listableFields(definition.fields).map((field) => `  ${field.name}: ${FILTER_INPUT_TYPE_BY_FIELD_TYPE[field.type]}`)];
+  const name = filterTypeName(definition.slug);
+  // SPEC.md §3.5: `and`/`or`/`not` are self-referencing so combinators nest to unbounded depth,
+  // reached only through the existing `where` arg (no separate `filters:` array).
+  const fieldLines = [
+    ...SYSTEM_FILTER_FIELDS,
+    ...listableFields(definition.fields).map((field) => `  ${field.name}: ${FILTER_INPUT_TYPE_BY_FIELD_TYPE[field.type]}`),
+    `  and: [${name}!]`,
+    `  or: [${name}!]`,
+    `  not: ${name}`,
+  ];
 
-  return `input ${filterTypeName(definition.slug)} {\n${fieldLines.join("\n")}\n}`;
+  return `input ${name} {\n${fieldLines.join("\n")}\n}`;
 }
 
 function buildOrderByType(definition: ContentTypeDefinition): string {
