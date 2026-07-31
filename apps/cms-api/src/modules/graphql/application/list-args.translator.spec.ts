@@ -256,6 +256,10 @@ describe("translateListArgs", () => {
       expectBadUserInput({ page: 1, pageSize: 0 }, "pageSize must not be 0");
     });
 
+    it("page mode: pageSize < 0 -> error", () => {
+      expectBadUserInput({ page: 1, pageSize: -5 }, "pageSize must not be negative");
+    });
+
     it("rule 6: valid page mode -> pageSize clamped to 100, start = (page-1)*pageSize, limit = pageSize", () => {
       const contentType = buildContentType();
 
@@ -300,6 +304,10 @@ describe("translateListArgs", () => {
       const contentType = buildContentType();
       const result = translateListArgs(contentType, { pagination: { limit: 500 } });
       expect(result.size).toBe(100);
+    });
+
+    it("offset mode: limit < -1 -> error", () => {
+      expectBadUserInput({ limit: -2 }, "limit must not be negative (use -1 for unlimited)");
     });
 
     it("rule 13: offset mode, 0 < limit <= 100 -> used as-is", () => {
