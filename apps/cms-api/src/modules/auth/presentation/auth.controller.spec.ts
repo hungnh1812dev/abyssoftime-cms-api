@@ -15,17 +15,17 @@ import { ResetPasswordService } from "../application/services/reset-password.ser
 import { VerifyOtpService } from "../application/services/verify-otp.service";
 import { type Request, type Response } from "express";
 
-import { UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
 
 import { ACCESS_TOKEN_COOKIE } from "@/common/guards/jwt-auth.guard";
+import { REFRESH_TOKEN_COOKIE } from "@/common/guards/jwt-refresh.guard";
 import { type ValidatedLoginUser } from "@/common/strategies/local.strategy";
-import { type AuthenticatedRequest } from "@/common/types/authenticated-request";
+import { type AuthenticatedRefreshRequest, type AuthenticatedRequest } from "@/common/types/authenticated-request";
 import { RoleEntity } from "@/modules/roles/domain/entities/role.entiry";
 import { UserEntity } from "@/modules/users/domain/entities/user.entity";
 
-import { AuthController, REFRESH_TOKEN_COOKIE } from "./auth.controller";
+import { AuthController } from "./auth.controller";
 
 describe("AuthController", () => {
   let controller: AuthController;
@@ -155,23 +155,25 @@ describe("AuthController", () => {
     expect(res.cookie).toHaveBeenCalledWith(REFRESH_TOKEN_COOKIE, "refresh-token", expect.objectContaining({ maxAge: 30 * 24 * 60 * 60 * 1000 }));
   });
 
-  it("refresh() reads the refresh cookie, delegates to RefreshTokenService, and rotates auth cookies with the returned maxAge", async () => {
-    const req = { cookies: { [REFRESH_TOKEN_COOKIE]: "old-refresh-token" } } as unknown as Request;
+  it("refresh() delegates to RefreshTokenService with the guard-verified sub/rememberMe and rotates auth cookies with the returned maxAge", async () => {
+    const req = { user: { sub: "user-1", rememberMe: true } } as unknown as AuthenticatedRefreshRequest;
     refreshTokenService.execute.mockResolvedValue({ accessToken: "new-access-token", refreshToken: "new-refresh-token", refreshTokenMaxAgeMs: 30 * 24 * 60 * 60 * 1000 });
 
     const result = await controller.refresh(req, res as unknown as Response);
 
-    expect(refreshTokenService.execute).toHaveBeenCalledWith("old-refresh-token");
+    expect(refreshTokenService.execute).toHaveBeenCalledWith("user-1", true);
     expect(res.cookie).toHaveBeenCalledWith(ACCESS_TOKEN_COOKIE, "new-access-token", expect.objectContaining({ maxAge: 15 * 60 * 1000 }));
     expect(res.cookie).toHaveBeenCalledWith(REFRESH_TOKEN_COOKIE, "new-refresh-token", expect.objectContaining({ maxAge: 30 * 24 * 60 * 60 * 1000 }));
     expect(result).toEqual({ message: "Token refreshed." });
   });
 
-  it("refresh() throws UnauthorizedException when the refresh cookie is missing", async () => {
-    const req = { cookies: {} } as unknown as Request;
+  it("refresh() defaults rememberMe to false for a pre-change refresh token that carries no rememberMe field", async () => {
+    const req = { user: { sub: "user-1" } } as unknown as AuthenticatedRefreshRequest;
+    refreshTokenService.execute.mockResolvedValue({ accessToken: "new-access-token", refreshToken: "new-refresh-token", refreshTokenMaxAgeMs: 7 * 24 * 60 * 60 * 1000 });
 
-    await expect(controller.refresh(req, res as unknown as Response)).rejects.toThrow(UnauthorizedException);
-    expect(refreshTokenService.execute).not.toHaveBeenCalled();
+    await controller.refresh(req, res as unknown as Response);
+
+    expect(refreshTokenService.execute).toHaveBeenCalledWith("user-1", false);
   });
 
   it("logout() clears both auth cookies", () => {

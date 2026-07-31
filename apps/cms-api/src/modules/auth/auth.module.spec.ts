@@ -4,8 +4,12 @@ import { MODULE_METADATA } from "@nestjs/common/constants";
 import { ConfigService } from "@nestjs/config";
 import { PassportModule } from "@nestjs/passport";
 
+import { JwtRefreshGuard } from "@/common/guards/jwt-refresh.guard";
+import { ApiTokenStrategy } from "@/common/strategies/api-token.strategy";
+import { JwtRefreshStrategy } from "@/common/strategies/jwt-refresh.strategy";
 import { JwtStrategy } from "@/common/strategies/jwt.strategy";
 import { LocalStrategy } from "@/common/strategies/local.strategy";
+import { AccessTokenModule } from "@/modules/access-tokens/access-token.module";
 import { RoleModule } from "@/modules/roles/role.module";
 import { UserModule } from "@/modules/users/user.module";
 
@@ -26,17 +30,18 @@ import { resolveEmailSender } from "./infrastructure/email/resolve-email-sender"
 import { AuthController } from "./presentation/auth.controller";
 
 describe("AuthModule", () => {
-  it("imports UserModule, RoleModule, a MailerModule registration, and a PassportModule registration", () => {
+  it("imports UserModule, RoleModule, AccessTokenModule, a MailerModule registration, and a PassportModule registration", () => {
     const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AuthModule) as unknown[];
 
-    expect(imports).toHaveLength(4);
+    expect(imports).toHaveLength(5);
     expect(imports[0]).toBe(UserModule);
     expect(imports[1]).toBe(RoleModule);
+    expect(imports[2]).toBe(AccessTokenModule);
 
-    const mailerModuleImport = imports[2] as { module: unknown };
+    const mailerModuleImport = imports[3] as { module: unknown };
     expect(typeof mailerModuleImport.module).toBe("function");
 
-    const passportModuleImport = imports[3] as { module: unknown };
+    const passportModuleImport = imports[4] as { module: unknown };
     expect(passportModuleImport.module).toBe(PassportModule);
   });
 
@@ -58,7 +63,10 @@ describe("AuthModule", () => {
       ResetPasswordService,
       GetMeService,
       JwtStrategy,
+      JwtRefreshStrategy,
+      ApiTokenStrategy,
       LocalStrategy,
+      JwtRefreshGuard,
       { provide: EMAIL_TEMPLATE_RENDERER, useClass: HandlebarsEmailTemplateRenderer },
       {
         provide: EMAIL_SENDER,
