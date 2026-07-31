@@ -1,9 +1,12 @@
+import { AccessTokenModule } from "../access-tokens/access-token.module";
 import { MailerModule, MailerService } from "@nestjs-modules/mailer";
 
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PassportModule } from "@nestjs/passport";
 
+import { ApiTokenStrategy } from "@/common/strategies/api-token.strategy";
+import { JwtRefreshStrategy } from "@/common/strategies/jwt-refresh.strategy";
 import { JwtStrategy } from "@/common/strategies/jwt.strategy";
 import { LocalStrategy } from "@/common/strategies/local.strategy";
 import { type EnvironmentVariables } from "@/config/env.validation";
@@ -29,6 +32,7 @@ import { AuthController } from "./presentation/auth.controller";
   imports: [
     UserModule,
     RoleModule,
+    AccessTokenModule,
     MailerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService<EnvironmentVariables, true>) => ({
@@ -59,6 +63,8 @@ import { AuthController } from "./presentation/auth.controller";
     ResetPasswordService,
     GetMeService,
     JwtStrategy,
+    JwtRefreshStrategy,
+    ApiTokenStrategy,
     LocalStrategy,
     { provide: EMAIL_TEMPLATE_RENDERER, useClass: HandlebarsEmailTemplateRenderer },
     {

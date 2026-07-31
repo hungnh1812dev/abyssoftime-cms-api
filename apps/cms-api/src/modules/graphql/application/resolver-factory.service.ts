@@ -1,3 +1,4 @@
+import { DateTimeScalar } from "../domain/date-time-scalar";
 import { JSONScalar } from "../domain/json-scalar";
 import {
   componentTypeName,
@@ -39,7 +40,7 @@ import { type GraphqlContext } from "./graphql-context.factory";
 import { type ListArgsInput, translateListArgs } from "./list-args.translator";
 
 interface SingleQueryArgs {
-  Id: string;
+  documentId: string;
   status?: string;
 }
 
@@ -52,12 +53,12 @@ interface CreateMutationArgs {
 }
 
 interface UpdateMutationArgs {
-  Id: string;
+  documentId: string;
   data: Record<string, unknown>;
 }
 
 interface IdMutationArgs {
-  Id: string;
+  documentId: string;
 }
 
 // Each Query/Mutation field has its own argument shape (SingleQueryArgs, ListArgsInput,
@@ -69,12 +70,18 @@ type FieldResolver = (parent: unknown, args: any, context: GraphqlContext, info?
 type MediaFieldResolver = (parent: Record<string, unknown>) => Promise<MediaAssetEntity | null>;
 
 function toResolverValue(document: DocumentEntity): Record<string, unknown> {
-  return { documentId: document.documentId, ...document.fields };
+  return {
+    documentId: document.documentId,
+    ...document.fields,
+    createdAt: document.createdAt,
+    updatedAt: document.updatedAt,
+    publishedAt: document.publishedAt,
+  };
 }
 
 function assertValidDocumentId(id: string): void {
   if (!isUUID(id, "4")) {
-    throw new GraphQLError(`Invalid Id: "${id}" (must be a UUID v4)`, { extensions: { code: "BAD_USER_INPUT" } });
+    throw new GraphQLError(`Invalid documentId: "${id}" (must be a UUID v4)`, { extensions: { code: "BAD_USER_INPUT" } });
   }
 }
 
@@ -106,6 +113,15 @@ async function withErrorMapping<T>(run: () => Promise<T>): Promise<T> {
     }
     throw error;
   }
+}
+
+// SPEC.md §3.3: page/pageSize are derived after resolution, not carried through from the
+// request — `limit == -1` (unlimited) reports pageSize as the full row count.
+function buildPaginationMeta(start: number, size: number, total: number): { page: number; pageSize: number; total: number } {
+  if (size === -1) {
+    return { page: 1, pageSize: total, total };
+  }
+  return { page: Math.floor(start / size) + 1, pageSize: size, total };
 }
 
 // Walks a content type's field tree (arbitrary component-nesting depth) and, for every type
@@ -176,22 +192,23 @@ export class ResolverFactoryService {
       collectMediaFieldResolvers(typeName(definition.slug), definition.slug, definition.fields, this.mediaAssets, typeResolvers);
 
       query[queryName(definition.slug)] = async (_parent: unknown, args: SingleQueryArgs, context: GraphqlContext) => {
-        assertValidDocumentId(args.Id);
+        assertValidDocumentId(args.documentId);
+        assertApiTokenPermission(context, "document:read");
 
         if (args.status === "draft") {
-          assertApiTokenPermission(context, "document:read");
-          const result = await resolveOrNull(() => this.getDocumentForEdit.execute(definition.slug, args.Id));
+          const result = await resolveOrNull(() => this.getDocumentForEdit.execute(definition.slug, args.documentId));
           return result ? toResolverValue(result.document) : null;
         }
 
-        const document = await resolveOrNull(() => this.getPublicDocument.execute(definition.slug, args.Id));
+        const document = await resolveOrNull(() => this.getPublicDocument.execute(definition.slug, args.documentId));
         return document ? toResolverValue(document) : null;
       };
 
-      query[listQueryName(definition.slug)] = async (_parent: unknown, args: ListArgsInput) => {
+      query[listQueryName(definition.slug)] = async (_parent: unknown, args: ListArgsInput, context: GraphqlContext) => {
+        assertApiTokenPermission(context, "document:read");
         const options = translateListArgs(definition, args);
         const result = await withErrorMapping(() => this.listDocumentsFull.execute(definition.slug, options));
-        return result.items;
+        return { items: result.items, meta: { pagination: buildPaginationMeta(options.start, options.size, result.total) } };
       };
 
       mutation[createMutationName(definition.slug)] = async (_parent: unknown, args: CreateMutationArgs, context: GraphqlContext) => {
@@ -201,32 +218,32 @@ export class ResolverFactoryService {
       };
 
       mutation[updateMutationName(definition.slug)] = async (_parent: unknown, args: UpdateMutationArgs, context: GraphqlContext) => {
-        assertValidDocumentId(args.Id);
+        assertValidDocumentId(args.documentId);
         assertApiTokenPermission(context, "document:update");
-        await withErrorMapping(() => this.saveDocument.execute(definition.slug, args.data, args.Id, context.apiToken!.documentId));
-        const result = await withErrorMapping(() => this.getDocumentForEdit.execute(definition.slug, args.Id));
+        await withErrorMapping(() => this.saveDocument.execute(definition.slug, args.data, args.documentId, context.apiToken!.documentId));
+        const result = await withErrorMapping(() => this.getDocumentForEdit.execute(definition.slug, args.documentId));
         return toResolverValue(result.document);
       };
 
       mutation[deleteMutationName(definition.slug)] = async (_parent: unknown, args: IdMutationArgs, context: GraphqlContext) => {
-        assertValidDocumentId(args.Id);
+        assertValidDocumentId(args.documentId);
         assertApiTokenPermission(context, "document:delete");
-        await withErrorMapping(() => this.deleteDocument.execute(definition.slug, args.Id));
+        await withErrorMapping(() => this.deleteDocument.execute(definition.slug, args.documentId));
         return true;
       };
 
       mutation[publishMutationName(definition.slug)] = async (_parent: unknown, args: IdMutationArgs, context: GraphqlContext) => {
-        assertValidDocumentId(args.Id);
+        assertValidDocumentId(args.documentId);
         assertApiTokenPermission(context, "document:publish");
-        const published = await withErrorMapping(() => this.publishDocument.execute(definition.slug, args.Id, context.apiToken!.documentId));
+        const published = await withErrorMapping(() => this.publishDocument.execute(definition.slug, args.documentId, context.apiToken!.documentId));
         return toResolverValue(published);
       };
 
       mutation[unpublishMutationName(definition.slug)] = async (_parent: unknown, args: IdMutationArgs, context: GraphqlContext) => {
-        assertValidDocumentId(args.Id);
+        assertValidDocumentId(args.documentId);
         assertApiTokenPermission(context, "document:unpublish");
-        await withErrorMapping(() => this.unpublishDocument.execute(definition.slug, args.Id));
-        const result = await withErrorMapping(() => this.getDocumentForEdit.execute(definition.slug, args.Id));
+        await withErrorMapping(() => this.unpublishDocument.execute(definition.slug, args.documentId));
+        const result = await withErrorMapping(() => this.getDocumentForEdit.execute(definition.slug, args.documentId));
         return toResolverValue(result.document);
       };
     }
@@ -235,8 +252,9 @@ export class ResolverFactoryService {
       collectMediaFieldResolvers(typeName(definition.slug), definition.slug, definition.fields, this.mediaAssets, typeResolvers);
 
       query[queryName(definition.slug)] = async (_parent: unknown, args: StatusOnlyArgs, context: GraphqlContext) => {
+        assertApiTokenPermission(context, "document:read");
+
         if (args.status === "draft") {
-          assertApiTokenPermission(context, "document:read");
           const result = await resolveOrNull(() => this.getSingleType.execute(definition.slug));
           return result ? toResolverValue(result.document) : null;
         }
@@ -266,6 +284,13 @@ export class ResolverFactoryService {
       };
     }
 
-    return { Query: query, Mutation: mutation, SortDirection: { ASC: "asc", DESC: "desc" }, JSON: JSONScalar, ...typeResolvers };
+    return {
+      Query: query,
+      Mutation: mutation,
+      SortDirection: { ASC: "asc", DESC: "desc", asc: "asc", desc: "desc" },
+      JSON: JSONScalar,
+      DateTime: DateTimeScalar,
+      ...typeResolvers,
+    };
   }
 }

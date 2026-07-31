@@ -20,7 +20,8 @@ export function queryName(slug: string): string {
 }
 
 export function listQueryName(slug: string): string {
-  return `${queryName(slug)}List`;
+  const singular = queryName(slug);
+  return /(s|x|z|ch|sh)$/i.test(singular) ? `${singular}es` : `${singular}s`;
 }
 
 export function inputTypeName(slug: string): string {

@@ -167,3 +167,43 @@ Record of the 10 findings from the five-axis code review of `src/modules/auth/**
 **Trade-off:** Every OTP and password-reset token continues to land in application logs in plaintext until a real provider is wired in. This is an accepted, explicitly-tracked gap — not something to lose track of before any non-dev deployment that handles real user accounts.
 
 **Update: resolved.** A separate build cycle (see `SPEC.md` / `tasks/plan.md`) added `SmtpEmailSender` (`nodemailer`-backed, `infrastructure/email/smtp-email.sender.ts`) alongside `ConsoleEmailSender`, selected env-driven via `resolveEmailSender` (`SMTP_HOST` set → real sender, else the `ConsoleEmailSender` dev/test fallback) — see `docs/documents/auth.md`'s Domain port section. The product/ops provider decision this finding deferred was made: SMTP via `nodemailer`, deferring the specific vendor to config rather than a hard-coded SDK. Real SMTP credentials/`EMAIL_FROM`/`FRONTEND_URL` and a live-inbox send confirmation are still the user's to do — tracked as the outstanding manual-verification step in `docs/documents/auth.md`.
+
+---
+
+## 11. New `JwtRefreshStrategy` shipped unregistered, then with the wrong token source
+
+**Severity:** Critical (unregistered provider — unhandled 500) / Important (wrong extractor — silent 401) / Suggestion (message wording, type pollution)
+
+**Issue:** While converting `/auth/refresh` to a Passport strategy (see `docs/documents/auth-passport-techstack.md`'s "Refresh-token verification" table), the first version of `JwtRefreshStrategy` had two bugs that made the route unusable, found by running it rather than by the five-axis review process that caught the rest of this document's findings:
+
+1. `JwtRefreshStrategy` was never added to `AuthModule`'s `providers` array (only `JwtRefreshGuard`, which *uses* the strategy, was). Nest's DI container never instantiated it, so Passport's process-wide strategy registry never learned `"jwt-refresh"` existed. Hitting `/auth/refresh` threw an unhandled `Error: Unknown authentication strategy "jwt-refresh"` — a 500, not a controlled auth failure, since it happens before `handleRequest` ever sees an `err`/`info`.
+2. Once registered, the strategy still failed: its `jwtFromRequest` was `ExtractJwt.fromAuthHeaderAsBearerToken()`, but the refresh token lives in the `refresh_token` httpOnly cookie (the client never sends an `Authorization` header for this route). `passport-jwt` found no token, set `info = Error("No auth token")`, and `JwtRefreshGuard.handleRequest` turned that into a controlled 401 — easy to mistake for "working as designed" since it's a clean auth failure, not a crash.
+
+Two smaller issues surfaced while fixing the above: `JwtRefreshGuard.handleRequest`'s two branches said `"Missing access token"` / `"Invalid or expired access token"` — copy-pasted from `JwtAuthGuard` without updating the wording for a refresh-specific failure, a regression against the pre-conversion messages (`"Missing refresh token"` / `"Invalid or expired refresh token"`, still documented in `auth.md`). And `common/types/jwt-payload.ts`'s `AccessTokenPayload` had picked up an unused `rememberMe?: boolean` field — added only so `AuthenticatedRequest` (typed `user: AccessTokenPayload`) would type-check when reused for the refresh handler, even though `rememberMe` only ever appears on the refresh token payload (confirmed by grepping every `signAccessToken` call site).
+
+**Resolution:**
+- Added `JwtRefreshStrategy` to `AuthModule`'s `providers` array.
+- Added `jwtRefreshCookieExtractor` (`common/strategies/jwt-refresh.strategy.ts`) — reads `REFRESH_TOKEN_COOKIE` off `req.cookies`, mirroring `jwt.strategy.ts`'s `jwtCookieExtractor` exactly — and switched `jwtFromRequest` to it. Also removed `passReqToCallback: true`, which wasn't paired with a `validate(req, payload)` signature; left in place, it would have silently bound the strategy's declared `payload` parameter to the Express `Request` object instead of the decoded JWT once extraction started succeeding.
+- Reworded `JwtRefreshGuard.handleRequest`'s two messages to `"Missing refresh token"` / `"Invalid or expired refresh token"`.
+- Added `AuthenticatedRefreshRequest = Request & { user: RefreshTokenPayload }` (`common/types/authenticated-request.ts`) and switched the `refresh` handler to it; removed the unused `rememberMe` field from `AccessTokenPayload`.
+- Deleted the dead commented-out code both bugs had briefly left behind in `RefreshTokenService.execute` and `AuthController.refresh` (the old manual-verify/manual-cookie-read logic, superseded by the guard).
+
+**Why this approach:**
+
+| Option | Verdict |
+|---|---|
+| Add the strategy to `providers` and fix the extractor, nothing else | **Rejected as incomplete.** Would have resolved the reported 500-then-401 but left the guard lying about which token type failed, and left a type-safety smell (`AccessTokenPayload.rememberMe`) that the *next* access-token-guarded route could trip over. |
+| Fix all four issues together, add dedicated specs, update docs | **Chosen.** Same session, same root cause (the refresh conversion happened outside the module's usual review-and-document cycle) — closing all of it now avoids a repeat investigation later. |
+
+**Technical apply:**
+- `src/modules/auth/auth.module.ts` — `JwtRefreshStrategy` added to `providers`.
+- `src/common/strategies/jwt-refresh.strategy.ts` — `jwtRefreshCookieExtractor`, `passReqToCallback` removed, unused `JwtTokenService` constructor param removed.
+- `src/common/guards/jwt-refresh.guard.ts` — `REFRESH_TOKEN_COOKIE` constant added (moved here from `auth.controller.ts`, mirroring `ACCESS_TOKEN_COOKIE`'s placement in `jwt-auth.guard.ts`); `handleRequest` messages reworded.
+- `src/common/types/jwt-payload.ts` — `AccessTokenPayload.rememberMe` removed.
+- `src/common/types/authenticated-request.ts` — new `AuthenticatedRefreshRequest` export.
+- `src/modules/auth/presentation/auth.controller.ts` / `auth.controller.spec.ts` — `refresh()` now takes `AuthenticatedRefreshRequest`; dead code removed; `REFRESH_TOKEN_COOKIE` import switched to the guard.
+- `src/modules/auth/application/services/refresh-token.service.ts` / `.spec.ts` — dead code removed; spec no longer mocks `verifyRefreshToken`, calls `execute(sub, rememberMe)` directly.
+- `src/modules/auth/auth.module.spec.ts` — provider/import list assertions updated to match current wiring (`AccessTokenModule` import, `JwtRefreshStrategy`/`ApiTokenStrategy`/`JwtRefreshGuard` providers).
+- New specs: `src/common/strategies/jwt-refresh.strategy.spec.ts`, `src/common/guards/jwt-refresh.guard.spec.ts` (mirror `jwt.strategy.spec.ts` / `jwt-auth.guard.spec.ts`).
+
+**Trade-off:** None — this closes a real, user-hit correctness bug (refresh was completely broken end-to-end) with the same pattern already established and accepted for the access-token strategy. `bun run build`, `bunx tsc --noEmit`, `bun run lint`, and `bun run test` (900 tests) all pass with zero errors after this fix.

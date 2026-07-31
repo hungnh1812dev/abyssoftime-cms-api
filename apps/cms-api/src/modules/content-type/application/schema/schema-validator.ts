@@ -13,6 +13,16 @@ export const RESERVED_SYSTEM_FIELD_NAMES: ReadonlySet<string> = new Set([
   "created_by",
   "updated_by",
   "published_by",
+  // camelCase forms baked into every generated GraphQL <Type>/<Type>Filter (schema-builder.service.ts):
+  // a content field literally named one of these would emit a duplicate SDL field, which the GraphQL
+  // module can't recover from at boot (Apollo rejects the whole typeDefs string, not just this content type).
+  "documentId",
+  "createdAt",
+  "updatedAt",
+  "publishedAt",
+  "and",
+  "or",
+  "not",
 ]);
 
 export class SchemaValidationError extends Error {

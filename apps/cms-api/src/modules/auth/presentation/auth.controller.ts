@@ -15,21 +15,21 @@ import { ResetPasswordService } from "../application/services/reset-password.ser
 import { VerifyOtpService } from "../application/services/verify-otp.service";
 import { type Request, type Response } from "express";
 
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res, UnauthorizedException, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AuthGuard } from "@nestjs/passport";
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { ACCESS_TOKEN_COOKIE, JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
+import { JwtRefreshGuard, REFRESH_TOKEN_COOKIE } from "@/common/guards/jwt-refresh.guard";
 import { RateLimitGuard } from "@/common/guards/rate-limit.guard";
 import { type ValidatedLoginUser } from "@/common/strategies/local.strategy";
-import { type AuthenticatedRequest } from "@/common/types/authenticated-request";
+import { type AuthenticatedRefreshRequest, type AuthenticatedRequest } from "@/common/types/authenticated-request";
 import { type EnvironmentVariables } from "@/config/env.validation";
 
 import { HasUsersResponseDto, MessageResponseDto } from "./dto/auth-response.dto";
 import { MeResponseDto } from "./dto/me-response.dto";
 
-export const REFRESH_TOKEN_COOKIE = "refresh_token";
 const ACCESS_TOKEN_MAX_AGE_MS = 15 * 60 * 1000;
 
 // Every route here is public by design (this module establishes identity), except `me` — the one
@@ -112,16 +112,14 @@ export class AuthController {
 
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtRefreshGuard)
   @ApiOperation({ summary: "Rotate the access/refresh token pair using the refresh_token cookie" })
   @ApiResponse({ status: 200, type: MessageResponseDto })
   @ApiResponse({ status: 401, description: "Refresh cookie missing, invalid, or expired" })
-  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<{ message: string }> {
-    const token: unknown = req.cookies?.[REFRESH_TOKEN_COOKIE];
-    if (typeof token !== "string" || token.length === 0) {
-      throw new UnauthorizedException("Missing refresh token");
-    }
+  async refresh(@Req() req: AuthenticatedRefreshRequest, @Res({ passthrough: true }) res: Response): Promise<{ message: string }> {
+    const { sub, rememberMe } = req.user;
 
-    const { accessToken, refreshToken, refreshTokenMaxAgeMs } = await this.refreshTokenService.execute(token);
+    const { accessToken, refreshToken, refreshTokenMaxAgeMs } = await this.refreshTokenService.execute(sub, rememberMe ?? false);
     this.setAuthCookies(res, accessToken, refreshToken, refreshTokenMaxAgeMs);
     return { message: "Token refreshed." };
   }

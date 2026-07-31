@@ -2,7 +2,23 @@
 
 `src/modules/graphql/**` — a second, parallel API surface (`POST /graphql`, `@nestjs/graphql` schema-first + `@nestjs/apollo`) over the exact same [`content-type`](content-type.md)/[`document`](document.md)/[`media`](media.md) engine the REST API already exposes. The SDL (types, inputs, queries, mutations) is generated dynamically at boot from `content-types/*.json` — zero hand-written per-content-type resolver code, and every resolver delegates straight to an existing, already-tested `document`/`content-type` usecase service. The module owns zero business logic, zero Prisma/SQL access, and zero new database tables/columns. See `docs/documents/graphql-techstack.md` for the three tech-stack decisions (runtime choice, schema-build timing fix, auth transport) confirmed during the Spec phase — all three shipped as decided.
 
-Ported from a Go/GORM-derived source design (`docs/graphql.md`); deviations are called out inline below, matching the pattern `content-type.md`/`document.md` use for their own source docs. The two biggest: no `locale` anywhere (repo-wide deviation, same as every other module), and the response shape has **no `data` wrapper** — a nullable object for single queries, `[Type!]!` for list queries — since the source doc's own later changelog entries (v1.13/v1.14) supersede its earlier wrapped-shape examples.
+Ported from a Go/GORM-derived source design (`docs/graphql.md`, plus a second later reference port at `docs/golang/{graphql.md,graphql-list-api-spec.md,guide.md}` used for the Contract Parity Pass below); deviations are called out inline, matching the pattern `content-type.md`/`document.md` use for their own source docs. The two biggest ongoing deviations: no `locale` anywhere (repo-wide, same as every other module), and the response shape has **no `data` wrapper** on single-item queries — a nullable object, not the source's wrapped shape.
+
+### GraphQL Contract Parity Pass
+
+A later cycle (`SPEC.md` at the time, since folded back into this doc) closed nine naming/shape gaps between this module and the Go reference port, confirmed as straight breaking renames since no real consumer (`cms-admin`) touches `/graphql` yet:
+
+1. List query names are pluralized (`blogPostList` → `blogPosts`), not singular+`List`.
+2. Every `Id` arg (single query + all 4 CRUD mutations) is `documentId`, not `Id`.
+3. List queries return an envelope (`<Type>List! { items, meta { pagination { page, pageSize, total } } }`), never a bare array.
+4. Pagination is a `PaginationInput` (`start`/`limit` offset mode **or** `page`/`pageSize` page mode, full 13-rule validation, `limit: -1` = unlimited), replacing flat `start`/`size`.
+5. `TextFilter`/`NumberFilter` gained `in`/`notIn`; new `IDFilter` (`eq`/`ne`/`in`/`notIn`) and `TimeFilter` (`eq`/`ne`).
+6. `<Type>Filter` gained self-referencing `and`/`or`/`not` combinators — still reached only through the existing `where` arg, never a separate `filters:` array.
+7. `<Type>Filter` gained `documentId`/`createdAt`/`updatedAt`/`publishedAt` system-field filters.
+8. Default sort (no `orderBy`, or all-null) changed from `id DESC` to `createdAt DESC`; the existing multi-field-`orderBy`-throws hardening is unchanged.
+9. Every generated `<Type>` gained `createdAt`/`updatedAt`/`publishedAt: DateTime` fields via a new `DateTime` scalar.
+
+Deliberately **not** changed: `locale`, the auth model, `formatError`/error-code shape, media/component handling, and `contains`-only-on-text (the union of REST's + Go's operators was kept, not strict Go parity) — see [Known quirks](#known-quirks--accepted-trade-offs) for why these were kept as deviations rather than "fixed."
 
 ## Schema-build timing
 
@@ -30,7 +46,7 @@ Ported from a Go/GORM-derived source design (`docs/graphql.md`); deviations are 
 | --- | --- |
 | `typeName` | `CvPage` |
 | `queryName` | `cvPage` |
-| `listQueryName` | `cvPageList` |
+| `listQueryName` | `cvPages` (pluralized: append `es` if the singular ends in `s`/`x`/`z`/`ch`/`sh`, else `s` — `listQueryName("en-it-vocab")` → `enItVocabs`) |
 | `inputTypeName` | `CvPageInput` |
 | `filterTypeName` | `CvPageFilter` |
 | `orderByTypeName` | `CvPageOrderBy` |
@@ -45,42 +61,80 @@ Ported from a Go/GORM-derived source design (`docs/graphql.md`); deviations are 
 
 **Collection-type** (both real seeds, `cv-page`/`en-it-vocab`, are `collection`-kind):
 
-- `Query.<slug>(Id: ID!, status: String): <Type>` — nullable; omitted/anything-but-`"draft"` `status` reads published, `status: "draft"` requires a `document:read`-scoped token.
-- `Query.<slug>List(where: <Type>Filter, orderBy: <Type>OrderBy, start: Int, size: Int): [<Type>!]!` — always published-only, no `status` arg at all (matches the source doc: list has no draft concept).
+- `Query.<slug>(documentId: ID!, status: String): <Type>` — nullable; requires a `document:read`-scoped token regardless of `status` — omitted/anything-but-`"draft"` `status` reads published, `status: "draft"` reads the edit view.
+- `Query.<pluralSlug>(where: <Type>Filter, orderBy: <Type>OrderBy, pagination: PaginationInput): <Type>List!` — requires a `document:read`-scoped token; always published-only, no `status` arg at all (matches the source doc: list has no draft concept). Never a bare array — always the `{ items, meta }` envelope (see [List envelope & pagination](#list-envelope--pagination) below).
 - `Mutation.create<Type>(data: <Type>Input!): <Type>!` — `document:create`.
-- `Mutation.update<Type>(Id: ID!, data: <Type>Input!): <Type>!` — `document:update`.
-- `Mutation.delete<Type>(Id: ID!): Boolean!` — `document:delete`.
-- `Mutation.publish<Type>(Id: ID!): <Type>!` — `document:publish`, `BAD_USER_INPUT` in Mode B.
-- `Mutation.unpublish<Type>(Id: ID!): <Type>!` — `document:unpublish`, `BAD_USER_INPUT` in Mode B.
+- `Mutation.update<Type>(documentId: ID!, data: <Type>Input!): <Type>!` — `document:update`.
+- `Mutation.delete<Type>(documentId: ID!): Boolean!` — `document:delete`.
+- `Mutation.publish<Type>(documentId: ID!): <Type>!` — `document:publish`, `BAD_USER_INPUT` in Mode B.
+- `Mutation.unpublish<Type>(documentId: ID!): <Type>!` — `document:unpublish`, `BAD_USER_INPUT` in Mode B.
 
 **Single-type** (no real seed; proven via a throwaway e2e content type — see [Tests](#tests)):
 
-- `Query.<slug>(status: String): <Type>` — nullable, no `Id` param.
+- `Query.<slug>(status: String): <Type>` — nullable, no `documentId` param; requires a `document:read`-scoped token regardless of `status`, same as the collection-type query.
 - `Mutation.save<Type>(data: <Type>Input!): <Type>!` — `document:update`. No `create`/`update`/`delete` — a single type has at most one entry, created on first save.
 - `Mutation.publish<Type>: <Type>!` / `Mutation.unpublish<Type>: <Type>!` — no args at all.
 
 **`<Type>Input`** mirrors the object type's shape: media fields submit as the target asset's `ID` (an input type can't reference an output type like `MediaAsset`), a repeatable component field is a nullable `[<Component>Input!]` (nullable, unlike the object type's always-real `[X!]!` array — a client submitting a partial input must not be forced to also submit every other repeatable component as an empty array). Every object/input type also recursively emits one nested type per unique component encountered, first-seen order, deduplicated by name.
 
-**`<Type>Filter`/`<Type>OrderBy`** (collection-type only — single types have no list query, so no filter/orderBy input is emitted for them): one field per *listable* scalar (`text`/`number`/`boolean` — `richtext`/`json`/`media`/`component` are never filterable/sortable in v1), typed `TextFilter`/`NumberFilter`/`BooleanFilter` (three shared input types, emitted once) or `SortDirection` (shared enum, `ASC`/`DESC`). `OrderBy` additionally always includes the three system timestamps (`createdAt`/`updatedAt`/`publishedAt`).
+Every generated `<Type>` also carries `createdAt: DateTime!`, `updatedAt: DateTime!`, `publishedAt: DateTime` (nullable — never set until first publish) alongside `documentId` and the content fields — via `domain/date-time-scalar.ts`'s `DateTimeScalar` (ISO-8601 string, serializes a real `Date`, rejects invalid dates/strings with `BAD_USER_INPUT` at either parse or serialize time).
+
+**`<Type>Filter`/`<Type>OrderBy`** (collection-type only — single types have no list query, so no filter/orderBy input is emitted for them):
+
+- One field per *listable* content scalar (`text`/`number`/`boolean` — `richtext`/`json`/`media`/`component` are never filterable/sortable in v1), typed `TextFilter`/`NumberFilter`/`BooleanFilter`.
+- `TextFilter`: `eq`/`ne`/`contains`/`in`/`notIn`. `NumberFilter`: `eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`in`/`notIn`. `BooleanFilter`: `eq` only. These three are shared input types, emitted once.
+- Four system-field filters prepended ahead of the content fields on every `<Type>Filter`: `documentId: IDFilter` (`eq`/`ne`/`in`/`notIn`), `createdAt`/`updatedAt`/`publishedAt: TimeFilter` (`eq`/`ne` only) — `IDFilter`/`TimeFilter` are also shared, emitted once.
+- Self-referencing combinators `and: [<Type>Filter!]`, `or: [<Type>Filter!]`, `not: <Type>Filter` — nest to unbounded depth, reached only through the existing `where` arg (never a separate `filters:` array). Every non-null field at one level (direct conditions and `and`/`or`/`not` alike) is implicitly ANDed together.
+- `OrderBy` additionally always includes the three system timestamps (`createdAt`/`updatedAt`/`publishedAt`); still exactly one non-null field accepted (see [Filtering & sorting](#filtering--sorting)).
+
+## List envelope & pagination
+
+Every list query returns `<Type>List! { items: [<Type>!]!, meta: ListMeta! }` where `ListMeta { pagination: PaginationMeta! }` and `PaginationMeta { page: Int!, pageSize: Int!, total: Int! }` (all three shared types, emitted once alongside the per-field-kind filter inputs).
+
+`pagination: PaginationInput { start, limit, page, pageSize }` (all nullable) replaces the old flat `start`/`size` args — offset mode (`start`/`limit`) and page mode (`page`/`pageSize`) are mutually exclusive. `list-args.translator.ts`'s `resolvePagination` validates in this exact order:
+
+| # | Condition | Result |
+| --- | --- | --- |
+| 1 | `pagination` omitted | `start = 0, limit = 10` |
+| 2 | both offset and page fields set | `BAD_USER_INPUT`: `"cannot mix offset (start/limit) and page (page/pageSize) modes"` |
+| 3 | only one of `page`/`pageSize` set | `BAD_USER_INPUT`: `"page and pageSize must both be provided"` |
+| 4 | `page < 1` | `BAD_USER_INPUT`: `"page must be >= 1"` |
+| 5 | `pageSize == 0` | `BAD_USER_INPUT`: `"pageSize must not be 0"` |
+| 6 | valid page mode | `pageSize = min(pageSize, 100)`; `start = (page-1)*pageSize`; `limit = pageSize` |
+| 7 | offset mode, `start` omitted | `start = 0` |
+| 8 | offset mode, `start < 0` | clamp to `0` (no error) |
+| 9 | offset mode, `limit` omitted | `limit = 10` |
+| 10 | offset mode, `limit == 0` | `BAD_USER_INPUT`: `"limit must not be 0"` |
+| 11 | offset mode, `limit == -1` | unlimited — every matching row, `LIMIT` omitted from the SQL entirely (Postgres rejects a negative `LIMIT`; see `prisma-document.repository.ts`'s `listPaginated`) |
+| 12 | offset mode, `limit > 100` | clamp to `100` |
+| 13 | offset mode, `0 < limit <= 100` | used as-is |
+
+Default `limit` when `pagination` is omitted is **10**, a deliberate change from the pre-parity-pass default of `20` (matches the Go reference; not an oversight). `resolver-factory.service.ts`'s `buildPaginationMeta(start, size, total)` computes the response `page`/`pageSize` *after* resolution — `size === -1` reports `page: 1, pageSize: total`, otherwise `page = floor(start/size) + 1, pageSize = size`. `total` always counts every row matching `where`, independent of pagination.
 
 ## Filtering & sorting
 
-`application/list-args.translator.ts` — `translateListArgs(contentType, args): FullListOptions`, called by every `<slug>List` resolver:
+`application/list-args.translator.ts` — `translateListArgs(contentType, args): FullListOptions`, called by every `<pluralSlug>` resolver:
 
-| Field type | v1 operators | 
+| Field type | Operators |
 | --- | --- |
-| `text` | `eq`, `ne`, `contains` |
-| `number` | `eq`, `ne`, `gt`, `gte`, `lt`, `lte` |
+| `text` | `eq`, `ne`, `contains`, `in`, `notIn` |
+| `number` | `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn` |
 | `boolean` | `eq` |
+| `documentId` (system) | `eq`, `ne`, `in`, `notIn` (via `IDFilter`) |
+| `createdAt`/`updatedAt`/`publishedAt` (system) | `eq`, `ne` (via `TimeFilter`) |
 
-Matches REST's existing `where-builder.ts` operator set exactly — `startsWith`/`endsWith`/`in` and top-level `AND`/`OR`/`NOT` are an explicit v1 deferral (would require editing `document`'s tested filter internals), not shipped. An unknown filter field, an operator illegal for that field's type, an unknown `orderBy` field, or a **multi-field `orderBy`** (v1 supports exactly one sort field — a multi-key input used to silently apply only the first key and drop the rest; now rejected outright, see [Post-review hardening](#post-review-hardening)) all throw `BAD_USER_INPUT`, never silently coerced or ignored. `start`/`size` default `0`/`20`, `size` capped at `100`. `createdAt`/`updatedAt`/`publishedAt` alias to their raw snake_case columns internally; no `search` arg in v1 (source doc's GraphQL list query has none either).
+A superset of REST's own `where-builder.ts` operator set, not strict Go parity — `contains` stays on `text` alongside the new `in`/`notIn` (Go doesn't have `contains`), and boolean keeps only `eq` (REST allows `ne` too; GraphQL v1 doesn't). `startsWith`/`endsWith` remain an explicit deferral. An unknown filter field, an operator illegal for that field's type, an unknown `orderBy` field, or a **multi-field `orderBy`** (still exactly one sort field accepted — a multi-key input throws rather than silently applying only the first key, see [Post-review hardening](#post-review-hardening)) all throw `BAD_USER_INPUT`, never silently coerced or ignored. `createdAt`/`updatedAt`/`publishedAt`/`documentId` alias to their raw snake_case columns (`created_at`/`updated_at`/`published_at`/`document_id`) internally; no `search` arg in v1 (source doc's GraphQL list query has none either).
+
+**Default sort** (no `orderBy`, or every field null): `createdAt DESC` — changed from the pre-parity-pass `id DESC` to match the Go reference. The existing hardening (throws `BAD_USER_INPUT` on more than one non-null `orderBy` field) is otherwise unchanged.
+
+**Combinators (`and`/`or`/`not`):** `resolveFilterNode` recurses through `where` — `and`/`or` map to an array of nested `WhereInput`s, `not` to a single nested one, any other key is a leaf field condition (resolved via `resolveFieldLeaves` into one `ParsedFilter` per operator). One code path handles both a flat field-only `where` and a full combinator tree, always collapsing to a single root `FilterNode` (or `undefined` for an empty/no-op `where`) — `and`/`or`/`not` nesting is unbounded in this pass, no depth limit. The resolved tree is threaded through as `FullListOptions.filterTree`, additive alongside the always-empty `filters: []` GraphQL now passes (GraphQL routes every condition, system or content, leaf or combinator, through the tree — see `document.md`'s [Filter combinators](document.md#filter-combinators-additive-graphql-only) for the shared SQL-builder side of this).
 
 ## Resolvers
 
 `application/resolver-factory.service.ts` — `ResolverFactoryService.buildResolvers()`, called once at boot alongside `buildTypeDefs()`; builds the full `{ Query, Mutation, SortDirection, JSON, <TypeName>: { <mediaField>: resolver } }` map. One loop over every `collection`-kind definition, one over every `single`-kind definition — each registers its own `Query`/`Mutation` fields plus, recursively, a field resolver for every `media`-typed field at any nesting depth (`collectMediaFieldResolvers`, walks the component tree once per content type).
 
-- **Single-item query** — `status !== "draft"` delegates to `GetPublicDocumentService`/`GetPublicSingleTypeService`; `status: "draft"` asserts `document:read` then delegates to `GetDocumentForEditService`/`GetSingleTypeService`. Either way, a `NotFoundException` from the service resolves to GraphQL `null` (`resolveOrNull`) — a nonexistent document is a nullable field, not an error, matching REST's 404-vs-null-field distinction.
-- **List query** — `translateListArgs` then `ListDocumentsFullService.execute` (a new `document`-module service — REST's own `ListDocumentsService` projects to `contentType.listFields`, which would silently null out any field a GraphQL client selects outside that admin-list-view allowlist; the new service returns full hydrated rows instead, published-only, no per-row status computation — simpler than the source doc implied, since list has no `status` arg at all).
+- **Single-item query** — asserts `document:read` unconditionally (hoisted above the `status` branch — no exception for published data), then `status !== "draft"` delegates to `GetPublicDocumentService`/`GetPublicSingleTypeService`; `status: "draft"` delegates to `GetDocumentForEditService`/`GetSingleTypeService`. Either way, a `NotFoundException` from the service resolves to GraphQL `null` (`resolveOrNull`) — a nonexistent document is a nullable field, not an error, matching REST's 404-vs-null-field distinction.
+- **List query** — asserts `document:read` first (before `translateListArgs`, matching the single-item query), then `translateListArgs` then `ListDocumentsFullService.execute` (a `document`-module service — REST's own `ListDocumentsService` projects to `contentType.listFields`, which would silently null out any field a GraphQL client selects outside that admin-list-view allowlist; this service returns full hydrated rows instead, published-only, no per-row status computation — simpler than the source doc implied, since list has no `status` arg at all). The resolver wraps the result into the envelope itself: `{ items: result.items, meta: { pagination: buildPaginationMeta(options.start, options.size, result.total) } }` — `ListDocumentsFullService`/`FullListOptions` don't know about the GraphQL-shaped envelope, only `start`/`size`/`total`.
 - **Media field resolver** — `parent[field.name]` (the raw FK) → `MEDIA_ASSET_REPOSITORY.findByDocumentId`; a `null`/missing FK or a dangling (deleted) asset both resolve to `null`, never throw.
 - **Mutations** — `assertApiTokenPermission` first, then delegate. `create<Type>` doesn't re-read (its return value is already the fresh entity — a newly created document can never already have an older published counterpart). `update<Type>`/`save<Type>`/`unpublish<Type>` all **re-read after the write** (`GetDocumentForEditService`/`GetSingleTypeService`), mirroring REST's own `PUT`/`unpublish` routes — the service's own return value is either an unhydrated echo of the input (`SaveDocumentService`) or doesn't reflect the correctly recomputed status, so a raw echo would be wrong. `publish<Type>` doesn't re-read — its return value is already the freshly published entity.
 - **Every resolver attaches `documentId`** (`toResolverValue`) even though it isn't a schema-defined content field — without it, a client creating a document has no way to learn its new id.
@@ -113,9 +167,9 @@ Matches REST's existing `where-builder.ts` operator set exactly — `startsWith`
 
 ## Tests
 
-Unit tests (Jest, `Test.createTestingModule` + `useValue` mocks or plain `new` construction, colocated `*.spec.ts`) — 10 spec files: `field-type-mapping.spec.ts`, `naming.spec.ts`, `json-scalar.spec.ts` (domain, pure functions); `schema-builder.service.spec.ts` (SDL generation per field type, both kinds, deterministic-ordering across repeated calls, shared types emitted exactly once), `resolver-factory.service.spec.ts` (resolver delegation with exact-args assertions for every query/mutation across both kinds, media-field resolution incl. dangling/null FK, permission-required/wrong-scope/missing-token branches per mutation, error-code mapping), `list-args.translator.spec.ts` (parity with REST's filter/orderBy semantics, every validation-rejection path), `authorize.util.spec.ts`, `graphql-context.factory.spec.ts` (missing/malformed/unknown/expired/valid/never-expiring token branches, mirrors `api-token.guard.spec.ts`'s own coverage), `format-error.util.spec.ts` (safe-code passthrough, unmapped-error replacement, original message never present in the output), `graphql.module.spec.ts` (DI wiring, real `typeDefs`/resolvers built via the real `useFactory`, the introspection-flip behavioral test, `formatError` wiring).
+Unit tests (Jest, `Test.createTestingModule` + `useValue` mocks or plain `new` construction, colocated `*.spec.ts`) — 11 spec files: `field-type-mapping.spec.ts`, `naming.spec.ts` (incl. the pluralization rule's irregular-suffix cases — `s`/`x`/`z`/`ch`/`sh`), `json-scalar.spec.ts`, `date-time-scalar.spec.ts` (domain, pure functions — serialize/parseValue/parseLiteral valid+invalid-Date/invalid-string paths); `schema-builder.service.spec.ts` (SDL generation per field type, both kinds, the pluralized list query name, the `<Type>List` envelope + `PaginationInput`/`PaginationMeta`/`ListMeta`, `IDFilter`/`TimeFilter`/system-field filters, `and`/`or`/`not` on `<Type>Filter`, `DateTime` scalar + system fields on `<Type>`, deterministic-ordering across repeated calls, shared types emitted exactly once), `resolver-factory.service.spec.ts` (resolver delegation with exact-args assertions for every query/mutation across both kinds incl. `documentId` naming, list-query envelope construction across all pagination modes incl. `limit: -1`, media-field resolution incl. dangling/null FK, permission-required/wrong-scope/missing-token branches per mutation, error-code mapping), `list-args.translator.spec.ts` (all 13 pagination-validation rules with exact error strings, `in`/`notIn` + system-field filter resolution, `and`/`or`/`not` tree resolution at multiple nesting depths, `createdAt DESC` default, every validation-rejection path), `authorize.util.spec.ts`, `graphql-context.factory.spec.ts`, `format-error.util.spec.ts`, `graphql.module.spec.ts`.
 
-e2e (`test/graphql.e2e-spec.ts`, real Postgres, `bootTestApp` — same infra `content-engine.e2e-spec.ts` uses): single/list queries against real `cv-page` data (published/draft, with/without token); 3-level nested component read with a `json`-typed array field; a throwaway media-bearing collection-type content type (file written to `content-types/` before boot, so it's a real part of the generated schema) proving media FK resolution including the null-FK case; full collection-type CRUD+publish+unpublish lifecycle plus every mutation's permission-denied (missing/wrong-scoped token) case; a throwaway single-type content type proving the full save→publish→unpublish lifecycle with no `Id` anywhere, plus its own permission-denied cases; a real introspection query against the full generated schema. Both throwaway content types are torn down in `afterAll` via `syncService.sync(realDefs)` — the same code path the boot process itself uses.
+e2e (`test/graphql.e2e-spec.ts`, real Postgres, `bootTestApp` — same infra `content-engine.e2e-spec.ts` uses): single/list queries against real `cv-page` data (published/draft, with/without token) using the pluralized query name and `documentId` arg; the full `<Type>List` envelope shape; all 13 pagination-rule cases plus `limit: -1` (unlimited, `pageSize === total`); `in`/`notIn` and system-field (`documentId`/`createdAt`/...) filter cases; a `SPEC.md §3.5`-style `and`/`or`/`not` combinator query against real seeded rows; real `createdAt`/`updatedAt`/`publishedAt` timestamps resolving on single/list/mutation responses; 3-level nested component read with a `json`-typed array field; a throwaway media-bearing collection-type content type (file written to `content-types/` before boot) proving media FK resolution including the null-FK case; full collection-type CRUD+publish+unpublish lifecycle plus every mutation's permission-denied case; a throwaway single-type content type proving the full save→publish→unpublish lifecycle with no `documentId` anywhere; a real introspection query against the full generated schema. Both throwaway content types are torn down in `afterAll` via `syncService.sync(realDefs)` — the same code path the boot process itself uses. `document`'s own unit suite (`where-builder.spec.ts`'s `buildFilterTree` cases, `prisma-document.repository.spec.ts`'s `filterTree`/`limit: -1` branches) and REST's own e2e suites were re-run unaffected, confirming the additive-only boundary held.
 
 Per project rule, no `coverageThreshold` entries were added — this module has no Prisma repository or controller-shaped files (it's pure application logic delegating to already-covered `document`/`content-type`/`media` services), so normal per-file thresholds apply everywhere.
 
@@ -137,4 +191,15 @@ Also addressed alongside the review (found during the same audit pass, same root
 
 ## Verified state
 
-`bun run build`, `bunx tsc --noEmit`, `bun run lint`, and `bun run test:cov` all pass (134 suites, 891 tests repo-wide, including every spec listed under [Tests](#tests) above). `bun run test:e2e` is green across all four e2e suites together (47 tests), including `graphql.e2e-spec.ts`'s 25 — full collection-type and single-type lifecycles, nested component + media resolution, permission-denied paths, and the introspection query — against a real reachable Postgres. A five-axis review ran over the complete feature diff (Phases 1–6) with both real findings fixed, confirmed by the same full check suite passing again afterward.
+`bun run build`, `bunx tsc --noEmit`, `bun run lint`, and `bun run test:cov` all pass (136 suites, 907 tests repo-wide, including every spec listed under [Tests](#tests) above). `bun run test:e2e` is green across all four e2e suites together (50 tests), including `graphql.e2e-spec.ts`'s 28 — full collection-type and single-type lifecycles, nested component + media resolution, permission-denied paths, and the introspection query — against a real reachable Postgres. A five-axis review ran over the complete feature diff (Phases 1–6) with both real findings fixed, confirmed by the same full check suite passing again afterward.
+
+A follow-up cycle then closed the one remaining gap: published-data reads (`Query.<slug>`/`Query.<slug>List` without `status: "draft"`) required no token at all, unlike every draft read and mutation. `assertApiTokenPermission(context, "document:read")` is now hoisted above the `status` branch in both single-item query resolvers and added (net-new) to the list query resolver — every GraphQL read now requires `document:read`, with no published-data exception. REST's public endpoints are untouched.
+
+A final, larger cycle — the **GraphQL Contract Parity Pass** (5 phases, 5 commits: naming+`documentId` → envelope+pagination+orderBy default → `DateTime`+system fields → operators+system-field filters → `and`/`or`/`not` combinators) — reconciled this module against a Go reference implementation; see [GraphQL Contract Parity Pass](#graphql-contract-parity-pass) at the top of this doc for the full list of contract changes, and [List envelope & pagination](#list-envelope--pagination) / [Filtering & sorting](#filtering--sorting) above for the details.
+
+A five-axis review over the full pass's diff flagged two real gaps, both fixed:
+
+1. **`resolvePagination` didn't reject a negative `limit`/`pageSize` other than the special-cased `-1`.** A value like `limit: -2` or `pageSize: -5` would sail through `Math.min(x, 100)` unchanged and reach `prisma-document.repository.ts` as a negative bind parameter, which Postgres rejects outright — surfacing as a raw, uncaught error instead of the clean `BAD_USER_INPUT` every other rule in the [pagination table](#list-envelope--pagination) provides. Fixed with explicit `pageSize < 0`/`limit < -1` checks (`"pageSize must not be negative"` / `"limit must not be negative (use -1 for unlimited)"`).
+2. **No reserved-name guard for the camelCase system fields this pass introduced.** `schema-builder.service.ts` unconditionally bakes `documentId`/`createdAt`/`updatedAt`/`publishedAt` into every generated object type and those plus `and`/`or`/`not` into every `<Type>Filter`, but nothing stopped a content type from naming a real field `createdAt` (or `and`, etc.) — producing a duplicate SDL field name that Apollo's schema parser rejects, taking down the *entire* GraphQL module (every content type) at boot, not just the offending one. Fixed in `content-type`'s `schema-validator.ts`: `RESERVED_SYSTEM_FIELD_NAMES` now also rejects `documentId`, `createdAt`, `updatedAt`, `publishedAt`, `and`, `or`, `not` as content-type field names, so this fails safely and locally at content-type creation instead of at server boot (see `content-type.md`).
+
+`bun run build`, `bun run lint`, `bun run test:cov` (137 suites / 976 tests repo-wide) and `bun run test:e2e` (4 suites / 61 tests, incl. `graphql.e2e-spec.ts`'s full pagination/filter/combinator matrix) were all re-verified green as the pass's final checkpoint, including both fixes above.

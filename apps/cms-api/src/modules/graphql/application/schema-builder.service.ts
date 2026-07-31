@@ -33,6 +33,8 @@ const MEDIA_ASSET_TYPE = `type MediaAsset {
 
 const JSON_SCALAR_TYPE = `scalar JSON`;
 
+const DATE_TIME_SCALAR_TYPE = `scalar DateTime`;
+
 // Mirrors list-args.translator.ts's OPERATORS_BY_FIELD_TYPE (SPEC.md decision #7): the shared
 // per-field-kind filter input types below must stay in lockstep with what that translator accepts.
 const FILTER_INPUT_TYPE_BY_FIELD_TYPE: Partial<Record<FieldType, string>> = {
@@ -41,12 +43,14 @@ const FILTER_INPUT_TYPE_BY_FIELD_TYPE: Partial<Record<FieldType, string>> = {
   boolean: "BooleanFilter",
 };
 
-const SYSTEM_ORDER_BY_FIELDS = ["createdAt", "updatedAt", "publishedAt"];
+const SYSTEM_ORDER_BY_FIELDS = ["id", "createdAt", "updatedAt", "publishedAt"];
 
-const SHARED_FILTER_AND_ORDER_TYPES = `input TextFilter {
+const FILTER_INPUT_TYPES = `input TextFilter {
   eq: String
   ne: String
   contains: String
+  in: [String!]
+  notIn: [String!]
 }
 
 input NumberFilter {
@@ -56,15 +60,54 @@ input NumberFilter {
   gte: Float
   lt: Float
   lte: Float
+  in: [Float!]
+  notIn: [Float!]
 }
 
 input BooleanFilter {
   eq: Boolean
 }
 
-enum SortDirection {
+input IDFilter {
+  eq: ID
+  ne: ID
+  in: [ID!]
+  notIn: [ID!]
+}
+
+input TimeFilter {
+  eq: DateTime
+  ne: DateTime
+}`;
+
+// SPEC.md §3.2: every <Type>Filter carries these 4 system-field filters ahead of its
+// content-field entries, regardless of content type.
+const SYSTEM_FILTER_FIELDS = ["  documentId: IDFilter", "  createdAt: TimeFilter", "  updatedAt: TimeFilter", "  publishedAt: TimeFilter"];
+
+// Both cases are accepted as distinct enum values (not normalized) so a client can send either
+// SortDirection: { ASC DESC asc desc } — resolver-factory.service.ts maps all four to "asc"/"desc".
+const ORDER_BY_TYPES = `enum SortDirection {
   ASC
   DESC
+  asc
+  desc
+}`;
+
+const PAGINATION_TYPES = `input PaginationInput {
+  start: Int
+  limit: Int
+  page: Int
+  pageSize: Int
+}
+
+type PaginationMeta {
+  page: Int!
+  pageSize: Int!
+  total: Int!
+}
+
+type ListMeta {
+  pagination: PaginationMeta!
 }`;
 
 function listableFields(fields: FieldDefinition[]): FieldDefinition[] {
@@ -84,7 +127,17 @@ function buildObjectType(definition: ContentTypeDefinition): string {
   // documentId isn't a schema-defined field, but every resolver (query and mutation) already
   // attaches it (toResolverValue) — without it in the SDL, a client has no way to learn a newly
   // created document's id, since create<Type>'s caller doesn't know it up front.
-  const fieldLines = ["  documentId: ID!", ...definition.fields.map((field) => buildFieldLine(definition.slug, field))];
+  const fieldLines = [
+    "  documentId: ID!",
+    // Auto-increment record id (BIGSERIAL), distinct from documentId (UUID). Only the list query
+    // resolver populates it (ListDocumentsFullService reads it straight off the DB row); other
+    // resolvers resolve it to null.
+    "  id: Int",
+    ...definition.fields.map((field) => buildFieldLine(definition.slug, field)),
+    "  createdAt: DateTime!",
+    "  updatedAt: DateTime!",
+    "  publishedAt: DateTime",
+  ];
 
   return `type ${typeName(definition.slug)} {\n${fieldLines.join("\n")}\n}`;
 }
@@ -170,17 +223,26 @@ function buildMutationFields(definition: ContentTypeDefinition): string[] {
 
   return [
     `  ${createMutationName(definition.slug)}(data: ${input}!): ${type}!`,
-    `  ${updateMutationName(definition.slug)}(Id: ID!, data: ${input}!): ${type}!`,
-    `  ${deleteMutationName(definition.slug)}(Id: ID!): Boolean!`,
-    `  ${publishMutationName(definition.slug)}(Id: ID!): ${type}!`,
-    `  ${unpublishMutationName(definition.slug)}(Id: ID!): ${type}!`,
+    `  ${updateMutationName(definition.slug)}(documentId: ID!, data: ${input}!): ${type}!`,
+    `  ${deleteMutationName(definition.slug)}(documentId: ID!): Boolean!`,
+    `  ${publishMutationName(definition.slug)}(documentId: ID!): ${type}!`,
+    `  ${unpublishMutationName(definition.slug)}(documentId: ID!): ${type}!`,
   ];
 }
 
 function buildFilterType(definition: ContentTypeDefinition): string {
-  const fieldLines = listableFields(definition.fields).map((field) => `  ${field.name}: ${FILTER_INPUT_TYPE_BY_FIELD_TYPE[field.type]}`);
+  const name = filterTypeName(definition.slug);
+  // SPEC.md §3.5: `and`/`or`/`not` are self-referencing so combinators nest to unbounded depth,
+  // reached only through the existing `where` arg (no separate `filters:` array).
+  const fieldLines = [
+    ...SYSTEM_FILTER_FIELDS,
+    ...listableFields(definition.fields).map((field) => `  ${field.name}: ${FILTER_INPUT_TYPE_BY_FIELD_TYPE[field.type]}`),
+    `  and: [${name}!]`,
+    `  or: [${name}!]`,
+    `  not: ${name}`,
+  ];
 
-  return `input ${filterTypeName(definition.slug)} {\n${fieldLines.join("\n")}\n}`;
+  return `input ${name} {\n${fieldLines.join("\n")}\n}`;
 }
 
 function buildOrderByType(definition: ContentTypeDefinition): string {
@@ -192,12 +254,20 @@ function buildOrderByType(definition: ContentTypeDefinition): string {
 
 function buildQueryField(definition: ContentTypeDefinition): string {
   const type = typeName(definition.slug);
-  return `  ${queryName(definition.slug)}(Id: ID!, status: String): ${type}`;
+  return `  ${queryName(definition.slug)}(documentId: ID!, status: String): ${type}`;
+}
+
+function listTypeName(slug: string): string {
+  return `${typeName(slug)}List`;
+}
+
+function buildListType(definition: ContentTypeDefinition): string {
+  const type = typeName(definition.slug);
+  return `type ${listTypeName(definition.slug)} {\n  items: [${type}!]!\n  meta: ListMeta!\n}`;
 }
 
 function buildListQueryField(definition: ContentTypeDefinition): string {
-  const type = typeName(definition.slug);
-  return `  ${listQueryName(definition.slug)}(where: ${filterTypeName(definition.slug)}, orderBy: ${orderByTypeName(definition.slug)}, start: Int, size: Int): [${type}!]!`;
+  return `  ${listQueryName(definition.slug)}(where: ${filterTypeName(definition.slug)}, orderBy: ${orderByTypeName(definition.slug)}, pagination: PaginationInput): ${listTypeName(definition.slug)}!`;
 }
 
 function buildSingleQueryField(definition: ContentTypeDefinition): string {
@@ -229,6 +299,7 @@ export class SchemaBuilderService {
     const inputTypes = [...collectionDefinitions, ...singleDefinitions].flatMap((definition) => [buildInputType(definition), ...buildComponentInputTypesFor(definition)]);
     const filterTypes = collectionDefinitions.map(buildFilterType);
     const orderByTypes = collectionDefinitions.map(buildOrderByType);
+    const listTypes = collectionDefinitions.map(buildListType);
     const queryFields = [
       "  _empty: String",
       ...collectionDefinitions.map(buildQueryField),
@@ -239,8 +310,20 @@ export class SchemaBuilderService {
     const mutationFields = ["  _empty: String", ...collectionDefinitions.flatMap(buildMutationFields), ...singleDefinitions.flatMap(buildSingleTypeMutationFields)];
     const mutationType = `type Mutation {\n${mutationFields.join("\n")}\n}`;
 
-    return [MEDIA_ASSET_TYPE, JSON_SCALAR_TYPE, ...objectTypes, ...inputTypes, SHARED_FILTER_AND_ORDER_TYPES, ...filterTypes, ...orderByTypes, queryType, mutationType].join(
-      "\n\n",
-    );
+    return [
+      MEDIA_ASSET_TYPE,
+      JSON_SCALAR_TYPE,
+      DATE_TIME_SCALAR_TYPE,
+      ...objectTypes,
+      ...inputTypes,
+      FILTER_INPUT_TYPES,
+      ORDER_BY_TYPES,
+      PAGINATION_TYPES,
+      ...filterTypes,
+      ...orderByTypes,
+      ...listTypes,
+      queryType,
+      mutationType,
+    ].join("\n\n");
   }
 }
