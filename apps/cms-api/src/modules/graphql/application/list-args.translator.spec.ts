@@ -327,6 +327,15 @@ describe("translateListArgs", () => {
     expect(result.sortDir).toBe("asc");
   });
 
+  it("orders by the numeric auto-increment id column", () => {
+    const contentType = buildContentType();
+
+    const result = translateListArgs(contentType, { orderBy: { id: "desc" } });
+
+    expect(result.orderBy).toBe("id");
+    expect(result.sortDir).toBe("desc");
+  });
+
   it("aliases camelCase system-timestamp orderBy fields to their raw snake_case columns", () => {
     const contentType = buildContentType();
 

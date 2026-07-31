@@ -74,8 +74,22 @@ describe("SchemaBuilderService", () => {
     const cvPageType = schema.getType("CvPage") as GraphQLObjectType;
     expect(cvPageType).toBeDefined();
     const fields = cvPageType.getFields();
-    expect(Object.keys(fields)).toEqual(["documentId", "position", "isMain", "company", "summary", "coverImage", "skills", "experiences", "createdAt", "updatedAt", "publishedAt"]);
+    expect(Object.keys(fields)).toEqual([
+      "documentId",
+      "id",
+      "position",
+      "isMain",
+      "company",
+      "summary",
+      "coverImage",
+      "skills",
+      "experiences",
+      "createdAt",
+      "updatedAt",
+      "publishedAt",
+    ]);
     expect(fields.documentId.type.toString()).toBe("ID!");
+    expect(fields.id.type.toString()).toBe("Int");
     expect(fields.position.type).toBe(GraphQLString);
     expect(fields.company.type).toBe(GraphQLString);
     expect(fields.summary.type).toBe(GraphQLString);
@@ -101,7 +115,7 @@ describe("SchemaBuilderService", () => {
     const schema = buildSchema(await service.buildTypeDefs());
 
     const type = schema.getType("EnItVocab") as GraphQLObjectType;
-    expect(Object.keys(type.getFields())).toEqual(["documentId", "wordGroup", "word", "synonyms", "phonetics", "createdAt", "updatedAt", "publishedAt"]);
+    expect(Object.keys(type.getFields())).toEqual(["documentId", "id", "wordGroup", "word", "synonyms", "phonetics", "createdAt", "updatedAt", "publishedAt"]);
 
     const queryFields = schema.getQueryType()!.getFields();
     expect(queryFields.enItVocab).toBeDefined();
@@ -115,7 +129,7 @@ describe("SchemaBuilderService", () => {
 
     const homePageType = schema.getType("HomePage") as GraphQLObjectType;
     expect(homePageType).toBeDefined();
-    expect(Object.keys(homePageType.getFields())).toEqual(["documentId", "title", "createdAt", "updatedAt", "publishedAt"]);
+    expect(Object.keys(homePageType.getFields())).toEqual(["documentId", "id", "title", "createdAt", "updatedAt", "publishedAt"]);
 
     const queryFields = schema.getQueryType()!.getFields();
     expect(queryFields.homePage).toBeDefined();
@@ -199,7 +213,7 @@ describe("SchemaBuilderService", () => {
     expect(timeFilter.getFields().eq.type.toString()).toBe("DateTime");
   });
 
-  it("emits <Type>OrderBy with sortable scalar fields plus the three system timestamps, enum-valued", async () => {
+  it("emits <Type>OrderBy with sortable scalar fields plus id and the three system timestamps, enum-valued", async () => {
     const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
 
     const schema = buildSchema(await service.buildTypeDefs());
@@ -207,11 +221,12 @@ describe("SchemaBuilderService", () => {
     const orderByType = schema.getType("CvPageOrderBy") as GraphQLInputObjectType;
     expect(orderByType).toBeDefined();
     const fields = orderByType.getFields();
-    expect(Object.keys(fields)).toEqual(["position", "isMain", "company", "createdAt", "updatedAt", "publishedAt"]);
+    expect(Object.keys(fields)).toEqual(["position", "isMain", "company", "id", "createdAt", "updatedAt", "publishedAt"]);
     expect(fields.position.type.toString()).toBe("SortDirection");
+    expect(fields.id.type.toString()).toBe("SortDirection");
 
     const sortDirection = schema.getType("SortDirection") as GraphQLEnumType;
-    expect(sortDirection.getValues().map((v) => v.name)).toEqual(["ASC", "DESC"]);
+    expect(sortDirection.getValues().map((v) => v.name)).toEqual(["ASC", "DESC", "asc", "desc"]);
   });
 
   it("emits a single shared MediaAsset type, regardless of how many content types have media fields", async () => {

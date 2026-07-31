@@ -45,9 +45,9 @@ describe("ListDocumentsFullService", () => {
     const createdAt = new Date("2026-01-01T00:00:00.000Z");
     const updatedAt = new Date("2026-01-02T00:00:00.000Z");
     const publishedAt = new Date("2026-01-03T00:00:00.000Z");
-    const row1 = new DocumentEntity("doc-1", "published", { wordGroup: "Networking" }, createdAt, updatedAt, publishedAt, null, null, null);
-    const row2 = new DocumentEntity("doc-2", "published", { wordGroup: "Storage" }, createdAt, updatedAt, publishedAt, null, null, null);
-    const row3 = new DocumentEntity("doc-3", "published", { wordGroup: "Compute" }, createdAt, updatedAt, publishedAt, null, null, null);
+    const row1 = new DocumentEntity("doc-1", "published", { wordGroup: "Networking" }, createdAt, updatedAt, publishedAt, null, null, null, 101);
+    const row2 = new DocumentEntity("doc-2", "published", { wordGroup: "Storage" }, createdAt, updatedAt, publishedAt, null, null, null, 102);
+    const row3 = new DocumentEntity("doc-3", "published", { wordGroup: "Compute" }, createdAt, updatedAt, publishedAt, null, null, null, 103);
     documents.listPaginated.mockResolvedValue({ rows: [row1, row2, row3], total: 3 });
     componentIo.hydrateComponents.mockImplementation((_slug, documentId) => Promise.resolve({ phonetics: [{ ipa: `ipa-${documentId}` }] }));
 
@@ -56,9 +56,9 @@ describe("ListDocumentsFullService", () => {
 
     expect(result.total).toBe(3);
     expect(result.items).toEqual([
-      { documentId: "doc-1", wordGroup: "Networking", phonetics: [{ ipa: "ipa-doc-1" }], createdAt, updatedAt, publishedAt },
-      { documentId: "doc-2", wordGroup: "Storage", phonetics: [{ ipa: "ipa-doc-2" }], createdAt, updatedAt, publishedAt },
-      { documentId: "doc-3", wordGroup: "Compute", phonetics: [{ ipa: "ipa-doc-3" }], createdAt, updatedAt, publishedAt },
+      { documentId: "doc-1", id: 101, wordGroup: "Networking", phonetics: [{ ipa: "ipa-doc-1" }], createdAt, updatedAt, publishedAt },
+      { documentId: "doc-2", id: 102, wordGroup: "Storage", phonetics: [{ ipa: "ipa-doc-2" }], createdAt, updatedAt, publishedAt },
+      { documentId: "doc-3", id: 103, wordGroup: "Compute", phonetics: [{ ipa: "ipa-doc-3" }], createdAt, updatedAt, publishedAt },
     ]);
   });
 

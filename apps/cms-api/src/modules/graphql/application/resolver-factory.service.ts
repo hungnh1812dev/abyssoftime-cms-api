@@ -284,6 +284,13 @@ export class ResolverFactoryService {
       };
     }
 
-    return { Query: query, Mutation: mutation, SortDirection: { ASC: "asc", DESC: "desc" }, JSON: JSONScalar, DateTime: DateTimeScalar, ...typeResolvers };
+    return {
+      Query: query,
+      Mutation: mutation,
+      SortDirection: { ASC: "asc", DESC: "desc", asc: "asc", desc: "desc" },
+      JSON: JSONScalar,
+      DateTime: DateTimeScalar,
+      ...typeResolvers,
+    };
   }
 }
