@@ -25,6 +25,9 @@ export class RefreshTokenService {
     }
 
     const role = await this.roles.findById(user.roleId);
+    if (!role) {
+      throw new UnauthorizedException("Invalid or expired refresh token");
+    }
 
     const accessToken = this.jwtTokenService.signAccessToken({ sub: user.documentId, roleSlug: role.slug, level: role.level, permissions: role.permissions });
     const newRefreshToken = this.jwtTokenService.signRefreshToken({ sub: user.documentId, rememberMe });

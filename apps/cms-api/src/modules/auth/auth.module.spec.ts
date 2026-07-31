@@ -4,7 +4,6 @@ import { MODULE_METADATA } from "@nestjs/common/constants";
 import { ConfigService } from "@nestjs/config";
 import { PassportModule } from "@nestjs/passport";
 
-import { JwtRefreshGuard } from "@/common/guards/jwt-refresh.guard";
 import { ApiTokenStrategy } from "@/common/strategies/api-token.strategy";
 import { JwtRefreshStrategy } from "@/common/strategies/jwt-refresh.strategy";
 import { JwtStrategy } from "@/common/strategies/jwt.strategy";
@@ -66,7 +65,6 @@ describe("AuthModule", () => {
       JwtRefreshStrategy,
       ApiTokenStrategy,
       LocalStrategy,
-      JwtRefreshGuard,
       { provide: EMAIL_TEMPLATE_RENDERER, useClass: HandlebarsEmailTemplateRenderer },
       {
         provide: EMAIL_SENDER,

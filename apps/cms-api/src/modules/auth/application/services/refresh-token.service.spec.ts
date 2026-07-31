@@ -71,6 +71,17 @@ describe("RefreshTokenService", () => {
     await expect(service.execute("user-1", false)).rejects.toThrow(UnauthorizedException);
   });
 
+  it("throws UnauthorizedException when the user's assigned role no longer exists", async () => {
+    // IRoleRepository.findById's type says non-null, but prisma-role.repository.ts returns
+    // `null as unknown as RoleEntity` on a miss — e.g. the role was deleted after this user's
+    // session was established. Every other findById caller in the codebase guards this; this one
+    // must too, or it throws an unhandled TypeError instead of a controlled 401.
+    users.findById.mockResolvedValue(verifiedUser);
+    roles.findById.mockResolvedValue(null as unknown as RoleEntity);
+
+    await expect(service.execute("user-1", false)).rejects.toThrow(UnauthorizedException);
+  });
+
   it("re-fetches the user and role fresh from the database and rotates both tokens, preserving rememberMe:true", async () => {
     users.findById.mockResolvedValue(verifiedUser);
     roles.findById.mockResolvedValue(adminRole);
