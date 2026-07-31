@@ -31,6 +31,18 @@ Comparison tables for the choices made integrating `@nestjs/passport` as the aut
 | Timing-attack parity | Preserved (unchanged code) | Preserved — the `DUMMY_PASSWORD_HASH` `bcrypt.compare` on the not-found path **moves verbatim** into `LocalStrategy.validate`; the error messages/status codes are byte-for-byte identical |
 | **Verdict** | Viable, smaller blast radius | **Chosen — by the user's explicit call.** Three scoped options were presented via comparison (JWT-only / JWT+local / scaffold-only); the user picked JWT+local for a single uniform Passport model now, accepting that the local conversion is more a consistency investment than a technical inevitability. Stated plainly so the record reflects how the decision was actually made. |
 
+## Refresh-token verification: manual `RefreshTokenService.execute(token)` (old) vs. `passport-jwt` strategy (chosen)
+
+| Criteria | Manual verify inside `RefreshTokenService` (old) | `JwtRefreshStrategy` + `JwtRefreshGuard` (chosen) |
+| --- | --- | --- |
+| Where verification lives | `RefreshTokenService.execute(refreshToken)` calls `jwtTokenService.verifyRefreshToken()` in a try/catch, mixing "verify the token" with "re-fetch user/role and re-sign" in one method | Verification moves into `JwtRefreshStrategy` (declarative `secretOrKey`/`ignoreExpiration`, same shape as `JwtStrategy`); `RefreshTokenService.execute(sub, rememberMe)` becomes DB-fetch-and-resign only, mirroring how `LoginService` shrank once `LocalStrategy` absorbed credential checking |
+| Consistency with the rest of the module | Was the one remaining hand-rolled auth check after the access-token/login Passport conversion | Closes that gap — every credential/token check (access, refresh, login, API token) now goes through Passport uniformly |
+| Route protection | Controller manually read the `refresh_token` cookie and threw `UnauthorizedException` by hand before calling the service | `@UseGuards(JwtRefreshGuard)`, consistent with every other protected route |
+| Cookie extraction | N/A (cookie read directly in the controller) | Same pattern as `JwtStrategy`'s `jwtCookieExtractor`: a custom `jwtRefreshCookieExtractor` reads `REFRESH_TOKEN_COOKIE`, since `passport-jwt` ships no cookie extractor |
+| **Verdict** | Rejected — the correct-and-working code, but the last inconsistency with the rest of the module's Passport conversion | **Chosen** — same architectural direction already committed to elsewhere in this module |
+
+**Known rough edge from this cycle:** the first version of `JwtRefreshStrategy` shipped with two bugs that would have been caught by the same five-axis review process as the rest of this table's decisions, but weren't (this conversion happened outside that review cycle): (1) the strategy class was never added to `AuthModule`'s `providers` array, so Nest never instantiated it and Passport never registered `"jwt-refresh"` — hitting `/auth/refresh` threw an unhandled `Unknown authentication strategy "jwt-refresh"` 500; (2) its extractor was `ExtractJwt.fromAuthHeaderAsBearerToken()` instead of a cookie extractor, so even once registered, it silently failed to find the token the client actually sends (a controlled 401 that looked like "working as designed" from the outside). Both fixed — see `docs/documents/auth-issues-fix.md` #11 for the full write-up, including two smaller follow-on findings (wrong error-message wording, an `AccessTokenPayload` type-pollution workaround) caught while verifying the fix.
+
 ## Strategy provider placement: global `TokenModule` vs. `AuthModule`-local (chosen)
 
 | Criteria | Register strategies in `@Global() TokenModule` | Register in `AuthModule` (chosen) |
