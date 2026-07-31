@@ -241,8 +241,16 @@ describe("GraphQL (e2e)", () => {
         .expect(200, { status: "published" });
     });
 
-    it("returns the published document with no token required", async () => {
+    it("rejects a published-data query with no token, UNAUTHENTICATED", async () => {
       const response = await gql(`{ cvPage(Id: "${documentId}") { position company } }`).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.data).toEqual({ cvPage: null });
+      expect(body.errors?.[0].extensions?.code).toBe("UNAUTHENTICATED");
+    });
+
+    it("returns the published document for a document:read-scoped token", async () => {
+      const response = await gql(`{ cvPage(Id: "${documentId}") { position company } }`, undefined, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
@@ -250,7 +258,7 @@ describe("GraphQL (e2e)", () => {
     });
 
     it("returns null (not a GraphQL error) for a nonexistent Id", async () => {
-      const response = await gql(`{ cvPage(Id: "${randomUUID()}") { position } }`).expect(200);
+      const response = await gql(`{ cvPage(Id: "${randomUUID()}") { position } }`, undefined, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
@@ -295,13 +303,21 @@ describe("GraphQL (e2e)", () => {
       await createAndPublish(`${filterTag} Secondary`, false);
     });
 
-    it("filters, orders, and paginates published rows, no token required", async () => {
+    it("rejects a list query with no token, UNAUTHENTICATED", async () => {
+      const response = await gql(`{ cvPageList(size: 1) { position } }`).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.data).toBeNull();
+      expect(body.errors?.[0].extensions?.code).toBe("UNAUTHENTICATED");
+    });
+
+    it("filters, orders, and paginates published rows for a document:read-scoped token", async () => {
       const query = `
         query($where: CvPageFilter, $orderBy: CvPageOrderBy) {
           cvPageList(where: $where, orderBy: $orderBy, start: 0, size: 10) { position isMain }
         }
       `;
-      const response = await gql(query, { where: { company: { eq: `${filterTag}-Co` } }, orderBy: { position: "ASC" } }).expect(200);
+      const response = await gql(query, { where: { company: { eq: `${filterTag}-Co` } }, orderBy: { position: "ASC" } }, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
@@ -355,7 +371,7 @@ describe("GraphQL (e2e)", () => {
           }
         }
       }`;
-      const response = await gql(query).expect(200);
+      const response = await gql(query, undefined, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
@@ -405,7 +421,7 @@ describe("GraphQL (e2e)", () => {
           cover { documentId url thumbnailUrl fileName width height }
         }
       }`;
-      const response = await gql(query).expect(200);
+      const response = await gql(query, undefined, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
@@ -429,7 +445,7 @@ describe("GraphQL (e2e)", () => {
 
       await request(app.getHttpServer()).post(`/api/v1/documents/collection-type/${mediaSlug}/${noCoverDocumentId}/publish`).set("Cookie", [superAdminCookie]).expect(200);
 
-      const response = await gql(`{ ${mediaQueryName}(Id: "${noCoverDocumentId}") { title cover { documentId } } }`).expect(200);
+      const response = await gql(`{ ${mediaQueryName}(Id: "${noCoverDocumentId}") { title cover { documentId } } }`, undefined, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
@@ -489,7 +505,7 @@ describe("GraphQL (e2e)", () => {
       expect(publishBody.errors).toBeUndefined();
       expect(publishBody.data).toEqual({ publishCvPage: { documentId, company: `UpdatedCo-${runId}` } });
 
-      const publicReadAfterPublish = await gql(`{ cvPage(Id: "${documentId}") { company } }`).expect(200);
+      const publicReadAfterPublish = await gql(`{ cvPage(Id: "${documentId}") { company } }`, undefined, readScopedApiToken).expect(200);
       expect((publicReadAfterPublish.body as GraphQLResponseBody).data).toEqual({ cvPage: { company: `UpdatedCo-${runId}` } });
 
       const unpublishResult = await gql(`mutation($Id: ID!) { unpublishCvPage(Id: $Id) { documentId company } }`, { Id: documentId }, unpublishOnlyApiToken).expect(200);
@@ -497,7 +513,7 @@ describe("GraphQL (e2e)", () => {
       expect(unpublishBody.errors).toBeUndefined();
       expect(unpublishBody.data).toEqual({ unpublishCvPage: { documentId, company: `UpdatedCo-${runId}` } });
 
-      const publicReadAfterUnpublish = await gql(`{ cvPage(Id: "${documentId}") { company } }`).expect(200);
+      const publicReadAfterUnpublish = await gql(`{ cvPage(Id: "${documentId}") { company } }`, undefined, readScopedApiToken).expect(200);
       expect((publicReadAfterUnpublish.body as GraphQLResponseBody).data).toEqual({ cvPage: null });
 
       const deleteResult = await gql(`mutation($Id: ID!) { deleteCvPage(Id: $Id) }`, { Id: documentId }, deleteOnlyApiToken).expect(200);
@@ -595,7 +611,7 @@ describe("GraphQL (e2e)", () => {
       const saved = (saveBody.data as Record<string, { documentId: string; heroTitle: string }>)[saveField];
       expect(saved).toMatchObject({ heroTitle: `Single Type ${runId}` });
 
-      const publicReadBeforePublish = await gql(`{ ${singleQueryName} { heroTitle } }`).expect(200);
+      const publicReadBeforePublish = await gql(`{ ${singleQueryName} { heroTitle } }`, undefined, readScopedApiToken).expect(200);
       expect((publicReadBeforePublish.body as GraphQLResponseBody).data).toEqual({ [singleQueryName]: null });
 
       const draftReadBeforePublish = await gql(`{ ${singleQueryName}(status: "draft") { heroTitle } }`, undefined, readScopedApiToken).expect(200);
@@ -606,7 +622,7 @@ describe("GraphQL (e2e)", () => {
       expect(publishBody.errors).toBeUndefined();
       expect(publishBody.data).toEqual({ [publishField]: { heroTitle: `Single Type ${runId}` } });
 
-      const publicReadAfterPublish = await gql(`{ ${singleQueryName} { heroTitle } }`).expect(200);
+      const publicReadAfterPublish = await gql(`{ ${singleQueryName} { heroTitle } }`, undefined, readScopedApiToken).expect(200);
       expect((publicReadAfterPublish.body as GraphQLResponseBody).data).toEqual({ [singleQueryName]: { heroTitle: `Single Type ${runId}` } });
 
       const unpublishResult = await gql(`mutation { ${unpublishField} { heroTitle } }`, undefined, unpublishOnlyApiToken).expect(200);
@@ -614,8 +630,16 @@ describe("GraphQL (e2e)", () => {
       expect(unpublishBody.errors).toBeUndefined();
       expect(unpublishBody.data).toEqual({ [unpublishField]: { heroTitle: `Single Type ${runId}` } });
 
-      const publicReadAfterUnpublish = await gql(`{ ${singleQueryName} { heroTitle } }`).expect(200);
+      const publicReadAfterUnpublish = await gql(`{ ${singleQueryName} { heroTitle } }`, undefined, readScopedApiToken).expect(200);
       expect((publicReadAfterUnpublish.body as GraphQLResponseBody).data).toEqual({ [singleQueryName]: null });
+    });
+
+    it(`rejects a ${singleQueryName} published-data query with no token, UNAUTHENTICATED`, async () => {
+      const response = await gql(`{ ${singleQueryName} { heroTitle } }`).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.data).toEqual({ [singleQueryName]: null });
+      expect(body.errors?.[0].extensions?.code).toBe("UNAUTHENTICATED");
     });
 
     it(`${saveMutationName(singleSlug)} rejects a wrongly-scoped token with FORBIDDEN, never executing the mutation`, async () => {
@@ -643,7 +667,7 @@ describe("GraphQL (e2e)", () => {
 
   describe("introspection gating", () => {
     it("allows a normal query to execute regardless of introspection gating", async () => {
-      const response = await gql(`{ cvPageList(size: 1) { position } }`).expect(200);
+      const response = await gql(`{ cvPageList(size: 1) { position } }`, undefined, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
