@@ -21,15 +21,15 @@ See `tasks/plan.md` for full context, dependency graph, and rationale. See `SPEC
 - [x] `resolver-factory.service.ts`: register `DateTime` scalar; `toResolverValue` stops dropping the 3 timestamp fields
 - [x] `list-documents-full.service.ts`: items mapper stops dropping the 3 timestamp fields
 - [x] Extend e2e assertions (single/list/mutation) for real ISO timestamps
-- [ ] **Checkpoint:** all checks green — commit
+- [x] **Checkpoint:** all checks green — commit
 
 ## Phase 4 — Expanded operators + system-field filters (Areas 5 + 7)
-- [ ] `document/domain/entities/filter.ts`: widen `FilterOperator` with `$in`/`$notIn`
-- [ ] `where-builder.ts`: add `$in`/`$notIn` branches to `buildFilterWhere` (confirmed shared-file edit)
-- [ ] `schema-builder.service.ts`: `TextFilter`/`NumberFilter` gain `in`/`notIn`; add `IDFilter`/`TimeFilter`; `buildFilterType` prepends system-field filters
-- [ ] `list-args.translator.ts`: add `in`/`notIn` operator mapping; add system-field (documentId/createdAt/updatedAt/publishedAt) filter resolution
-- [ ] Extend e2e list-query block with `in`/`notIn` + system-field filter cases
-- [ ] **Checkpoint:** all checks green — commit
+- [x] `document/domain/entities/filter.ts`: widen `FilterOperator` with `$in`/`$notIn`
+- [x] `where-builder.ts`: add `$in`/`$notIn` branches to `buildFilterWhere` (confirmed shared-file edit)
+- [x] `schema-builder.service.ts`: `TextFilter`/`NumberFilter` gain `in`/`notIn`; add `IDFilter`/`TimeFilter`; `buildFilterType` prepends system-field filters
+- [x] `list-args.translator.ts`: add `in`/`notIn` operator mapping; add system-field (documentId/createdAt/updatedAt/publishedAt) filter resolution
+- [x] Extend e2e list-query block with `in`/`notIn` + system-field filter cases
+- [x] **Checkpoint:** all checks green — commit
 
 ## Phase 5 — Filter combinators `and`/`or`/`not` (Area 6)
 - [ ] `filter.ts`: add `FilterNode` discriminated union
