@@ -45,8 +45,8 @@ Ported from a Go/GORM-derived source design (`docs/graphql.md`); deviations are 
 
 **Collection-type** (both real seeds, `cv-page`/`en-it-vocab`, are `collection`-kind):
 
-- `Query.<slug>(Id: ID!, status: String): <Type>` — nullable; omitted/anything-but-`"draft"` `status` reads published, `status: "draft"` requires a `document:read`-scoped token.
-- `Query.<slug>List(where: <Type>Filter, orderBy: <Type>OrderBy, start: Int, size: Int): [<Type>!]!` — always published-only, no `status` arg at all (matches the source doc: list has no draft concept).
+- `Query.<slug>(Id: ID!, status: String): <Type>` — nullable; requires a `document:read`-scoped token regardless of `status` — omitted/anything-but-`"draft"` `status` reads published, `status: "draft"` reads the edit view.
+- `Query.<slug>List(where: <Type>Filter, orderBy: <Type>OrderBy, start: Int, size: Int): [<Type>!]!` — requires a `document:read`-scoped token; always published-only, no `status` arg at all (matches the source doc: list has no draft concept).
 - `Mutation.create<Type>(data: <Type>Input!): <Type>!` — `document:create`.
 - `Mutation.update<Type>(Id: ID!, data: <Type>Input!): <Type>!` — `document:update`.
 - `Mutation.delete<Type>(Id: ID!): Boolean!` — `document:delete`.
@@ -55,7 +55,7 @@ Ported from a Go/GORM-derived source design (`docs/graphql.md`); deviations are 
 
 **Single-type** (no real seed; proven via a throwaway e2e content type — see [Tests](#tests)):
 
-- `Query.<slug>(status: String): <Type>` — nullable, no `Id` param.
+- `Query.<slug>(status: String): <Type>` — nullable, no `Id` param; requires a `document:read`-scoped token regardless of `status`, same as the collection-type query.
 - `Mutation.save<Type>(data: <Type>Input!): <Type>!` — `document:update`. No `create`/`update`/`delete` — a single type has at most one entry, created on first save.
 - `Mutation.publish<Type>: <Type>!` / `Mutation.unpublish<Type>: <Type>!` — no args at all.
 
@@ -79,8 +79,8 @@ Matches REST's existing `where-builder.ts` operator set exactly — `startsWith`
 
 `application/resolver-factory.service.ts` — `ResolverFactoryService.buildResolvers()`, called once at boot alongside `buildTypeDefs()`; builds the full `{ Query, Mutation, SortDirection, JSON, <TypeName>: { <mediaField>: resolver } }` map. One loop over every `collection`-kind definition, one over every `single`-kind definition — each registers its own `Query`/`Mutation` fields plus, recursively, a field resolver for every `media`-typed field at any nesting depth (`collectMediaFieldResolvers`, walks the component tree once per content type).
 
-- **Single-item query** — `status !== "draft"` delegates to `GetPublicDocumentService`/`GetPublicSingleTypeService`; `status: "draft"` asserts `document:read` then delegates to `GetDocumentForEditService`/`GetSingleTypeService`. Either way, a `NotFoundException` from the service resolves to GraphQL `null` (`resolveOrNull`) — a nonexistent document is a nullable field, not an error, matching REST's 404-vs-null-field distinction.
-- **List query** — `translateListArgs` then `ListDocumentsFullService.execute` (a new `document`-module service — REST's own `ListDocumentsService` projects to `contentType.listFields`, which would silently null out any field a GraphQL client selects outside that admin-list-view allowlist; the new service returns full hydrated rows instead, published-only, no per-row status computation — simpler than the source doc implied, since list has no `status` arg at all).
+- **Single-item query** — asserts `document:read` unconditionally (hoisted above the `status` branch — no exception for published data), then `status !== "draft"` delegates to `GetPublicDocumentService`/`GetPublicSingleTypeService`; `status: "draft"` delegates to `GetDocumentForEditService`/`GetSingleTypeService`. Either way, a `NotFoundException` from the service resolves to GraphQL `null` (`resolveOrNull`) — a nonexistent document is a nullable field, not an error, matching REST's 404-vs-null-field distinction.
+- **List query** — asserts `document:read` first (before `translateListArgs`, matching the single-item query), then `translateListArgs` then `ListDocumentsFullService.execute` (a new `document`-module service — REST's own `ListDocumentsService` projects to `contentType.listFields`, which would silently null out any field a GraphQL client selects outside that admin-list-view allowlist; the new service returns full hydrated rows instead, published-only, no per-row status computation — simpler than the source doc implied, since list has no `status` arg at all).
 - **Media field resolver** — `parent[field.name]` (the raw FK) → `MEDIA_ASSET_REPOSITORY.findByDocumentId`; a `null`/missing FK or a dangling (deleted) asset both resolve to `null`, never throw.
 - **Mutations** — `assertApiTokenPermission` first, then delegate. `create<Type>` doesn't re-read (its return value is already the fresh entity — a newly created document can never already have an older published counterpart). `update<Type>`/`save<Type>`/`unpublish<Type>` all **re-read after the write** (`GetDocumentForEditService`/`GetSingleTypeService`), mirroring REST's own `PUT`/`unpublish` routes — the service's own return value is either an unhydrated echo of the input (`SaveDocumentService`) or doesn't reflect the correctly recomputed status, so a raw echo would be wrong. `publish<Type>` doesn't re-read — its return value is already the freshly published entity.
 - **Every resolver attaches `documentId`** (`toResolverValue`) even though it isn't a schema-defined content field — without it, a client creating a document has no way to learn its new id.
@@ -137,4 +137,6 @@ Also addressed alongside the review (found during the same audit pass, same root
 
 ## Verified state
 
-`bun run build`, `bunx tsc --noEmit`, `bun run lint`, and `bun run test:cov` all pass (134 suites, 891 tests repo-wide, including every spec listed under [Tests](#tests) above). `bun run test:e2e` is green across all four e2e suites together (47 tests), including `graphql.e2e-spec.ts`'s 25 — full collection-type and single-type lifecycles, nested component + media resolution, permission-denied paths, and the introspection query — against a real reachable Postgres. A five-axis review ran over the complete feature diff (Phases 1–6) with both real findings fixed, confirmed by the same full check suite passing again afterward.
+`bun run build`, `bunx tsc --noEmit`, `bun run lint`, and `bun run test:cov` all pass (136 suites, 907 tests repo-wide, including every spec listed under [Tests](#tests) above). `bun run test:e2e` is green across all four e2e suites together (50 tests), including `graphql.e2e-spec.ts`'s 28 — full collection-type and single-type lifecycles, nested component + media resolution, permission-denied paths, and the introspection query — against a real reachable Postgres. A five-axis review ran over the complete feature diff (Phases 1–6) with both real findings fixed, confirmed by the same full check suite passing again afterward.
+
+A follow-up cycle then closed the one remaining gap: published-data reads (`Query.<slug>`/`Query.<slug>List` without `status: "draft"`) required no token at all, unlike every draft read and mutation. `assertApiTokenPermission(context, "document:read")` is now hoisted above the `status` branch in both single-item query resolvers and added (net-new) to the list query resolver — every GraphQL read now requires `document:read`, with no published-data exception. REST's public endpoints are untouched.
