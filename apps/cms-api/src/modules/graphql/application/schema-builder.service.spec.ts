@@ -239,7 +239,7 @@ describe("SchemaBuilderService", () => {
     expect(typeDefs.match(/scalar JSON/g)).toHaveLength(1);
   });
 
-  it("emits <slug>List returning a non-null list of non-null items, with where/orderBy/start/size args", async () => {
+  it("emits <slug>List returning a non-null <Type>List envelope, with where/orderBy/pagination args", async () => {
     const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
 
     const schema = buildSchema(await service.buildTypeDefs());
@@ -247,16 +247,56 @@ describe("SchemaBuilderService", () => {
     const queryFields = schema.getQueryType()!.getFields();
     const listField = queryFields.cvPages;
     expect(listField).toBeDefined();
-    expect(listField.type).toBeInstanceOf(GraphQLNonNull);
-    const listOfType = (listField.type as GraphQLNonNull<GraphQLList<unknown>>).ofType;
-    expect(listOfType).toBeInstanceOf(GraphQLList);
-    expect((listOfType as GraphQLList<GraphQLNonNull<GraphQLObjectType>>).ofType.toString()).toBe("CvPage!");
+    expect(listField.type.toString()).toBe("CvPageList!");
 
-    expect(listField.args.map((arg) => arg.name)).toEqual(["where", "orderBy", "start", "size"]);
+    expect(listField.args.map((arg) => arg.name)).toEqual(["where", "orderBy", "pagination"]);
     expect(listField.args.find((a) => a.name === "where")!.type.toString()).toBe("CvPageFilter");
     expect(listField.args.find((a) => a.name === "orderBy")!.type.toString()).toBe("CvPageOrderBy");
-    expect(listField.args.find((a) => a.name === "start")!.type.toString()).toBe("Int");
-    expect(listField.args.find((a) => a.name === "size")!.type.toString()).toBe("Int");
+    expect(listField.args.find((a) => a.name === "pagination")!.type.toString()).toBe("PaginationInput");
+  });
+
+  it("emits <Type>List { items, meta } wrapping a non-null list of non-null items", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
+
+    const schema = buildSchema(await service.buildTypeDefs());
+
+    const listType = schema.getType("CvPageList") as GraphQLObjectType;
+    expect(listType).toBeDefined();
+    const fields = listType.getFields();
+    expect(Object.keys(fields)).toEqual(["items", "meta"]);
+    expect(fields.items.type).toBeInstanceOf(GraphQLNonNull);
+    const itemsOfType = (fields.items.type as GraphQLNonNull<GraphQLList<unknown>>).ofType;
+    expect(itemsOfType).toBeInstanceOf(GraphQLList);
+    expect((itemsOfType as GraphQLList<GraphQLNonNull<GraphQLObjectType>>).ofType.toString()).toBe("CvPage!");
+    expect(fields.meta.type.toString()).toBe("ListMeta!");
+  });
+
+  it("emits shared PaginationInput/PaginationMeta/ListMeta types once", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([cvPage, enItVocab]));
+
+    const typeDefs = await service.buildTypeDefs();
+    const schema = buildSchema(typeDefs);
+
+    const paginationInput = schema.getType("PaginationInput") as GraphQLInputObjectType;
+    expect(Object.keys(paginationInput.getFields())).toEqual(["start", "limit", "page", "pageSize"]);
+    expect(paginationInput.getFields().start.type.toString()).toBe("Int");
+    expect(paginationInput.getFields().limit.type.toString()).toBe("Int");
+    expect(paginationInput.getFields().page.type.toString()).toBe("Int");
+    expect(paginationInput.getFields().pageSize.type.toString()).toBe("Int");
+
+    const paginationMeta = schema.getType("PaginationMeta") as GraphQLObjectType;
+    expect(Object.keys(paginationMeta.getFields())).toEqual(["page", "pageSize", "total"]);
+    expect(paginationMeta.getFields().page.type.toString()).toBe("Int!");
+    expect(paginationMeta.getFields().pageSize.type.toString()).toBe("Int!");
+    expect(paginationMeta.getFields().total.type.toString()).toBe("Int!");
+
+    const listMeta = schema.getType("ListMeta") as GraphQLObjectType;
+    expect(Object.keys(listMeta.getFields())).toEqual(["pagination"]);
+    expect(listMeta.getFields().pagination.type.toString()).toBe("PaginationMeta!");
+
+    expect(typeDefs.match(/input PaginationInput /g)).toHaveLength(1);
+    expect(typeDefs.match(/type PaginationMeta /g)).toHaveLength(1);
+    expect(typeDefs.match(/type ListMeta /g)).toHaveLength(1);
   });
 
   it("emits <Type>Input mirroring the object type's shape, with media fields as ID and repeatable components as an optional list", async () => {

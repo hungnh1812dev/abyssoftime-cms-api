@@ -108,6 +108,15 @@ async function withErrorMapping<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+// SPEC.md §3.3: page/pageSize are derived after resolution, not carried through from the
+// request — `limit == -1` (unlimited) reports pageSize as the full row count.
+function buildPaginationMeta(start: number, size: number, total: number): { page: number; pageSize: number; total: number } {
+  if (size === -1) {
+    return { page: 1, pageSize: total, total };
+  }
+  return { page: Math.floor(start / size) + 1, pageSize: size, total };
+}
+
 // Walks a content type's field tree (arbitrary component-nesting depth) and, for every type
 // that has media-typed fields — the root object type or any nested component type — registers a
 // field resolver hydrating that field's raw FK via MEDIA_ASSET_REPOSITORY.findByDocumentId.
@@ -192,7 +201,7 @@ export class ResolverFactoryService {
         assertApiTokenPermission(context, "document:read");
         const options = translateListArgs(definition, args);
         const result = await withErrorMapping(() => this.listDocumentsFull.execute(definition.slug, options));
-        return result.items;
+        return { items: result.items, meta: { pagination: buildPaginationMeta(options.start, options.size, result.total) } };
       };
 
       mutation[createMutationName(definition.slug)] = async (_parent: unknown, args: CreateMutationArgs, context: GraphqlContext) => {

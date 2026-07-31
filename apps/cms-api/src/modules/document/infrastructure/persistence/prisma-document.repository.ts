@@ -105,14 +105,22 @@ export class PrismaDocumentRepository implements IDocumentRepository {
     const countRows = await this.prisma.$queryRawUnsafe<{ count: number }[]>(`SELECT COUNT(*) AS count FROM ${table} WHERE ${whereSql}`, ...whereParams);
     const total = Number(countRows[0]?.count ?? 0);
 
-    const limitIndex = whereParams.length + 1;
-    const offsetIndex = whereParams.length + 2;
-    const dataRows = await this.prisma.$queryRawUnsafe<Record<string, unknown>[]>(
-      `SELECT * FROM ${table} WHERE ${whereSql} ${orderByClause} LIMIT $${limitIndex} OFFSET $${offsetIndex}`,
-      ...whereParams,
-      opts.size,
-      opts.start,
-    );
+    // GraphQL's `limit: -1` (SPEC.md §3.3 rule 11) means "every matching row" — Postgres rejects
+    // a negative LIMIT, so it's omitted entirely rather than passed through. REST's own
+    // parseSize can never produce -1, so this branch is unreachable from REST.
+    const dataRows =
+      opts.size === -1
+        ? await this.prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+            `SELECT * FROM ${table} WHERE ${whereSql} ${orderByClause} OFFSET $${whereParams.length + 1}`,
+            ...whereParams,
+            opts.start,
+          )
+        : await this.prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+            `SELECT * FROM ${table} WHERE ${whereSql} ${orderByClause} LIMIT $${whereParams.length + 1} OFFSET $${whereParams.length + 2}`,
+            ...whereParams,
+            opts.size,
+            opts.start,
+          );
 
     return { rows: dataRows.map((row) => mapRowToDocument(row, fields)), total };
   }

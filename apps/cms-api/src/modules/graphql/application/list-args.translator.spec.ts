@@ -86,33 +86,108 @@ describe("translateListArgs", () => {
     expect(() => translateListArgs(contentType, { where: { position: { gt: "z" } } })).toThrow(GraphQLError);
   });
 
-  it("defaults start to 0, size to 20, orderBy to id desc when omitted", () => {
+  it("defaults start to 0, size to 10, orderBy to created_at desc when omitted (SPEC.md §3.3 rule 1)", () => {
     const contentType = buildContentType();
 
     const result = translateListArgs(contentType, {});
 
     expect(result.start).toBe(0);
-    expect(result.size).toBe(20);
-    expect(result.orderBy).toBe("id");
+    expect(result.size).toBe(10);
+    expect(result.orderBy).toBe("created_at");
     expect(result.sortDir).toBe("desc");
     expect(result.filters).toEqual([]);
   });
 
-  it("caps size at 100", () => {
-    const contentType = buildContentType();
+  describe("pagination (SPEC.md §3.3)", () => {
+    function expectBadUserInput(pagination: Record<string, number>, message: string): void {
+      const contentType = buildContentType();
+      try {
+        translateListArgs(contentType, { pagination });
+        fail("expected translateListArgs to throw");
+      } catch (error) {
+        expect(error).toBeInstanceOf(GraphQLError);
+        expect((error as GraphQLError).message).toBe(message);
+        expect((error as GraphQLError).extensions?.code).toBe("BAD_USER_INPUT");
+      }
+    }
 
-    const result = translateListArgs(contentType, { size: 500 });
+    it("rule 1: pagination omitted -> start 0, limit 10", () => {
+      const contentType = buildContentType();
+      const result = translateListArgs(contentType, {});
+      expect(result.start).toBe(0);
+      expect(result.size).toBe(10);
+    });
 
-    expect(result.size).toBe(100);
-  });
+    it("rule 2: both offset (start/limit) and page (page/pageSize) fields set -> error", () => {
+      expectBadUserInput({ start: 0, page: 1, pageSize: 10 }, "cannot mix offset (start/limit) and page (page/pageSize) modes");
+      expectBadUserInput({ limit: 10, page: 1, pageSize: 10 }, "cannot mix offset (start/limit) and page (page/pageSize) modes");
+    });
 
-  it("passes start/size straight through when within bounds", () => {
-    const contentType = buildContentType();
+    it("rule 3: only one of page/pageSize set -> error", () => {
+      expectBadUserInput({ page: 1 }, "page and pageSize must both be provided");
+      expectBadUserInput({ pageSize: 10 }, "page and pageSize must both be provided");
+    });
 
-    const result = translateListArgs(contentType, { start: 40, size: 10 });
+    it("rule 4: page < 1 -> error", () => {
+      expectBadUserInput({ page: 0, pageSize: 10 }, "page must be >= 1");
+    });
 
-    expect(result.start).toBe(40);
-    expect(result.size).toBe(10);
+    it("rule 5: pageSize == 0 -> error", () => {
+      expectBadUserInput({ page: 1, pageSize: 0 }, "pageSize must not be 0");
+    });
+
+    it("rule 6: valid page mode -> pageSize clamped to 100, start = (page-1)*pageSize, limit = pageSize", () => {
+      const contentType = buildContentType();
+
+      const result = translateListArgs(contentType, { pagination: { page: 3, pageSize: 20 } });
+      expect(result.start).toBe(40);
+      expect(result.size).toBe(20);
+
+      const clamped = translateListArgs(contentType, { pagination: { page: 2, pageSize: 500 } });
+      expect(clamped.size).toBe(100);
+      expect(clamped.start).toBe(100);
+    });
+
+    it("rule 7: offset mode, start omitted -> start 0", () => {
+      const contentType = buildContentType();
+      const result = translateListArgs(contentType, { pagination: { limit: 5 } });
+      expect(result.start).toBe(0);
+    });
+
+    it("rule 8: offset mode, start < 0 -> clamp to 0 (no error)", () => {
+      const contentType = buildContentType();
+      const result = translateListArgs(contentType, { pagination: { start: -5, limit: 5 } });
+      expect(result.start).toBe(0);
+    });
+
+    it("rule 9: offset mode, limit omitted -> limit 10", () => {
+      const contentType = buildContentType();
+      const result = translateListArgs(contentType, { pagination: { start: 40 } });
+      expect(result.size).toBe(10);
+    });
+
+    it("rule 10: offset mode, limit == 0 -> error", () => {
+      expectBadUserInput({ limit: 0 }, "limit must not be 0");
+    });
+
+    it("rule 11: offset mode, limit == -1 -> unlimited", () => {
+      const contentType = buildContentType();
+      const result = translateListArgs(contentType, { pagination: { limit: -1 } });
+      expect(result.size).toBe(-1);
+    });
+
+    it("rule 12: offset mode, limit > 100 -> clamp to 100 (no error)", () => {
+      const contentType = buildContentType();
+      const result = translateListArgs(contentType, { pagination: { limit: 500 } });
+      expect(result.size).toBe(100);
+    });
+
+    it("rule 13: offset mode, 0 < limit <= 100 -> used as-is", () => {
+      const contentType = buildContentType();
+      const result = translateListArgs(contentType, { pagination: { start: 40, limit: 10 } });
+      expect(result.start).toBe(40);
+      expect(result.size).toBe(10);
+    });
   });
 
   it("translates a scalar-field orderBy", () => {

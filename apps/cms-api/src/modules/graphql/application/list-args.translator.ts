@@ -11,9 +11,9 @@ import { sortableColumnsFor } from "@/modules/document/infrastructure/persistenc
 type ContentTypeFields = { fields: FieldDefinition[] };
 
 const DEFAULT_START = 0;
-const DEFAULT_SIZE = 20;
-const MAX_SIZE = 100;
-const DEFAULT_ORDER_BY = "id";
+const DEFAULT_LIMIT = 10;
+const MAX_LIMIT = 100;
+const UNLIMITED = -1;
 const DEFAULT_SORT_DIR = "desc";
 
 // SPEC.md decision #7: GraphQL v1 ships REST's operator set minus boolean `ne` — narrower than
@@ -43,35 +43,66 @@ const SYSTEM_ORDER_BY_ALIASES: Record<string, string> = {
   publishedAt: "published_at",
 };
 
+// SPEC.md §3.4: default sort column is now the system createdAt column, not id.
+const DEFAULT_ORDER_BY = SYSTEM_ORDER_BY_ALIASES.createdAt;
+
+export interface PaginationInputArg {
+  start?: number;
+  limit?: number;
+  page?: number;
+  pageSize?: number;
+}
+
 export interface ListArgsInput {
   where?: Record<string, Record<string, unknown>>;
   orderBy?: Record<string, "asc" | "desc">;
-  start?: number;
-  size?: number;
+  pagination?: PaginationInputArg;
 }
 
 function badUserInput(message: string): GraphQLError {
   return new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
 }
 
-function resolveStart(start: number | undefined): number {
-  if (start === undefined) {
-    return DEFAULT_START;
+// SPEC.md §3.3's 13-rule validation table, applied in this exact order.
+function resolvePagination(pagination: PaginationInputArg | undefined): { start: number; size: number } {
+  if (!pagination) {
+    return { start: DEFAULT_START, size: DEFAULT_LIMIT };
   }
-  if (!Number.isInteger(start) || start < 0) {
-    throw badUserInput(`Invalid "start": ${start}`);
-  }
-  return start;
-}
 
-function resolveSize(size: number | undefined): number {
-  if (size === undefined) {
-    return DEFAULT_SIZE;
+  const { start, limit, page, pageSize } = pagination;
+  const offsetFieldSet = start !== undefined || limit !== undefined;
+  const pageFieldSet = page !== undefined || pageSize !== undefined;
+
+  if (offsetFieldSet && pageFieldSet) {
+    throw badUserInput("cannot mix offset (start/limit) and page (page/pageSize) modes");
   }
-  if (!Number.isInteger(size) || size < 1) {
-    throw badUserInput(`Invalid "size": ${size}`);
+
+  if (pageFieldSet) {
+    if ((page === undefined) !== (pageSize === undefined)) {
+      throw badUserInput("page and pageSize must both be provided");
+    }
+    if (page! < 1) {
+      throw badUserInput("page must be >= 1");
+    }
+    if (pageSize === 0) {
+      throw badUserInput("pageSize must not be 0");
+    }
+    const resolvedPageSize = Math.min(pageSize!, MAX_LIMIT);
+    return { start: (page! - 1) * resolvedPageSize, size: resolvedPageSize };
   }
-  return Math.min(size, MAX_SIZE);
+
+  const resolvedStart = start === undefined ? DEFAULT_START : Math.max(start, 0);
+
+  if (limit === undefined) {
+    return { start: resolvedStart, size: DEFAULT_LIMIT };
+  }
+  if (limit === 0) {
+    throw badUserInput("limit must not be 0");
+  }
+  if (limit === UNLIMITED) {
+    return { start: resolvedStart, size: UNLIMITED };
+  }
+  return { start: resolvedStart, size: Math.min(limit, MAX_LIMIT) };
 }
 
 function resolveOrderBy(orderBy: Record<string, "asc" | "desc"> | undefined, contentType: ContentTypeFields): { orderBy: string; sortDir: "asc" | "desc" } {
@@ -121,8 +152,7 @@ function resolveFilters(where: Record<string, Record<string, unknown>> | undefin
 
 export function translateListArgs(contentType: ContentTypeFields, args: ListArgsInput): FullListOptions {
   return {
-    start: resolveStart(args.start),
-    size: resolveSize(args.size),
+    ...resolvePagination(args.pagination),
     ...resolveOrderBy(args.orderBy, contentType),
     filters: resolveFilters(args.where, contentType),
   };

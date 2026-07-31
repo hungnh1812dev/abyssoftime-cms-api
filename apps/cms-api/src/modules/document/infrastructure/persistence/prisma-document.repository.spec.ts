@@ -248,6 +248,17 @@ describe("PrismaDocumentRepository", () => {
       expect(countParams).toEqual(["draft", "%hi%", true]);
     });
 
+    it("omits the LIMIT clause (keeps OFFSET) when size is -1 (unlimited, SPEC.md §3.3 rule 11)", async () => {
+      prisma.$queryRawUnsafe.mockResolvedValueOnce([{ count: 5 }]).mockResolvedValueOnce([]);
+
+      await repository.listPaginated("en-it-vocab", "draft", { ...opts, size: -1, start: 0 }, FIELDS);
+
+      const [dataSql, ...dataParams] = prisma.$queryRawUnsafe.mock.calls[1];
+      expect(String(dataSql)).not.toContain("LIMIT");
+      expect(String(dataSql)).toContain("OFFSET $2");
+      expect(dataParams).toEqual(["draft", 0]);
+    });
+
     it("rejects an orderBy column outside the schema allowlist", async () => {
       await expect(repository.listPaginated("en-it-vocab", "draft", { ...opts, orderBy: "techStack" }, FIELDS)).rejects.toThrow();
     });
