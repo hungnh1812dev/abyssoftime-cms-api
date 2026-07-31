@@ -177,9 +177,9 @@ export class ResolverFactoryService {
 
       query[queryName(definition.slug)] = async (_parent: unknown, args: SingleQueryArgs, context: GraphqlContext) => {
         assertValidDocumentId(args.Id);
+        assertApiTokenPermission(context, "document:read");
 
         if (args.status === "draft") {
-          assertApiTokenPermission(context, "document:read");
           const result = await resolveOrNull(() => this.getDocumentForEdit.execute(definition.slug, args.Id));
           return result ? toResolverValue(result.document) : null;
         }
@@ -188,7 +188,8 @@ export class ResolverFactoryService {
         return document ? toResolverValue(document) : null;
       };
 
-      query[listQueryName(definition.slug)] = async (_parent: unknown, args: ListArgsInput) => {
+      query[listQueryName(definition.slug)] = async (_parent: unknown, args: ListArgsInput, context: GraphqlContext) => {
+        assertApiTokenPermission(context, "document:read");
         const options = translateListArgs(definition, args);
         const result = await withErrorMapping(() => this.listDocumentsFull.execute(definition.slug, options));
         return result.items;
@@ -235,8 +236,9 @@ export class ResolverFactoryService {
       collectMediaFieldResolvers(typeName(definition.slug), definition.slug, definition.fields, this.mediaAssets, typeResolvers);
 
       query[queryName(definition.slug)] = async (_parent: unknown, args: StatusOnlyArgs, context: GraphqlContext) => {
+        assertApiTokenPermission(context, "document:read");
+
         if (args.status === "draft") {
-          assertApiTokenPermission(context, "document:read");
           const result = await resolveOrNull(() => this.getSingleType.execute(definition.slug));
           return result ? toResolverValue(result.document) : null;
         }
