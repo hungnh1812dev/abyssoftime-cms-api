@@ -124,11 +124,29 @@ describe("ResolverFactoryService", () => {
     expect(Object.keys(resolvers.Query)).toEqual(["cvPage", "cvPageList"]);
   });
 
-  it("delegates a non-draft query to GetPublicDocumentService with (slug, Id), no token required", async () => {
+  it("requires document:read for a published-data query and rejects when the context has no token", async () => {
+    const resolvers = await service.buildResolvers();
+
+    await expect(resolvers.Query.cvPage(undefined, { Id: validId }, noToken, undefined)).rejects.toMatchObject({
+      extensions: { code: "UNAUTHENTICATED" },
+    });
+    expect(getPublicDocument.execute).not.toHaveBeenCalled();
+  });
+
+  it("rejects a published-data query with a wrongly-scoped token, FORBIDDEN", async () => {
+    const resolvers = await service.buildResolvers();
+
+    await expect(resolvers.Query.cvPage(undefined, { Id: validId }, createScopedToken, undefined)).rejects.toMatchObject({
+      extensions: { code: "FORBIDDEN" },
+    });
+    expect(getPublicDocument.execute).not.toHaveBeenCalled();
+  });
+
+  it("delegates a non-draft query to GetPublicDocumentService with (slug, Id) when the token is document:read-scoped", async () => {
     getPublicDocument.execute.mockResolvedValue(buildDocument({ position: "Engineer" }));
     const resolvers = await service.buildResolvers();
 
-    const result = await resolvers.Query.cvPage(undefined, { Id: validId }, noToken, undefined);
+    const result = await resolvers.Query.cvPage(undefined, { Id: validId }, readScopedToken, undefined);
 
     expect(getPublicDocument.execute).toHaveBeenCalledWith("cv-page", validId);
     expect(getDocumentForEdit.execute).not.toHaveBeenCalled();
@@ -139,7 +157,7 @@ describe("ResolverFactoryService", () => {
     getPublicDocument.execute.mockRejectedValue(new NotFoundException("not found"));
     const resolvers = await service.buildResolvers();
 
-    const result = await resolvers.Query.cvPage(undefined, { Id: anotherValidId }, noToken, undefined);
+    const result = await resolvers.Query.cvPage(undefined, { Id: anotherValidId }, readScopedToken, undefined);
 
     expect(result).toBeNull();
   });
@@ -181,12 +199,30 @@ describe("ResolverFactoryService", () => {
     expect(result).toBeNull();
   });
 
-  it("delegates cvPageList to translateListArgs + ListDocumentsFullService.execute, no token required", async () => {
+  it("requires document:read for cvPageList and rejects when the context has no token", async () => {
+    const resolvers = await service.buildResolvers();
+
+    await expect(resolvers.Query.cvPageList(undefined, {}, noToken, undefined)).rejects.toMatchObject({
+      extensions: { code: "UNAUTHENTICATED" },
+    });
+    expect(listDocumentsFull.execute).not.toHaveBeenCalled();
+  });
+
+  it("rejects cvPageList with a wrongly-scoped token, FORBIDDEN", async () => {
+    const resolvers = await service.buildResolvers();
+
+    await expect(resolvers.Query.cvPageList(undefined, {}, createScopedToken, undefined)).rejects.toMatchObject({
+      extensions: { code: "FORBIDDEN" },
+    });
+    expect(listDocumentsFull.execute).not.toHaveBeenCalled();
+  });
+
+  it("delegates cvPageList to translateListArgs + ListDocumentsFullService.execute when the token is document:read-scoped", async () => {
     const items = [{ documentId: validId, position: "Engineer", isMain: true }];
     listDocumentsFull.execute.mockResolvedValue({ items, total: 1, start: 0, size: 20 });
     const resolvers = await service.buildResolvers();
 
-    const result = await resolvers.Query.cvPageList(undefined, { where: { isMain: { eq: true } }, start: 0, size: 10 }, noToken, undefined);
+    const result = await resolvers.Query.cvPageList(undefined, { where: { isMain: { eq: true } }, start: 0, size: 10 }, readScopedToken, undefined);
 
     expect(listDocumentsFull.execute).toHaveBeenCalledWith(
       "cv-page",
@@ -198,7 +234,7 @@ describe("ResolverFactoryService", () => {
   it("propagates a BAD_USER_INPUT GraphQL error for an invalid where field, never swallowed or ignored", async () => {
     const resolvers = await service.buildResolvers();
 
-    await expect(resolvers.Query.cvPageList(undefined, { where: { nope: { eq: 1 } } }, noToken, undefined)).rejects.toMatchObject({
+    await expect(resolvers.Query.cvPageList(undefined, { where: { nope: { eq: 1 } } }, readScopedToken, undefined)).rejects.toMatchObject({
       extensions: { code: "BAD_USER_INPUT" },
     });
     expect(listDocumentsFull.execute).not.toHaveBeenCalled();
@@ -208,7 +244,7 @@ describe("ResolverFactoryService", () => {
     listDocumentsFull.execute.mockRejectedValue(new NotFoundException("not found"));
     const resolvers = await service.buildResolvers();
 
-    await expect(resolvers.Query.cvPageList(undefined, {}, noToken, undefined)).rejects.toMatchObject({
+    await expect(resolvers.Query.cvPageList(undefined, {}, readScopedToken, undefined)).rejects.toMatchObject({
       extensions: { code: "NOT_FOUND" },
     });
   });
@@ -428,11 +464,29 @@ describe("ResolverFactoryService", () => {
         expect(Object.keys(resolvers.Mutation)).toEqual(["saveHomePage", "publishHomePage", "unpublishHomePage"]);
       });
 
-      it("delegates a non-draft query to GetPublicSingleTypeService with (slug), no token required", async () => {
+      it("requires document:read for a published-data query and rejects when the context has no token", async () => {
+        const resolvers = await service.buildResolvers();
+
+        await expect(resolvers.Query.homePage(undefined, {}, noToken, undefined)).rejects.toMatchObject({
+          extensions: { code: "UNAUTHENTICATED" },
+        });
+        expect(getPublicSingleType.execute).not.toHaveBeenCalled();
+      });
+
+      it("rejects a published-data query with a wrongly-scoped token, FORBIDDEN", async () => {
+        const resolvers = await service.buildResolvers();
+
+        await expect(resolvers.Query.homePage(undefined, {}, createScopedToken, undefined)).rejects.toMatchObject({
+          extensions: { code: "FORBIDDEN" },
+        });
+        expect(getPublicSingleType.execute).not.toHaveBeenCalled();
+      });
+
+      it("delegates a non-draft query to GetPublicSingleTypeService with (slug) when the token is document:read-scoped", async () => {
         getPublicSingleType.execute.mockResolvedValue(buildDocument({ heroTitle: "Welcome" }));
         const resolvers = await service.buildResolvers();
 
-        const result = await resolvers.Query.homePage(undefined, {}, noToken, undefined);
+        const result = await resolvers.Query.homePage(undefined, {}, readScopedToken, undefined);
 
         expect(getPublicSingleType.execute).toHaveBeenCalledWith("home-page");
         expect(getSingleType.execute).not.toHaveBeenCalled();
@@ -443,7 +497,7 @@ describe("ResolverFactoryService", () => {
         getPublicSingleType.execute.mockRejectedValue(new NotFoundException("not found"));
         const resolvers = await service.buildResolvers();
 
-        const result = await resolvers.Query.homePage(undefined, {}, noToken, undefined);
+        const result = await resolvers.Query.homePage(undefined, {}, readScopedToken, undefined);
 
         expect(result).toBeNull();
       });
