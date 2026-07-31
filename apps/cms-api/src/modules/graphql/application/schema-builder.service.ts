@@ -170,10 +170,10 @@ function buildMutationFields(definition: ContentTypeDefinition): string[] {
 
   return [
     `  ${createMutationName(definition.slug)}(data: ${input}!): ${type}!`,
-    `  ${updateMutationName(definition.slug)}(Id: ID!, data: ${input}!): ${type}!`,
-    `  ${deleteMutationName(definition.slug)}(Id: ID!): Boolean!`,
-    `  ${publishMutationName(definition.slug)}(Id: ID!): ${type}!`,
-    `  ${unpublishMutationName(definition.slug)}(Id: ID!): ${type}!`,
+    `  ${updateMutationName(definition.slug)}(documentId: ID!, data: ${input}!): ${type}!`,
+    `  ${deleteMutationName(definition.slug)}(documentId: ID!): Boolean!`,
+    `  ${publishMutationName(definition.slug)}(documentId: ID!): ${type}!`,
+    `  ${unpublishMutationName(definition.slug)}(documentId: ID!): ${type}!`,
   ];
 }
 
@@ -192,7 +192,7 @@ function buildOrderByType(definition: ContentTypeDefinition): string {
 
 function buildQueryField(definition: ContentTypeDefinition): string {
   const type = typeName(definition.slug);
-  return `  ${queryName(definition.slug)}(Id: ID!, status: String): ${type}`;
+  return `  ${queryName(definition.slug)}(documentId: ID!, status: String): ${type}`;
 }
 
 function buildListQueryField(definition: ContentTypeDefinition): string {

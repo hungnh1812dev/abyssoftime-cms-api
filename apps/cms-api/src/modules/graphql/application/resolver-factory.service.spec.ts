@@ -121,13 +121,13 @@ describe("ResolverFactoryService", () => {
   it("builds single-item and list Query resolvers named after each collection-type's camelCase slug", async () => {
     const resolvers = await service.buildResolvers();
 
-    expect(Object.keys(resolvers.Query)).toEqual(["cvPage", "cvPageList"]);
+    expect(Object.keys(resolvers.Query)).toEqual(["cvPage", "cvPages"]);
   });
 
   it("requires document:read for a published-data query and rejects when the context has no token", async () => {
     const resolvers = await service.buildResolvers();
 
-    await expect(resolvers.Query.cvPage(undefined, { Id: validId }, noToken, undefined)).rejects.toMatchObject({
+    await expect(resolvers.Query.cvPage(undefined, { documentId: validId }, noToken, undefined)).rejects.toMatchObject({
       extensions: { code: "UNAUTHENTICATED" },
     });
     expect(getPublicDocument.execute).not.toHaveBeenCalled();
@@ -136,17 +136,17 @@ describe("ResolverFactoryService", () => {
   it("rejects a published-data query with a wrongly-scoped token, FORBIDDEN", async () => {
     const resolvers = await service.buildResolvers();
 
-    await expect(resolvers.Query.cvPage(undefined, { Id: validId }, createScopedToken, undefined)).rejects.toMatchObject({
+    await expect(resolvers.Query.cvPage(undefined, { documentId: validId }, createScopedToken, undefined)).rejects.toMatchObject({
       extensions: { code: "FORBIDDEN" },
     });
     expect(getPublicDocument.execute).not.toHaveBeenCalled();
   });
 
-  it("delegates a non-draft query to GetPublicDocumentService with (slug, Id) when the token is document:read-scoped", async () => {
+  it("delegates a non-draft query to GetPublicDocumentService with (slug, documentId) when the token is document:read-scoped", async () => {
     getPublicDocument.execute.mockResolvedValue(buildDocument({ position: "Engineer" }));
     const resolvers = await service.buildResolvers();
 
-    const result = await resolvers.Query.cvPage(undefined, { Id: validId }, readScopedToken, undefined);
+    const result = await resolvers.Query.cvPage(undefined, { documentId: validId }, readScopedToken, undefined);
 
     expect(getPublicDocument.execute).toHaveBeenCalledWith("cv-page", validId);
     expect(getDocumentForEdit.execute).not.toHaveBeenCalled();
@@ -157,15 +157,15 @@ describe("ResolverFactoryService", () => {
     getPublicDocument.execute.mockRejectedValue(new NotFoundException("not found"));
     const resolvers = await service.buildResolvers();
 
-    const result = await resolvers.Query.cvPage(undefined, { Id: anotherValidId }, readScopedToken, undefined);
+    const result = await resolvers.Query.cvPage(undefined, { documentId: anotherValidId }, readScopedToken, undefined);
 
     expect(result).toBeNull();
   });
 
-  it("rejects a malformed (non-UUID) Id with a BAD_USER_INPUT GraphQL error, never a raw 500", async () => {
+  it("rejects a malformed (non-UUID) documentId with a BAD_USER_INPUT GraphQL error, never a raw 500", async () => {
     const resolvers = await service.buildResolvers();
 
-    await expect(resolvers.Query.cvPage(undefined, { Id: "not-a-uuid" }, noToken, undefined)).rejects.toMatchObject({
+    await expect(resolvers.Query.cvPage(undefined, { documentId: "not-a-uuid" }, noToken, undefined)).rejects.toMatchObject({
       extensions: { code: "BAD_USER_INPUT" },
     });
     expect(getPublicDocument.execute).not.toHaveBeenCalled();
@@ -174,7 +174,7 @@ describe("ResolverFactoryService", () => {
   it("requires document:read for status: draft and rejects when the context has no token", async () => {
     const resolvers = await service.buildResolvers();
 
-    await expect(resolvers.Query.cvPage(undefined, { Id: validId, status: "draft" }, noToken, undefined)).rejects.toMatchObject({
+    await expect(resolvers.Query.cvPage(undefined, { documentId: validId, status: "draft" }, noToken, undefined)).rejects.toMatchObject({
       extensions: { code: "UNAUTHENTICATED" },
     });
     expect(getDocumentForEdit.execute).not.toHaveBeenCalled();
@@ -184,7 +184,7 @@ describe("ResolverFactoryService", () => {
     getDocumentForEdit.execute.mockResolvedValue({ document: buildDocument({ position: "Draft Engineer" }), status: "draft" });
     const resolvers = await service.buildResolvers();
 
-    const result = await resolvers.Query.cvPage(undefined, { Id: validId, status: "draft" }, readScopedToken, undefined);
+    const result = await resolvers.Query.cvPage(undefined, { documentId: validId, status: "draft" }, readScopedToken, undefined);
 
     expect(getDocumentForEdit.execute).toHaveBeenCalledWith("cv-page", validId);
     expect(result).toEqual(expect.objectContaining({ position: "Draft Engineer" }));
@@ -194,35 +194,35 @@ describe("ResolverFactoryService", () => {
     getDocumentForEdit.execute.mockRejectedValue(new NotFoundException("not found"));
     const resolvers = await service.buildResolvers();
 
-    const result = await resolvers.Query.cvPage(undefined, { Id: anotherValidId, status: "draft" }, readScopedToken, undefined);
+    const result = await resolvers.Query.cvPage(undefined, { documentId: anotherValidId, status: "draft" }, readScopedToken, undefined);
 
     expect(result).toBeNull();
   });
 
-  it("requires document:read for cvPageList and rejects when the context has no token", async () => {
+  it("requires document:read for cvPages and rejects when the context has no token", async () => {
     const resolvers = await service.buildResolvers();
 
-    await expect(resolvers.Query.cvPageList(undefined, {}, noToken, undefined)).rejects.toMatchObject({
+    await expect(resolvers.Query.cvPages(undefined, {}, noToken, undefined)).rejects.toMatchObject({
       extensions: { code: "UNAUTHENTICATED" },
     });
     expect(listDocumentsFull.execute).not.toHaveBeenCalled();
   });
 
-  it("rejects cvPageList with a wrongly-scoped token, FORBIDDEN", async () => {
+  it("rejects cvPages with a wrongly-scoped token, FORBIDDEN", async () => {
     const resolvers = await service.buildResolvers();
 
-    await expect(resolvers.Query.cvPageList(undefined, {}, createScopedToken, undefined)).rejects.toMatchObject({
+    await expect(resolvers.Query.cvPages(undefined, {}, createScopedToken, undefined)).rejects.toMatchObject({
       extensions: { code: "FORBIDDEN" },
     });
     expect(listDocumentsFull.execute).not.toHaveBeenCalled();
   });
 
-  it("delegates cvPageList to translateListArgs + ListDocumentsFullService.execute when the token is document:read-scoped", async () => {
+  it("delegates cvPages to translateListArgs + ListDocumentsFullService.execute when the token is document:read-scoped", async () => {
     const items = [{ documentId: validId, position: "Engineer", isMain: true }];
     listDocumentsFull.execute.mockResolvedValue({ items, total: 1, start: 0, size: 20 });
     const resolvers = await service.buildResolvers();
 
-    const result = await resolvers.Query.cvPageList(undefined, { where: { isMain: { eq: true } }, start: 0, size: 10 }, readScopedToken, undefined);
+    const result = await resolvers.Query.cvPages(undefined, { where: { isMain: { eq: true } }, start: 0, size: 10 }, readScopedToken, undefined);
 
     expect(listDocumentsFull.execute).toHaveBeenCalledWith(
       "cv-page",
@@ -234,7 +234,7 @@ describe("ResolverFactoryService", () => {
   it("propagates a BAD_USER_INPUT GraphQL error for an invalid where field, never swallowed or ignored", async () => {
     const resolvers = await service.buildResolvers();
 
-    await expect(resolvers.Query.cvPageList(undefined, { where: { nope: { eq: 1 } } }, readScopedToken, undefined)).rejects.toMatchObject({
+    await expect(resolvers.Query.cvPages(undefined, { where: { nope: { eq: 1 } } }, readScopedToken, undefined)).rejects.toMatchObject({
       extensions: { code: "BAD_USER_INPUT" },
     });
     expect(listDocumentsFull.execute).not.toHaveBeenCalled();
@@ -244,7 +244,7 @@ describe("ResolverFactoryService", () => {
     listDocumentsFull.execute.mockRejectedValue(new NotFoundException("not found"));
     const resolvers = await service.buildResolvers();
 
-    await expect(resolvers.Query.cvPageList(undefined, {}, readScopedToken, undefined)).rejects.toMatchObject({
+    await expect(resolvers.Query.cvPages(undefined, {}, readScopedToken, undefined)).rejects.toMatchObject({
       extensions: { code: "NOT_FOUND" },
     });
   });
@@ -357,7 +357,7 @@ describe("ResolverFactoryService", () => {
         getDocumentForEdit.execute.mockResolvedValue({ document: buildDocument({ position: "New" }), status: "modified" });
         const resolvers = await service.buildResolvers();
 
-        const result = await resolvers.Mutation.updateCvPage(undefined, { Id: validId, data: { position: "New" } }, updateScopedToken);
+        const result = await resolvers.Mutation.updateCvPage(undefined, { documentId: validId, data: { position: "New" } }, updateScopedToken);
 
         expect(saveDocument.execute).toHaveBeenCalledWith("cv-page", { position: "New" }, validId, "token-1");
         expect(getDocumentForEdit.execute).toHaveBeenCalledWith("cv-page", validId);
@@ -367,7 +367,7 @@ describe("ResolverFactoryService", () => {
       it("rejects a missing/wrong-scoped token, never calling the service", async () => {
         const resolvers = await service.buildResolvers();
 
-        await expect(resolvers.Mutation.updateCvPage(undefined, { Id: validId, data: {} }, noToken)).rejects.toMatchObject({ extensions: { code: "UNAUTHENTICATED" } });
+        await expect(resolvers.Mutation.updateCvPage(undefined, { documentId: validId, data: {} }, noToken)).rejects.toMatchObject({ extensions: { code: "UNAUTHENTICATED" } });
         expect(saveDocument.execute).not.toHaveBeenCalled();
       });
     });
@@ -377,7 +377,7 @@ describe("ResolverFactoryService", () => {
         deleteDocument.execute.mockResolvedValue(undefined);
         const resolvers = await service.buildResolvers();
 
-        const result = await resolvers.Mutation.deleteCvPage(undefined, { Id: validId }, deleteScopedToken);
+        const result = await resolvers.Mutation.deleteCvPage(undefined, { documentId: validId }, deleteScopedToken);
 
         expect(deleteDocument.execute).toHaveBeenCalledWith("cv-page", validId);
         expect(result).toBe(true);
@@ -387,13 +387,13 @@ describe("ResolverFactoryService", () => {
         deleteDocument.execute.mockRejectedValue(new NotFoundException("not found"));
         const resolvers = await service.buildResolvers();
 
-        await expect(resolvers.Mutation.deleteCvPage(undefined, { Id: validId }, deleteScopedToken)).rejects.toMatchObject({ extensions: { code: "NOT_FOUND" } });
+        await expect(resolvers.Mutation.deleteCvPage(undefined, { documentId: validId }, deleteScopedToken)).rejects.toMatchObject({ extensions: { code: "NOT_FOUND" } });
       });
 
       it("rejects a missing token, never calling the service", async () => {
         const resolvers = await service.buildResolvers();
 
-        await expect(resolvers.Mutation.deleteCvPage(undefined, { Id: validId }, noToken)).rejects.toMatchObject({ extensions: { code: "UNAUTHENTICATED" } });
+        await expect(resolvers.Mutation.deleteCvPage(undefined, { documentId: validId }, noToken)).rejects.toMatchObject({ extensions: { code: "UNAUTHENTICATED" } });
         expect(deleteDocument.execute).not.toHaveBeenCalled();
       });
     });
@@ -403,7 +403,7 @@ describe("ResolverFactoryService", () => {
         publishDocument.execute.mockResolvedValue(buildDocument({ position: "Published" }));
         const resolvers = await service.buildResolvers();
 
-        const result = await resolvers.Mutation.publishCvPage(undefined, { Id: validId }, publishScopedToken);
+        const result = await resolvers.Mutation.publishCvPage(undefined, { documentId: validId }, publishScopedToken);
 
         expect(publishDocument.execute).toHaveBeenCalledWith("cv-page", validId, "token-1");
         expect(result).toEqual(expect.objectContaining({ position: "Published" }));
@@ -413,13 +413,13 @@ describe("ResolverFactoryService", () => {
         publishDocument.execute.mockRejectedValue(new BadRequestException("draft/publish disabled"));
         const resolvers = await service.buildResolvers();
 
-        await expect(resolvers.Mutation.publishCvPage(undefined, { Id: validId }, publishScopedToken)).rejects.toMatchObject({ extensions: { code: "BAD_USER_INPUT" } });
+        await expect(resolvers.Mutation.publishCvPage(undefined, { documentId: validId }, publishScopedToken)).rejects.toMatchObject({ extensions: { code: "BAD_USER_INPUT" } });
       });
 
       it("rejects a wrongly-scoped token, never calling the service", async () => {
         const resolvers = await service.buildResolvers();
 
-        await expect(resolvers.Mutation.publishCvPage(undefined, { Id: validId }, readScopedToken)).rejects.toMatchObject({ extensions: { code: "FORBIDDEN" } });
+        await expect(resolvers.Mutation.publishCvPage(undefined, { documentId: validId }, readScopedToken)).rejects.toMatchObject({ extensions: { code: "FORBIDDEN" } });
         expect(publishDocument.execute).not.toHaveBeenCalled();
       });
     });
@@ -430,7 +430,7 @@ describe("ResolverFactoryService", () => {
         getDocumentForEdit.execute.mockResolvedValue({ document: buildDocument({ position: "Draft again" }), status: "draft" });
         const resolvers = await service.buildResolvers();
 
-        const result = await resolvers.Mutation.unpublishCvPage(undefined, { Id: validId }, unpublishScopedToken);
+        const result = await resolvers.Mutation.unpublishCvPage(undefined, { documentId: validId }, unpublishScopedToken);
 
         expect(unpublishDocument.execute).toHaveBeenCalledWith("cv-page", validId);
         expect(getDocumentForEdit.execute).toHaveBeenCalledWith("cv-page", validId);
@@ -441,13 +441,15 @@ describe("ResolverFactoryService", () => {
         unpublishDocument.execute.mockRejectedValue(new BadRequestException("draft/publish disabled"));
         const resolvers = await service.buildResolvers();
 
-        await expect(resolvers.Mutation.unpublishCvPage(undefined, { Id: validId }, unpublishScopedToken)).rejects.toMatchObject({ extensions: { code: "BAD_USER_INPUT" } });
+        await expect(resolvers.Mutation.unpublishCvPage(undefined, { documentId: validId }, unpublishScopedToken)).rejects.toMatchObject({
+          extensions: { code: "BAD_USER_INPUT" },
+        });
       });
 
       it("rejects a missing token, never calling the service", async () => {
         const resolvers = await service.buildResolvers();
 
-        await expect(resolvers.Mutation.unpublishCvPage(undefined, { Id: validId }, noToken)).rejects.toMatchObject({ extensions: { code: "UNAUTHENTICATED" } });
+        await expect(resolvers.Mutation.unpublishCvPage(undefined, { documentId: validId }, noToken)).rejects.toMatchObject({ extensions: { code: "UNAUTHENTICATED" } });
         expect(unpublishDocument.execute).not.toHaveBeenCalled();
       });
     });
@@ -611,19 +613,19 @@ describe("ResolverFactoryService", () => {
       });
     });
 
-    it("rejects a malformed (non-UUID) Id for update/delete/publish/unpublish with BAD_USER_INPUT", async () => {
+    it("rejects a malformed (non-UUID) documentId for update/delete/publish/unpublish with BAD_USER_INPUT", async () => {
       const resolvers = await service.buildResolvers();
 
-      await expect(resolvers.Mutation.updateCvPage(undefined, { Id: "not-a-uuid", data: {} }, updateScopedToken)).rejects.toMatchObject({
+      await expect(resolvers.Mutation.updateCvPage(undefined, { documentId: "not-a-uuid", data: {} }, updateScopedToken)).rejects.toMatchObject({
         extensions: { code: "BAD_USER_INPUT" },
       });
-      await expect(resolvers.Mutation.deleteCvPage(undefined, { Id: "not-a-uuid" }, deleteScopedToken)).rejects.toMatchObject({
+      await expect(resolvers.Mutation.deleteCvPage(undefined, { documentId: "not-a-uuid" }, deleteScopedToken)).rejects.toMatchObject({
         extensions: { code: "BAD_USER_INPUT" },
       });
-      await expect(resolvers.Mutation.publishCvPage(undefined, { Id: "not-a-uuid" }, publishScopedToken)).rejects.toMatchObject({
+      await expect(resolvers.Mutation.publishCvPage(undefined, { documentId: "not-a-uuid" }, publishScopedToken)).rejects.toMatchObject({
         extensions: { code: "BAD_USER_INPUT" },
       });
-      await expect(resolvers.Mutation.unpublishCvPage(undefined, { Id: "not-a-uuid" }, unpublishScopedToken)).rejects.toMatchObject({
+      await expect(resolvers.Mutation.unpublishCvPage(undefined, { documentId: "not-a-uuid" }, unpublishScopedToken)).rejects.toMatchObject({
         extensions: { code: "BAD_USER_INPUT" },
       });
     });
