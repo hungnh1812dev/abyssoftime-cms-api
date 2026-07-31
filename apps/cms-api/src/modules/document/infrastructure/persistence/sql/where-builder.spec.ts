@@ -1,7 +1,17 @@
 import { UnsafeSqlIdentifierError } from "@/modules/content-type/application/schema/sql-identifier";
 import { FieldDefinition } from "@/modules/content-type/domain/entities/field-definition";
+import { FilterNode } from "@/modules/document/domain/entities/filter";
 
-import { buildFilterWhere, buildOrderByClause, buildSearchWhere, escapeSearchValue, InvalidOrderByFieldError, ParsedFilter, sortableColumnsFor } from "./where-builder";
+import {
+  buildFilterTree,
+  buildFilterWhere,
+  buildOrderByClause,
+  buildSearchWhere,
+  escapeSearchValue,
+  InvalidOrderByFieldError,
+  ParsedFilter,
+  sortableColumnsFor,
+} from "./where-builder";
 
 describe("buildOrderByClause", () => {
   const ALLOWED = ["id", "created_at", "wordGroup", "isMain"];
@@ -140,6 +150,68 @@ describe("buildFilterWhere", () => {
       sql: '(NOT ("documentId" = ANY($1)))',
       params: [["a", "b"]],
     });
+  });
+});
+
+describe("buildFilterTree", () => {
+  it("builds a bare leaf clause with no surrounding parens", () => {
+    const node: FilterNode = { column: "status", operator: "$eq", value: "active" };
+
+    expect(buildFilterTree(node, 1)).toEqual({ sql: '"status" = $1', params: ["active"] });
+  });
+
+  it("builds a parenthesized AND group across sequential placeholder indices", () => {
+    const node: FilterNode = {
+      and: [
+        { column: "status", operator: "$eq", value: "active" },
+        { column: "age", operator: "$gte", value: 18 },
+      ],
+    };
+
+    expect(buildFilterTree(node, 1)).toEqual({ sql: '("status" = $1 AND "age" >= $2)', params: ["active", 18] });
+  });
+
+  it("builds a parenthesized OR group", () => {
+    const node: FilterNode = {
+      or: [
+        { column: "featured", operator: "$eq", value: true },
+        { column: "title", operator: "$contains", value: "launch" },
+      ],
+    };
+
+    expect(buildFilterTree(node, 1)).toEqual({ sql: `("featured" = $1 OR "title" ILIKE $2 ESCAPE '\\')`, params: [true, "%launch%"] });
+  });
+
+  it("negates a nested group with NOT ( ... )", () => {
+    const node: FilterNode = { not: { column: "status", operator: "$eq", value: "archived" } };
+
+    expect(buildFilterTree(node, 1)).toEqual({ sql: '(NOT "status" = $1)', params: ["archived"] });
+  });
+
+  it("reuses in/notIn leaf handling from buildFilterWhere (SPEC.md §3.5)", () => {
+    const node: FilterNode = { column: "documentId", operator: "$in", value: ["a", "b"] };
+
+    expect(buildFilterTree(node, 1)).toEqual({ sql: '"documentId" = ANY($1)', params: [["a", "b"]] });
+  });
+
+  it("correctly parenthesizes arbitrary nesting: and[ leaf, or[ leaf, not[leaf] ] ]", () => {
+    const node: FilterNode = {
+      and: [
+        { column: "documentId", operator: "$in", value: ["a", "b"] },
+        { or: [{ column: "featured", operator: "$eq", value: true }, { not: { column: "title", operator: "$contains", value: "launch" } }] },
+      ],
+    };
+
+    expect(buildFilterTree(node, 1)).toEqual({
+      sql: `("documentId" = ANY($1) AND ("featured" = $2 OR (NOT "title" ILIKE $3 ESCAPE '\\')))`,
+      params: [["a", "b"], true, "%launch%"],
+    });
+  });
+
+  it("re-validates leaf column names as a defence-in-depth check", () => {
+    const node: FilterNode = { column: 'status"; DROP TABLE users; --', operator: "$eq", value: "active" };
+
+    expect(() => buildFilterTree(node, 1)).toThrow(UnsafeSqlIdentifierError);
   });
 });
 

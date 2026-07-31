@@ -10,7 +10,7 @@ import { Prisma } from "@/prisma/application/client";
 import { PrismaService } from "@/prisma/application/prisma.service";
 
 import { fieldsToRowValues, mapRowToDocument } from "./sql/row-mapper";
-import { buildFilterWhere, buildOrderByClause, buildSearchWhere, sortableColumnsFor } from "./sql/where-builder";
+import { buildFilterTree, buildFilterWhere, buildOrderByClause, buildSearchWhere, sortableColumnsFor } from "./sql/where-builder";
 
 @Injectable()
 export class PrismaDocumentRepository implements IDocumentRepository {
@@ -98,6 +98,14 @@ export class PrismaDocumentRepository implements IDocumentRepository {
     if (filters) {
       whereSql += ` AND ${filters.sql}`;
       whereParams.push(...filters.params);
+    }
+
+    // SPEC.md §3.5: GraphQL's `and`/`or`/`not` combinators, additive onto the flat filters above
+    // (REST never sets `filterTree`, so this branch is unreachable from REST).
+    if (opts.filterTree) {
+      const tree = buildFilterTree(opts.filterTree, whereParams.length + 1);
+      whereSql += ` AND ${tree.sql}`;
+      whereParams.push(...tree.params);
     }
 
     const orderByClause = buildOrderByClause(opts.orderBy, opts.sortDir, sortableColumnsFor(fields));

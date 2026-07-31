@@ -88,6 +88,17 @@ describe("ListDocumentsFullService", () => {
     );
   });
 
+  it("passes filterTree straight through to the repository (SPEC.md §3.5 combinators)", async () => {
+    const contentType = buildContentType();
+    const { schemaResolver, documents, componentIo } = buildDeps(contentType);
+
+    const service = new ListDocumentsFullService(schemaResolver, documents, componentIo);
+    const customOptions: FullListOptions = { ...options, filterTree: { or: [{ column: "wordGroup", operator: "$eq", value: "Networking" }] } };
+    await service.execute("en-it-vocab", customOptions);
+
+    expect(documents.listPaginated).toHaveBeenCalledWith("en-it-vocab", "published", expect.objectContaining({ filterTree: customOptions.filterTree }), contentType.fields);
+  });
+
   it("throws when the content type is single-kind", async () => {
     const contentType = buildContentType("single");
     const { schemaResolver, documents, componentIo } = buildDeps(contentType);

@@ -2,7 +2,7 @@ import { GraphQLError } from "graphql";
 
 import { FieldDefinition, FieldType, LISTABLE_FIELD_TYPES } from "@/modules/content-type/domain/entities/field-definition";
 import { FullListOptions } from "@/modules/document/application/services/list-documents-full.service";
-import { FilterOperator, ParsedFilter } from "@/modules/document/domain/entities/filter";
+import { FilterNode, FilterOperator, ParsedFilter } from "@/modules/document/domain/entities/filter";
 import { sortableColumnsFor } from "@/modules/document/infrastructure/persistence/sql/where-builder";
 
 // Structural, not `ContentTypeEntity` — the graphql module's own resolver-factory only has
@@ -71,8 +71,12 @@ export interface PaginationInputArg {
   pageSize?: number;
 }
 
+// SPEC.md §3.5: a leaf entry maps a field name to its operator object (`{ eq: ... }`); `and`/`or`
+// recurse into an array of nested `WhereInput`s, `not` into a single nested one.
+export type WhereInput = Record<string, unknown>;
+
 export interface ListArgsInput {
-  where?: Record<string, Record<string, unknown>>;
+  where?: WhereInput;
   orderBy?: Record<string, "asc" | "desc">;
   pagination?: PaginationInputArg;
 }
@@ -141,39 +145,70 @@ function resolveOrderBy(orderBy: Record<string, "asc" | "desc"> | undefined, con
   return { orderBy: column, sortDir: direction };
 }
 
-function resolveFilters(where: Record<string, Record<string, unknown>> | undefined, contentType: ContentTypeFields): ParsedFilter[] {
-  if (!where) {
-    return [];
+// Leaf-level resolution: one field's operator object (`{ eq: ..., in: ... }`) becomes one
+// ParsedFilter per operator — reused by resolveFilterNode regardless of nesting depth.
+function resolveFieldLeaves(field: string, operators: Record<string, unknown>, fieldTypeByName: Map<string, FieldType>): ParsedFilter[] {
+  const systemColumn = SYSTEM_FILTER_FIELD_ALIASES[field];
+  const fieldType = fieldTypeByName.get(field);
+  if (!systemColumn && !fieldType) {
+    throw badUserInput(`Invalid filter field: "${field}"`);
   }
+  const legalOperators = systemColumn ? SYSTEM_FILTER_OPERATORS[field] : (OPERATORS_BY_FIELD_TYPE[fieldType!] ?? []);
+  const resolvedColumn = systemColumn ?? field;
 
-  const fieldTypeByName = new Map(contentType.fields.filter((field) => LISTABLE_FIELD_TYPES.has(field.type)).map((field) => [field.name, field.type]));
-
-  const filters: ParsedFilter[] = [];
-  for (const [column, operators] of Object.entries(where)) {
-    const systemColumn = SYSTEM_FILTER_FIELD_ALIASES[column];
-    const fieldType = fieldTypeByName.get(column);
-    if (!systemColumn && !fieldType) {
-      throw badUserInput(`Invalid filter field: "${column}"`);
+  const leaves: ParsedFilter[] = [];
+  for (const [operatorArg, value] of Object.entries(operators)) {
+    const operator = OPERATOR_ARG_TO_FILTER_OPERATOR[operatorArg];
+    if (!operator || !legalOperators.includes(operator)) {
+      throw badUserInput(`Operator "${operatorArg}" is not supported for filter field "${field}"`);
     }
-    const legalOperators = systemColumn ? SYSTEM_FILTER_OPERATORS[column] : (OPERATORS_BY_FIELD_TYPE[fieldType!] ?? []);
-    const resolvedColumn = systemColumn ?? column;
+    leaves.push({ column: resolvedColumn, operator, value: value as ParsedFilter["value"] });
+  }
+  return leaves;
+}
 
-    for (const [operatorArg, value] of Object.entries(operators)) {
-      const operator = OPERATOR_ARG_TO_FILTER_OPERATOR[operatorArg];
-      if (!operator || !legalOperators.includes(operator)) {
-        throw badUserInput(`Operator "${operatorArg}" is not supported for filter field "${column}"`);
+// SPEC.md §3.5: `and`/`or` recurse into an array of nested WhereInputs, `not` into a single one;
+// any other key is a leaf field condition. Every non-null entry at a level is implicitly ANDed —
+// one code path handles both a plain field-only `where` and a combinator tree, always returning a
+// single root FilterNode (or undefined for an empty/no-op object).
+function resolveFilterNode(where: WhereInput, fieldTypeByName: Map<string, FieldType>): FilterNode | undefined {
+  const nodes: FilterNode[] = [];
+
+  for (const [key, value] of Object.entries(where)) {
+    if (key === "and" || key === "or") {
+      const children = (value as WhereInput[]).map((entry) => resolveFilterNode(entry, fieldTypeByName)).filter((node): node is FilterNode => node !== undefined);
+      if (children.length > 0) {
+        nodes.push({ [key]: children } as FilterNode);
       }
-      filters.push({ column: resolvedColumn, operator, value: value as ParsedFilter["value"] });
+    } else if (key === "not") {
+      const child = resolveFilterNode(value as WhereInput, fieldTypeByName);
+      if (child) {
+        nodes.push({ not: child });
+      }
+    } else {
+      nodes.push(...resolveFieldLeaves(key, value as Record<string, unknown>, fieldTypeByName));
     }
   }
 
-  return filters;
+  if (nodes.length === 0) {
+    return undefined;
+  }
+  return nodes.length === 1 ? nodes[0] : { and: nodes };
+}
+
+function resolveFilterTree(where: WhereInput | undefined, contentType: ContentTypeFields): FilterNode | undefined {
+  if (!where) {
+    return undefined;
+  }
+  const fieldTypeByName = new Map(contentType.fields.filter((field) => LISTABLE_FIELD_TYPES.has(field.type)).map((field) => [field.name, field.type]));
+  return resolveFilterNode(where, fieldTypeByName);
 }
 
 export function translateListArgs(contentType: ContentTypeFields, args: ListArgsInput): FullListOptions {
   return {
     ...resolvePagination(args.pagination),
     ...resolveOrderBy(args.orderBy, contentType),
-    filters: resolveFilters(args.where, contentType),
+    filters: [],
+    filterTree: resolveFilterTree(args.where, contentType),
   };
 }

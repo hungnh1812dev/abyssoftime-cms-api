@@ -7,3 +7,5 @@ export interface ParsedFilter {
   operator: FilterOperator;
   value: FilterValue;
 }
+
+export type FilterNode = ParsedFilter | { and: FilterNode[] } | { or: FilterNode[] } | { not: FilterNode };
