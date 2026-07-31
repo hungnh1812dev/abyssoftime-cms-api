@@ -242,7 +242,7 @@ describe("GraphQL (e2e)", () => {
     });
 
     it("rejects a published-data query with no token, UNAUTHENTICATED", async () => {
-      const response = await gql(`{ cvPage(Id: "${documentId}") { position company } }`).expect(200);
+      const response = await gql(`{ cvPage(documentId: "${documentId}") { position company } }`).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.data).toEqual({ cvPage: null });
@@ -250,15 +250,15 @@ describe("GraphQL (e2e)", () => {
     });
 
     it("returns the published document for a document:read-scoped token", async () => {
-      const response = await gql(`{ cvPage(Id: "${documentId}") { position company } }`, undefined, readScopedApiToken).expect(200);
+      const response = await gql(`{ cvPage(documentId: "${documentId}") { position company } }`, undefined, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
       expect(body.data).toEqual({ cvPage: { position: `GraphQL Engineer ${runId}`, company: `Acme-${runId}` } });
     });
 
-    it("returns null (not a GraphQL error) for a nonexistent Id", async () => {
-      const response = await gql(`{ cvPage(Id: "${randomUUID()}") { position } }`, undefined, readScopedApiToken).expect(200);
+    it("returns null (not a GraphQL error) for a nonexistent documentId", async () => {
+      const response = await gql(`{ cvPage(documentId: "${randomUUID()}") { position } }`, undefined, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
@@ -266,7 +266,7 @@ describe("GraphQL (e2e)", () => {
     });
 
     it("rejects a status: draft query with no token, UNAUTHENTICATED", async () => {
-      const response = await gql(`{ cvPage(Id: "${documentId}", status: "draft") { position } }`).expect(200);
+      const response = await gql(`{ cvPage(documentId: "${documentId}", status: "draft") { position } }`).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.data).toEqual({ cvPage: null });
@@ -274,7 +274,7 @@ describe("GraphQL (e2e)", () => {
     });
 
     it("returns the edit-view document for a document:read-scoped token", async () => {
-      const response = await gql(`{ cvPage(Id: "${documentId}", status: "draft") { position } }`, undefined, readScopedApiToken).expect(200);
+      const response = await gql(`{ cvPage(documentId: "${documentId}", status: "draft") { position } }`, undefined, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
@@ -304,7 +304,7 @@ describe("GraphQL (e2e)", () => {
     });
 
     it("rejects a list query with no token, UNAUTHENTICATED", async () => {
-      const response = await gql(`{ cvPageList(size: 1) { position } }`).expect(200);
+      const response = await gql(`{ cvPages(size: 1) { position } }`).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.data).toBeNull();
@@ -314,14 +314,14 @@ describe("GraphQL (e2e)", () => {
     it("filters, orders, and paginates published rows for a document:read-scoped token", async () => {
       const query = `
         query($where: CvPageFilter, $orderBy: CvPageOrderBy) {
-          cvPageList(where: $where, orderBy: $orderBy, start: 0, size: 10) { position isMain }
+          cvPages(where: $where, orderBy: $orderBy, start: 0, size: 10) { position isMain }
         }
       `;
       const response = await gql(query, { where: { company: { eq: `${filterTag}-Co` } }, orderBy: { position: "ASC" } }, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
-      const items = (body.data as { cvPageList: { position: string; isMain: boolean }[] }).cvPageList;
+      const items = (body.data as { cvPages: { position: string; isMain: boolean }[] }).cvPages;
       expect(items).toEqual([
         { position: `${filterTag} Primary`, isMain: true },
         { position: `${filterTag} Secondary`, isMain: false },
@@ -359,7 +359,7 @@ describe("GraphQL (e2e)", () => {
 
     it("resolves nested repeatable components at every level, with a JSON-typed field returning a real array", async () => {
       const query = `{
-        cvPage(Id: "${documentId}") {
+        cvPage(documentId: "${documentId}") {
           position
           experiences {
             company
@@ -416,7 +416,7 @@ describe("GraphQL (e2e)", () => {
 
     it("resolves the media-typed field's FK to the full MediaAsset", async () => {
       const query = `{
-        ${mediaQueryName}(Id: "${documentId}") {
+        ${mediaQueryName}(documentId: "${documentId}") {
           title
           cover { documentId url thumbnailUrl fileName width height }
         }
@@ -445,7 +445,7 @@ describe("GraphQL (e2e)", () => {
 
       await request(app.getHttpServer()).post(`/api/v1/documents/collection-type/${mediaSlug}/${noCoverDocumentId}/publish`).set("Cookie", [superAdminCookie]).expect(200);
 
-      const response = await gql(`{ ${mediaQueryName}(Id: "${noCoverDocumentId}") { title cover { documentId } } }`, undefined, readScopedApiToken).expect(200);
+      const response = await gql(`{ ${mediaQueryName}(documentId: "${noCoverDocumentId}") { title cover { documentId } } }`, undefined, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
@@ -492,37 +492,45 @@ describe("GraphQL (e2e)", () => {
       });
 
       const updateResult = await gql(
-        `mutation($Id: ID!, $data: CvPageInput!) { updateCvPage(Id: $Id, data: $data) { documentId company } }`,
-        { Id: documentId, data: { position: `Mutation Engineer ${runId}`, isMain: true, company: `UpdatedCo-${runId}`, summary: "<p>Summary</p>" } },
+        `mutation($documentId: ID!, $data: CvPageInput!) { updateCvPage(documentId: $documentId, data: $data) { documentId company } }`,
+        { documentId: documentId, data: { position: `Mutation Engineer ${runId}`, isMain: true, company: `UpdatedCo-${runId}`, summary: "<p>Summary</p>" } },
         updateOnlyApiToken,
       ).expect(200);
       const updateBody = updateResult.body as GraphQLResponseBody;
       expect(updateBody.errors).toBeUndefined();
       expect(updateBody.data).toEqual({ updateCvPage: { documentId, company: `UpdatedCo-${runId}` } });
 
-      const publishResult = await gql(`mutation($Id: ID!) { publishCvPage(Id: $Id) { documentId company } }`, { Id: documentId }, publishOnlyApiToken).expect(200);
+      const publishResult = await gql(
+        `mutation($documentId: ID!) { publishCvPage(documentId: $documentId) { documentId company } }`,
+        { documentId: documentId },
+        publishOnlyApiToken,
+      ).expect(200);
       const publishBody = publishResult.body as GraphQLResponseBody;
       expect(publishBody.errors).toBeUndefined();
       expect(publishBody.data).toEqual({ publishCvPage: { documentId, company: `UpdatedCo-${runId}` } });
 
-      const publicReadAfterPublish = await gql(`{ cvPage(Id: "${documentId}") { company } }`, undefined, readScopedApiToken).expect(200);
+      const publicReadAfterPublish = await gql(`{ cvPage(documentId: "${documentId}") { company } }`, undefined, readScopedApiToken).expect(200);
       expect((publicReadAfterPublish.body as GraphQLResponseBody).data).toEqual({ cvPage: { company: `UpdatedCo-${runId}` } });
 
-      const unpublishResult = await gql(`mutation($Id: ID!) { unpublishCvPage(Id: $Id) { documentId company } }`, { Id: documentId }, unpublishOnlyApiToken).expect(200);
+      const unpublishResult = await gql(
+        `mutation($documentId: ID!) { unpublishCvPage(documentId: $documentId) { documentId company } }`,
+        { documentId: documentId },
+        unpublishOnlyApiToken,
+      ).expect(200);
       const unpublishBody = unpublishResult.body as GraphQLResponseBody;
       expect(unpublishBody.errors).toBeUndefined();
       expect(unpublishBody.data).toEqual({ unpublishCvPage: { documentId, company: `UpdatedCo-${runId}` } });
 
-      const publicReadAfterUnpublish = await gql(`{ cvPage(Id: "${documentId}") { company } }`, undefined, readScopedApiToken).expect(200);
+      const publicReadAfterUnpublish = await gql(`{ cvPage(documentId: "${documentId}") { company } }`, undefined, readScopedApiToken).expect(200);
       expect((publicReadAfterUnpublish.body as GraphQLResponseBody).data).toEqual({ cvPage: null });
 
-      const deleteResult = await gql(`mutation($Id: ID!) { deleteCvPage(Id: $Id) }`, { Id: documentId }, deleteOnlyApiToken).expect(200);
+      const deleteResult = await gql(`mutation($documentId: ID!) { deleteCvPage(documentId: $documentId) }`, { documentId: documentId }, deleteOnlyApiToken).expect(200);
       const deleteBody = deleteResult.body as GraphQLResponseBody;
       expect(deleteBody.errors).toBeUndefined();
       expect(deleteBody.data).toEqual({ deleteCvPage: true });
       pendingCleanupCvPageIds.delete(documentId);
 
-      const draftReadAfterDelete = await gql(`{ cvPage(Id: "${documentId}", status: "draft") { company } }`, undefined, readScopedApiToken).expect(200);
+      const draftReadAfterDelete = await gql(`{ cvPage(documentId: "${documentId}", status: "draft") { company } }`, undefined, readScopedApiToken).expect(200);
       expect((draftReadAfterDelete.body as GraphQLResponseBody).data).toEqual({ cvPage: null });
     });
 
@@ -530,12 +538,12 @@ describe("GraphQL (e2e)", () => {
       { mutationName: "createCvPage", query: `mutation($data: CvPageInput!) { createCvPage(data: $data) { documentId } }`, variables: { data: { position: "X" } } },
       {
         mutationName: "updateCvPage",
-        query: `mutation($Id: ID!, $data: CvPageInput!) { updateCvPage(Id: $Id, data: $data) { documentId } }`,
-        variables: { Id: randomUUID(), data: {} },
+        query: `mutation($documentId: ID!, $data: CvPageInput!) { updateCvPage(documentId: $documentId, data: $data) { documentId } }`,
+        variables: { documentId: randomUUID(), data: {} },
       },
-      { mutationName: "deleteCvPage", query: `mutation($Id: ID!) { deleteCvPage(Id: $Id) }`, variables: { Id: randomUUID() } },
-      { mutationName: "publishCvPage", query: `mutation($Id: ID!) { publishCvPage(Id: $Id) { documentId } }`, variables: { Id: randomUUID() } },
-      { mutationName: "unpublishCvPage", query: `mutation($Id: ID!) { unpublishCvPage(Id: $Id) { documentId } }`, variables: { Id: randomUUID() } },
+      { mutationName: "deleteCvPage", query: `mutation($documentId: ID!) { deleteCvPage(documentId: $documentId) }`, variables: { documentId: randomUUID() } },
+      { mutationName: "publishCvPage", query: `mutation($documentId: ID!) { publishCvPage(documentId: $documentId) { documentId } }`, variables: { documentId: randomUUID() } },
+      { mutationName: "unpublishCvPage", query: `mutation($documentId: ID!) { unpublishCvPage(documentId: $documentId) { documentId } }`, variables: { documentId: randomUUID() } },
     ];
 
     it.each(permissionDeniedCases)("$mutationName rejects a wrongly-scoped token with FORBIDDEN, never executing the mutation", async ({ query, variables }) => {
@@ -582,10 +590,10 @@ describe("GraphQL (e2e)", () => {
 
       const updateMutationField = updateMutationName(mediaSlug);
       const updateResult = await gql(
-        `mutation($Id: ID!, $data: ${inputTypeName(mediaSlug)}!) {
-          ${updateMutationField}(Id: $Id, data: $data) { documentId title cover { documentId fileName } }
+        `mutation($documentId: ID!, $data: ${inputTypeName(mediaSlug)}!) {
+          ${updateMutationField}(documentId: $documentId, data: $data) { documentId title cover { documentId fileName } }
         }`,
-        { Id: documentId, data: { title: `Mutation media updated ${runId}`, cover: mutationMediaDocumentId } },
+        { documentId: documentId, data: { title: `Mutation media updated ${runId}`, cover: mutationMediaDocumentId } },
         updateOnlyApiToken,
       ).expect(200);
       const updateBody = updateResult.body as GraphQLResponseBody;
@@ -596,7 +604,7 @@ describe("GraphQL (e2e)", () => {
   });
 
   describe(`single-type (${singleSlug})`, () => {
-    it("round-trips a full lifecycle — save, publish, unpublish — via a token scoped with exactly its required permission, no Id anywhere", async () => {
+    it("round-trips a full lifecycle — save, publish, unpublish — via a token scoped with exactly its required permission, no documentId anywhere", async () => {
       const saveField = saveMutationName(singleSlug);
       const publishField = publishMutationName(singleSlug);
       const unpublishField = unpublishMutationName(singleSlug);
@@ -667,7 +675,7 @@ describe("GraphQL (e2e)", () => {
 
   describe("introspection gating", () => {
     it("allows a normal query to execute regardless of introspection gating", async () => {
-      const response = await gql(`{ cvPageList(size: 1) { position } }`, undefined, readScopedApiToken).expect(200);
+      const response = await gql(`{ cvPages(size: 1) { position } }`, undefined, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();

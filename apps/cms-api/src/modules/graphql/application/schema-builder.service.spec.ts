@@ -85,8 +85,8 @@ describe("SchemaBuilderService", () => {
     const queryFields = schema.getQueryType()!.getFields();
     expect(queryFields.cvPage).toBeDefined();
     expect(queryFields.cvPage.type.toString()).toBe("CvPage");
-    expect(queryFields.cvPage.args.map((arg) => arg.name)).toEqual(["Id", "status"]);
-    const idArg = queryFields.cvPage.args.find((a) => a.name === "Id")!;
+    expect(queryFields.cvPage.args.map((arg) => arg.name)).toEqual(["documentId", "status"]);
+    const idArg = queryFields.cvPage.args.find((a) => a.name === "documentId")!;
     expect(idArg.type.toString()).toBe("ID!");
     const statusArg = queryFields.cvPage.args.find((a) => a.name === "status")!;
     expect(statusArg.type.toString()).toBe("String");
@@ -245,7 +245,7 @@ describe("SchemaBuilderService", () => {
     const schema = buildSchema(await service.buildTypeDefs());
 
     const queryFields = schema.getQueryType()!.getFields();
-    const listField = queryFields.cvPageList;
+    const listField = queryFields.cvPages;
     expect(listField).toBeDefined();
     expect(listField.type).toBeInstanceOf(GraphQLNonNull);
     const listOfType = (listField.type as GraphQLNonNull<GraphQLList<unknown>>).ofType;
@@ -305,22 +305,22 @@ describe("SchemaBuilderService", () => {
     expect(mutationFields.createCvPage.args[0].type.toString()).toBe("CvPageInput!");
     expect(mutationFields.createCvPage.type.toString()).toBe("CvPage!");
 
-    expect(mutationFields.updateCvPage.args.map((a) => a.name)).toEqual(["Id", "data"]);
+    expect(mutationFields.updateCvPage.args.map((a) => a.name)).toEqual(["documentId", "data"]);
     expect(mutationFields.updateCvPage.args[0].type.toString()).toBe("ID!");
     expect(mutationFields.updateCvPage.args[1].type.toString()).toBe("CvPageInput!");
     expect(mutationFields.updateCvPage.type.toString()).toBe("CvPage!");
 
-    expect(mutationFields.deleteCvPage.args.map((a) => a.name)).toEqual(["Id"]);
+    expect(mutationFields.deleteCvPage.args.map((a) => a.name)).toEqual(["documentId"]);
     expect(mutationFields.deleteCvPage.type.toString()).toBe("Boolean!");
 
-    expect(mutationFields.publishCvPage.args.map((a) => a.name)).toEqual(["Id"]);
+    expect(mutationFields.publishCvPage.args.map((a) => a.name)).toEqual(["documentId"]);
     expect(mutationFields.publishCvPage.type.toString()).toBe("CvPage!");
 
-    expect(mutationFields.unpublishCvPage.args.map((a) => a.name)).toEqual(["Id"]);
+    expect(mutationFields.unpublishCvPage.args.map((a) => a.name)).toEqual(["documentId"]);
     expect(mutationFields.unpublishCvPage.type.toString()).toBe("CvPage!");
   });
 
-  it("emits save/publish/unpublish mutations (no create/update/delete/Id) for a single-kind definition", async () => {
+  it("emits save/publish/unpublish mutations (no create/update/delete/documentId) for a single-kind definition", async () => {
     const service = new SchemaBuilderService(buildSchemaLoader([singleTypeDef]));
 
     const schema = buildSchema(await service.buildTypeDefs());

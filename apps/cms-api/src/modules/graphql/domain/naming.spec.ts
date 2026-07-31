@@ -26,7 +26,7 @@ describe("naming", () => {
     });
 
     it("derives the list query name", () => {
-      expect(listQueryName("cv-page")).toBe("cvPageList");
+      expect(listQueryName("cv-page")).toBe("cvPages");
     });
 
     it("derives the input type name", () => {
@@ -76,7 +76,7 @@ describe("naming", () => {
     });
 
     it("derives the list query name", () => {
-      expect(listQueryName("en-it-vocab")).toBe("enItVocabList");
+      expect(listQueryName("en-it-vocab")).toBe("enItVocabs");
     });
 
     it("derives the input type name", () => {
@@ -93,6 +93,36 @@ describe("naming", () => {
 
     it("derives a component type name for an already-camelCase component name", () => {
       expect(componentTypeName("en-it-vocab", "syllablePart")).toBe("EnItVocabSyllablePart");
+    });
+  });
+
+  describe("listQueryName pluralization suffix rules", () => {
+    it("appends 's' for a regular ending", () => {
+      expect(listQueryName("blog-post")).toBe("blogPosts");
+    });
+
+    it("appends 'es' when the query name ends in 's'", () => {
+      expect(listQueryName("gas")).toBe("gases");
+    });
+
+    it("appends 'es' when the query name ends in 'x'", () => {
+      expect(listQueryName("box")).toBe("boxes");
+    });
+
+    it("appends 'es' when the query name ends in 'z'", () => {
+      expect(listQueryName("buzz")).toBe("buzzes");
+    });
+
+    it("appends 'es' when the query name ends in 'ch'", () => {
+      expect(listQueryName("batch")).toBe("batches");
+    });
+
+    it("appends 'es' when the query name ends in 'sh'", () => {
+      expect(listQueryName("dish")).toBe("dishes");
+    });
+
+    it("does not attempt irregular pluralization", () => {
+      expect(listQueryName("category")).toBe("categorys");
     });
   });
 });
