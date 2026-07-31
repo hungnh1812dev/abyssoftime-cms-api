@@ -8,12 +8,12 @@ See `tasks/plan.md` for full context, dependency graph, and rationale. See `SPEC
 - [x] **Checkpoint A:** full e2e green — commit (covers Tasks 1.1 + 1.2)
 
 ## Phase 2 — List envelope + pagination + orderBy default (Areas 3 + 4 + 8)
-- [ ] Add `PaginationInput`/`PaginationMeta`/`ListMeta` SDL (as split-out named constants) + `<Type>List` envelope type; rewrite `buildListQueryField`
-- [ ] Rewrite `list-args.translator.ts`: `pagination` arg replaces `start`/`size`; implement SPEC §3.3's 13-rule validation table with exact error strings; default order-by column → `createdAt`
-- [ ] Resolver: build `{ items, meta: { pagination } }` envelope, computing `page`/`pageSize` post-resolution (incl. `limit: -1` unlimited case)
-- [ ] `prisma-document.repository.ts`: additive branch in `listPaginated` to omit `LIMIT` when `opts.size === -1`
-- [ ] Rewrite e2e list-query block for envelope shape; add all 13 pagination-rule cases + `limit: -1` case
-- [ ] **Checkpoint:** all checks green — commit (note deliberate default-limit change 20→10 in message)
+- [x] Add `PaginationInput`/`PaginationMeta`/`ListMeta` SDL (as split-out named constants) + `<Type>List` envelope type; rewrite `buildListQueryField`
+- [x] Rewrite `list-args.translator.ts`: `pagination` arg replaces `start`/`size`; implement SPEC §3.3's 13-rule validation table with exact error strings; default order-by column → `createdAt`
+- [x] Resolver: build `{ items, meta: { pagination } }` envelope, computing `page`/`pageSize` post-resolution (incl. `limit: -1` unlimited case)
+- [x] `prisma-document.repository.ts`: additive branch in `listPaginated` to omit `LIMIT` when `opts.size === -1`
+- [x] Rewrite e2e list-query block for envelope shape; add all 13 pagination-rule cases + `limit: -1` case
+- [x] **Checkpoint:** all checks green — commit (note deliberate default-limit change 20→10 in message)
 
 ## Phase 3 — `DateTime` scalar + system fields on `<Type>` (Area 9)
 - [ ] New `graphql/domain/date-time-scalar.ts` (mirrors `json-scalar.ts`) + `date-time-scalar.spec.ts`

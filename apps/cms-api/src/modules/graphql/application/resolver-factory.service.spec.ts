@@ -89,7 +89,7 @@ describe("ResolverFactoryService", () => {
     schemaLoader = { load: jest.fn().mockResolvedValue([cvPage]), loadFromDir: jest.fn() } as unknown as jest.Mocked<SchemaLoaderService>;
     getPublicDocument = { execute: jest.fn() } as unknown as jest.Mocked<GetPublicDocumentService>;
     getDocumentForEdit = { execute: jest.fn() } as unknown as jest.Mocked<GetDocumentForEditService>;
-    listDocumentsFull = { execute: jest.fn().mockResolvedValue({ items: [], total: 0, start: 0, size: 20 }) } as unknown as jest.Mocked<ListDocumentsFullService>;
+    listDocumentsFull = { execute: jest.fn().mockResolvedValue({ items: [], total: 0, start: 0, size: 10 }) } as unknown as jest.Mocked<ListDocumentsFullService>;
     mediaAssets = { findByDocumentId: jest.fn() } as unknown as jest.Mocked<IMediaAssetRepository>;
     saveDocument = { execute: jest.fn() } as unknown as jest.Mocked<SaveDocumentService>;
     publishDocument = { execute: jest.fn() } as unknown as jest.Mocked<PublishDocumentService>;
@@ -219,16 +219,28 @@ describe("ResolverFactoryService", () => {
 
   it("delegates cvPages to translateListArgs + ListDocumentsFullService.execute when the token is document:read-scoped", async () => {
     const items = [{ documentId: validId, position: "Engineer", isMain: true }];
-    listDocumentsFull.execute.mockResolvedValue({ items, total: 1, start: 0, size: 20 });
+    listDocumentsFull.execute.mockResolvedValue({ items, total: 1, start: 0, size: 10 });
     const resolvers = await service.buildResolvers();
 
-    const result = await resolvers.Query.cvPages(undefined, { where: { isMain: { eq: true } }, start: 0, size: 10 }, readScopedToken, undefined);
+    const result = await resolvers.Query.cvPages(undefined, { where: { isMain: { eq: true } }, pagination: { start: 0, limit: 10 } }, readScopedToken, undefined);
 
     expect(listDocumentsFull.execute).toHaveBeenCalledWith(
       "cv-page",
       expect.objectContaining({ start: 0, size: 10, filters: [{ column: "isMain", operator: "$eq", value: true }] }),
     );
-    expect(result).toBe(items);
+    expect(result).toEqual({ items, meta: { pagination: { page: 1, pageSize: 10, total: 1 } } });
+  });
+
+  it("computes page/pageSize post-resolution from start/size, including the limit: -1 unlimited case", async () => {
+    listDocumentsFull.execute.mockResolvedValue({ items: [], total: 37, start: 20, size: 10 });
+    const resolvers = await service.buildResolvers();
+
+    const paged = await resolvers.Query.cvPages(undefined, { pagination: { start: 20, limit: 10 } }, readScopedToken, undefined);
+    expect(paged).toMatchObject({ meta: { pagination: { page: 3, pageSize: 10, total: 37 } } });
+
+    listDocumentsFull.execute.mockResolvedValue({ items: [], total: 37, start: 0, size: -1 });
+    const unlimited = await resolvers.Query.cvPages(undefined, { pagination: { limit: -1 } }, readScopedToken, undefined);
+    expect(unlimited).toMatchObject({ meta: { pagination: { page: 1, pageSize: 37, total: 37 } } });
   });
 
   it("propagates a BAD_USER_INPUT GraphQL error for an invalid where field, never swallowed or ignored", async () => {

@@ -304,28 +304,103 @@ describe("GraphQL (e2e)", () => {
     });
 
     it("rejects a list query with no token, UNAUTHENTICATED", async () => {
-      const response = await gql(`{ cvPages(size: 1) { position } }`).expect(200);
+      const response = await gql(`{ cvPages(pagination: { limit: 1 }) { items { position } } }`).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.data).toBeNull();
       expect(body.errors?.[0].extensions?.code).toBe("UNAUTHENTICATED");
     });
 
-    it("filters, orders, and paginates published rows for a document:read-scoped token", async () => {
+    it("filters, orders, and paginates published rows for a document:read-scoped token, wrapped in the items/meta envelope", async () => {
+      const query = `
+        query($where: CvPageFilter, $orderBy: CvPageOrderBy, $pagination: PaginationInput) {
+          cvPages(where: $where, orderBy: $orderBy, pagination: $pagination) {
+            items { position isMain }
+            meta { pagination { page pageSize total } }
+          }
+        }
+      `;
+      const response = await gql(
+        query,
+        { where: { company: { eq: `${filterTag}-Co` } }, orderBy: { position: "ASC" }, pagination: { start: 0, limit: 10 } },
+        readScopedApiToken,
+      ).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.errors).toBeUndefined();
+      const result = (body.data as { cvPages: { items: { position: string; isMain: boolean }[]; meta: { pagination: { page: number; pageSize: number; total: number } } } })
+        .cvPages;
+      expect(result.items).toEqual([
+        { position: `${filterTag} Primary`, isMain: true },
+        { position: `${filterTag} Secondary`, isMain: false },
+      ]);
+      expect(result.meta.pagination).toEqual({ page: 1, pageSize: 10, total: 2 });
+    });
+
+    it("limit: -1 returns every matching row, unlimited, with pageSize == total (SPEC.md §3.3 rule 11)", async () => {
+      const query = `
+        query($where: CvPageFilter) {
+          cvPages(where: $where, pagination: { limit: -1 }) { items { position } meta { pagination { page pageSize total } } }
+        }
+      `;
+      const response = await gql(query, { where: { company: { eq: `${filterTag}-Co` } } }, readScopedApiToken).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.errors).toBeUndefined();
+      const result = (body.data as { cvPages: { items: unknown[]; meta: { pagination: { page: number; pageSize: number; total: number } } } }).cvPages;
+      expect(result.items).toHaveLength(2);
+      expect(result.meta.pagination).toEqual({ page: 1, pageSize: 2, total: 2 });
+    });
+
+    it("page mode paginates with page/pageSize, computing start/limit accordingly", async () => {
       const query = `
         query($where: CvPageFilter, $orderBy: CvPageOrderBy) {
-          cvPages(where: $where, orderBy: $orderBy, start: 0, size: 10) { position isMain }
+          cvPages(where: $where, orderBy: $orderBy, pagination: { page: 2, pageSize: 1 }) {
+            items { position }
+            meta { pagination { page pageSize total } }
+          }
         }
       `;
       const response = await gql(query, { where: { company: { eq: `${filterTag}-Co` } }, orderBy: { position: "ASC" } }, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
-      const items = (body.data as { cvPages: { position: string; isMain: boolean }[] }).cvPages;
-      expect(items).toEqual([
-        { position: `${filterTag} Primary`, isMain: true },
-        { position: `${filterTag} Secondary`, isMain: false },
-      ]);
+      const result = (body.data as { cvPages: { items: { position: string }[]; meta: { pagination: { page: number; pageSize: number; total: number } } } }).cvPages;
+      expect(result.items).toEqual([{ position: `${filterTag} Secondary` }]);
+      expect(result.meta.pagination).toEqual({ page: 2, pageSize: 1, total: 2 });
+    });
+
+    describe("pagination validation (SPEC.md §3.3, all 13 rules)", () => {
+      async function expectPaginationError(pagination: Record<string, number>, message: string): Promise<void> {
+        const response = await gql(`query($pagination: PaginationInput) { cvPages(pagination: $pagination) { items { position } } }`, { pagination }, readScopedApiToken).expect(
+          200,
+        );
+
+        const body = response.body as GraphQLResponseBody;
+        expect(body.data).toBeNull();
+        expect(body.errors?.[0].extensions?.code).toBe("BAD_USER_INPUT");
+        expect(body.errors?.[0].message).toBe(message);
+      }
+
+      it("rule 2: mixing offset and page fields", async () => {
+        await expectPaginationError({ start: 0, page: 1, pageSize: 10 }, "cannot mix offset (start/limit) and page (page/pageSize) modes");
+      });
+
+      it("rule 3: only one of page/pageSize provided", async () => {
+        await expectPaginationError({ page: 1 }, "page and pageSize must both be provided");
+      });
+
+      it("rule 4: page < 1", async () => {
+        await expectPaginationError({ page: 0, pageSize: 10 }, "page must be >= 1");
+      });
+
+      it("rule 5: pageSize == 0", async () => {
+        await expectPaginationError({ page: 1, pageSize: 0 }, "pageSize must not be 0");
+      });
+
+      it("rule 10: limit == 0", async () => {
+        await expectPaginationError({ limit: 0 }, "limit must not be 0");
+      });
     });
   });
 
@@ -675,7 +750,7 @@ describe("GraphQL (e2e)", () => {
 
   describe("introspection gating", () => {
     it("allows a normal query to execute regardless of introspection gating", async () => {
-      const response = await gql(`{ cvPages(size: 1) { position } }`, undefined, readScopedApiToken).expect(200);
+      const response = await gql(`{ cvPages(pagination: { limit: 1 }) { items { position } } }`, undefined, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();

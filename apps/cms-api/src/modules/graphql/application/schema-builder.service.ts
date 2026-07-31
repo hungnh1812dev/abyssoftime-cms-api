@@ -43,7 +43,7 @@ const FILTER_INPUT_TYPE_BY_FIELD_TYPE: Partial<Record<FieldType, string>> = {
 
 const SYSTEM_ORDER_BY_FIELDS = ["createdAt", "updatedAt", "publishedAt"];
 
-const SHARED_FILTER_AND_ORDER_TYPES = `input TextFilter {
+const FILTER_INPUT_TYPES = `input TextFilter {
   eq: String
   ne: String
   contains: String
@@ -60,11 +60,28 @@ input NumberFilter {
 
 input BooleanFilter {
   eq: Boolean
-}
+}`;
 
-enum SortDirection {
+const ORDER_BY_TYPES = `enum SortDirection {
   ASC
   DESC
+}`;
+
+const PAGINATION_TYPES = `input PaginationInput {
+  start: Int
+  limit: Int
+  page: Int
+  pageSize: Int
+}
+
+type PaginationMeta {
+  page: Int!
+  pageSize: Int!
+  total: Int!
+}
+
+type ListMeta {
+  pagination: PaginationMeta!
 }`;
 
 function listableFields(fields: FieldDefinition[]): FieldDefinition[] {
@@ -195,9 +212,17 @@ function buildQueryField(definition: ContentTypeDefinition): string {
   return `  ${queryName(definition.slug)}(documentId: ID!, status: String): ${type}`;
 }
 
-function buildListQueryField(definition: ContentTypeDefinition): string {
+function listTypeName(slug: string): string {
+  return `${typeName(slug)}List`;
+}
+
+function buildListType(definition: ContentTypeDefinition): string {
   const type = typeName(definition.slug);
-  return `  ${listQueryName(definition.slug)}(where: ${filterTypeName(definition.slug)}, orderBy: ${orderByTypeName(definition.slug)}, start: Int, size: Int): [${type}!]!`;
+  return `type ${listTypeName(definition.slug)} {\n  items: [${type}!]!\n  meta: ListMeta!\n}`;
+}
+
+function buildListQueryField(definition: ContentTypeDefinition): string {
+  return `  ${listQueryName(definition.slug)}(where: ${filterTypeName(definition.slug)}, orderBy: ${orderByTypeName(definition.slug)}, pagination: PaginationInput): ${listTypeName(definition.slug)}!`;
 }
 
 function buildSingleQueryField(definition: ContentTypeDefinition): string {
@@ -229,6 +254,7 @@ export class SchemaBuilderService {
     const inputTypes = [...collectionDefinitions, ...singleDefinitions].flatMap((definition) => [buildInputType(definition), ...buildComponentInputTypesFor(definition)]);
     const filterTypes = collectionDefinitions.map(buildFilterType);
     const orderByTypes = collectionDefinitions.map(buildOrderByType);
+    const listTypes = collectionDefinitions.map(buildListType);
     const queryFields = [
       "  _empty: String",
       ...collectionDefinitions.map(buildQueryField),
@@ -239,8 +265,19 @@ export class SchemaBuilderService {
     const mutationFields = ["  _empty: String", ...collectionDefinitions.flatMap(buildMutationFields), ...singleDefinitions.flatMap(buildSingleTypeMutationFields)];
     const mutationType = `type Mutation {\n${mutationFields.join("\n")}\n}`;
 
-    return [MEDIA_ASSET_TYPE, JSON_SCALAR_TYPE, ...objectTypes, ...inputTypes, SHARED_FILTER_AND_ORDER_TYPES, ...filterTypes, ...orderByTypes, queryType, mutationType].join(
-      "\n\n",
-    );
+    return [
+      MEDIA_ASSET_TYPE,
+      JSON_SCALAR_TYPE,
+      ...objectTypes,
+      ...inputTypes,
+      FILTER_INPUT_TYPES,
+      ORDER_BY_TYPES,
+      PAGINATION_TYPES,
+      ...filterTypes,
+      ...orderByTypes,
+      ...listTypes,
+      queryType,
+      mutationType,
+    ].join("\n\n");
   }
 }
