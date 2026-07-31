@@ -109,6 +109,9 @@ function resolvePagination(pagination: PaginationInputArg | undefined): { start:
     if (pageSize === 0) {
       throw badUserInput("pageSize must not be 0");
     }
+    if (pageSize! < 0) {
+      throw badUserInput("pageSize must not be negative");
+    }
     const resolvedPageSize = Math.min(pageSize!, MAX_LIMIT);
     return { start: (page! - 1) * resolvedPageSize, size: resolvedPageSize };
   }
@@ -123,6 +126,9 @@ function resolvePagination(pagination: PaginationInputArg | undefined): { start:
   }
   if (limit === UNLIMITED) {
     return { start: resolvedStart, size: UNLIMITED };
+  }
+  if (limit < UNLIMITED) {
+    throw badUserInput("limit must not be negative (use -1 for unlimited)");
   }
   return { start: resolvedStart, size: Math.min(limit, MAX_LIMIT) };
 }
