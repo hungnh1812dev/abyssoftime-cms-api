@@ -74,19 +74,36 @@ describe("SchemaBuilderService", () => {
     const cvPageType = schema.getType("CvPage") as GraphQLObjectType;
     expect(cvPageType).toBeDefined();
     const fields = cvPageType.getFields();
-    expect(Object.keys(fields)).toEqual(["documentId", "position", "isMain", "company", "summary", "coverImage", "skills", "experiences"]);
+    expect(Object.keys(fields)).toEqual([
+      "documentId",
+      "id",
+      "position",
+      "isMain",
+      "company",
+      "summary",
+      "coverImage",
+      "skills",
+      "experiences",
+      "createdAt",
+      "updatedAt",
+      "publishedAt",
+    ]);
     expect(fields.documentId.type.toString()).toBe("ID!");
+    expect(fields.id.type.toString()).toBe("Int");
     expect(fields.position.type).toBe(GraphQLString);
     expect(fields.company.type).toBe(GraphQLString);
     expect(fields.summary.type).toBe(GraphQLString);
     expect(fields.isMain.type.toString()).toBe("Boolean");
     expect(fields.coverImage.type.toString()).toBe("MediaAsset");
+    expect(fields.createdAt.type.toString()).toBe("DateTime!");
+    expect(fields.updatedAt.type.toString()).toBe("DateTime!");
+    expect(fields.publishedAt.type.toString()).toBe("DateTime");
 
     const queryFields = schema.getQueryType()!.getFields();
     expect(queryFields.cvPage).toBeDefined();
     expect(queryFields.cvPage.type.toString()).toBe("CvPage");
-    expect(queryFields.cvPage.args.map((arg) => arg.name)).toEqual(["Id", "status"]);
-    const idArg = queryFields.cvPage.args.find((a) => a.name === "Id")!;
+    expect(queryFields.cvPage.args.map((arg) => arg.name)).toEqual(["documentId", "status"]);
+    const idArg = queryFields.cvPage.args.find((a) => a.name === "documentId")!;
     expect(idArg.type.toString()).toBe("ID!");
     const statusArg = queryFields.cvPage.args.find((a) => a.name === "status")!;
     expect(statusArg.type.toString()).toBe("String");
@@ -98,7 +115,7 @@ describe("SchemaBuilderService", () => {
     const schema = buildSchema(await service.buildTypeDefs());
 
     const type = schema.getType("EnItVocab") as GraphQLObjectType;
-    expect(Object.keys(type.getFields())).toEqual(["documentId", "wordGroup", "word", "synonyms", "phonetics"]);
+    expect(Object.keys(type.getFields())).toEqual(["documentId", "id", "wordGroup", "word", "synonyms", "phonetics", "createdAt", "updatedAt", "publishedAt"]);
 
     const queryFields = schema.getQueryType()!.getFields();
     expect(queryFields.enItVocab).toBeDefined();
@@ -112,7 +129,7 @@ describe("SchemaBuilderService", () => {
 
     const homePageType = schema.getType("HomePage") as GraphQLObjectType;
     expect(homePageType).toBeDefined();
-    expect(Object.keys(homePageType.getFields())).toEqual(["documentId", "title"]);
+    expect(Object.keys(homePageType.getFields())).toEqual(["documentId", "id", "title", "createdAt", "updatedAt", "publishedAt"]);
 
     const queryFields = schema.getQueryType()!.getFields();
     expect(queryFields.homePage).toBeDefined();
@@ -140,7 +157,7 @@ describe("SchemaBuilderService", () => {
     expect(first).toBe(second);
   });
 
-  it("emits <Type>Filter with one entry per listable scalar field, typed by field kind (text/number/boolean only)", async () => {
+  it("emits <Type>Filter with system-field filters first, then one entry per listable scalar field, typed by field kind (text/number/boolean only)", async () => {
     const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
 
     const schema = buildSchema(await service.buildTypeDefs());
@@ -149,28 +166,54 @@ describe("SchemaBuilderService", () => {
     expect(filterType).toBeDefined();
     const fields = filterType.getFields();
     // richtext ("summary") and component ("skills") fields are not listable/filterable in v1.
-    expect(Object.keys(fields)).toEqual(["position", "isMain", "company"]);
+    expect(Object.keys(fields)).toEqual(["documentId", "createdAt", "updatedAt", "publishedAt", "position", "isMain", "company", "and", "or", "not"]);
+    expect(fields.documentId.type.toString()).toBe("IDFilter");
+    expect(fields.createdAt.type.toString()).toBe("TimeFilter");
+    expect(fields.updatedAt.type.toString()).toBe("TimeFilter");
+    expect(fields.publishedAt.type.toString()).toBe("TimeFilter");
     expect(fields.position.type.toString()).toBe("TextFilter");
     expect(fields.isMain.type.toString()).toBe("BooleanFilter");
     expect(fields.company.type.toString()).toBe("TextFilter");
   });
 
-  it("emits shared TextFilter/NumberFilter/BooleanFilter input types once, with SPEC.md's v1 operator set", async () => {
+  it("makes <Type>Filter self-referencing via and/or/not (SPEC.md §3.5 combinators)", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
+
+    const schema = buildSchema(await service.buildTypeDefs());
+
+    const filterType = schema.getType("CvPageFilter") as GraphQLInputObjectType;
+    const fields = filterType.getFields();
+
+    expect(fields.and.type.toString()).toBe("[CvPageFilter!]");
+    expect(fields.or.type.toString()).toBe("[CvPageFilter!]");
+    expect(fields.not.type.toString()).toBe("CvPageFilter");
+  });
+
+  it("emits shared TextFilter/NumberFilter/BooleanFilter/IDFilter/TimeFilter input types once, with SPEC.md's v1 operator set", async () => {
     const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
 
     const schema = buildSchema(await service.buildTypeDefs());
 
     const textFilter = schema.getType("TextFilter") as GraphQLInputObjectType;
-    expect(Object.keys(textFilter.getFields())).toEqual(["eq", "ne", "contains"]);
+    expect(Object.keys(textFilter.getFields())).toEqual(["eq", "ne", "contains", "in", "notIn"]);
 
     const numberFilter = schema.getType("NumberFilter") as GraphQLInputObjectType;
-    expect(Object.keys(numberFilter.getFields())).toEqual(["eq", "ne", "gt", "gte", "lt", "lte"]);
+    expect(Object.keys(numberFilter.getFields())).toEqual(["eq", "ne", "gt", "gte", "lt", "lte", "in", "notIn"]);
 
     const booleanFilter = schema.getType("BooleanFilter") as GraphQLInputObjectType;
     expect(Object.keys(booleanFilter.getFields())).toEqual(["eq"]);
+
+    const idFilter = schema.getType("IDFilter") as GraphQLInputObjectType;
+    expect(Object.keys(idFilter.getFields())).toEqual(["eq", "ne", "in", "notIn"]);
+    expect(idFilter.getFields().eq.type.toString()).toBe("ID");
+    expect(idFilter.getFields().in.type.toString()).toBe("[ID!]");
+
+    const timeFilter = schema.getType("TimeFilter") as GraphQLInputObjectType;
+    expect(Object.keys(timeFilter.getFields())).toEqual(["eq", "ne"]);
+    expect(timeFilter.getFields().eq.type.toString()).toBe("DateTime");
   });
 
-  it("emits <Type>OrderBy with sortable scalar fields plus the three system timestamps, enum-valued", async () => {
+  it("emits <Type>OrderBy with sortable scalar fields plus id and the three system timestamps, enum-valued", async () => {
     const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
 
     const schema = buildSchema(await service.buildTypeDefs());
@@ -178,11 +221,12 @@ describe("SchemaBuilderService", () => {
     const orderByType = schema.getType("CvPageOrderBy") as GraphQLInputObjectType;
     expect(orderByType).toBeDefined();
     const fields = orderByType.getFields();
-    expect(Object.keys(fields)).toEqual(["position", "isMain", "company", "createdAt", "updatedAt", "publishedAt"]);
+    expect(Object.keys(fields)).toEqual(["position", "isMain", "company", "id", "createdAt", "updatedAt", "publishedAt"]);
     expect(fields.position.type.toString()).toBe("SortDirection");
+    expect(fields.id.type.toString()).toBe("SortDirection");
 
     const sortDirection = schema.getType("SortDirection") as GraphQLEnumType;
-    expect(sortDirection.getValues().map((v) => v.name)).toEqual(["ASC", "DESC"]);
+    expect(sortDirection.getValues().map((v) => v.name)).toEqual(["ASC", "DESC", "asc", "desc"]);
   });
 
   it("emits a single shared MediaAsset type, regardless of how many content types have media fields", async () => {
@@ -239,24 +283,72 @@ describe("SchemaBuilderService", () => {
     expect(typeDefs.match(/scalar JSON/g)).toHaveLength(1);
   });
 
-  it("emits <slug>List returning a non-null list of non-null items, with where/orderBy/start/size args", async () => {
+  it("emits a shared DateTime scalar once, regardless of how many content types are defined", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([cvPage, enItVocab]));
+
+    const typeDefs = await service.buildTypeDefs();
+
+    expect(typeDefs.match(/scalar DateTime/g)).toHaveLength(1);
+  });
+
+  it("emits <slug>List returning a non-null <Type>List envelope, with where/orderBy/pagination args", async () => {
     const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
 
     const schema = buildSchema(await service.buildTypeDefs());
 
     const queryFields = schema.getQueryType()!.getFields();
-    const listField = queryFields.cvPageList;
+    const listField = queryFields.cvPages;
     expect(listField).toBeDefined();
-    expect(listField.type).toBeInstanceOf(GraphQLNonNull);
-    const listOfType = (listField.type as GraphQLNonNull<GraphQLList<unknown>>).ofType;
-    expect(listOfType).toBeInstanceOf(GraphQLList);
-    expect((listOfType as GraphQLList<GraphQLNonNull<GraphQLObjectType>>).ofType.toString()).toBe("CvPage!");
+    expect(listField.type.toString()).toBe("CvPageList!");
 
-    expect(listField.args.map((arg) => arg.name)).toEqual(["where", "orderBy", "start", "size"]);
+    expect(listField.args.map((arg) => arg.name)).toEqual(["where", "orderBy", "pagination"]);
     expect(listField.args.find((a) => a.name === "where")!.type.toString()).toBe("CvPageFilter");
     expect(listField.args.find((a) => a.name === "orderBy")!.type.toString()).toBe("CvPageOrderBy");
-    expect(listField.args.find((a) => a.name === "start")!.type.toString()).toBe("Int");
-    expect(listField.args.find((a) => a.name === "size")!.type.toString()).toBe("Int");
+    expect(listField.args.find((a) => a.name === "pagination")!.type.toString()).toBe("PaginationInput");
+  });
+
+  it("emits <Type>List { items, meta } wrapping a non-null list of non-null items", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([cvPage]));
+
+    const schema = buildSchema(await service.buildTypeDefs());
+
+    const listType = schema.getType("CvPageList") as GraphQLObjectType;
+    expect(listType).toBeDefined();
+    const fields = listType.getFields();
+    expect(Object.keys(fields)).toEqual(["items", "meta"]);
+    expect(fields.items.type).toBeInstanceOf(GraphQLNonNull);
+    const itemsOfType = (fields.items.type as GraphQLNonNull<GraphQLList<unknown>>).ofType;
+    expect(itemsOfType).toBeInstanceOf(GraphQLList);
+    expect((itemsOfType as GraphQLList<GraphQLNonNull<GraphQLObjectType>>).ofType.toString()).toBe("CvPage!");
+    expect(fields.meta.type.toString()).toBe("ListMeta!");
+  });
+
+  it("emits shared PaginationInput/PaginationMeta/ListMeta types once", async () => {
+    const service = new SchemaBuilderService(buildSchemaLoader([cvPage, enItVocab]));
+
+    const typeDefs = await service.buildTypeDefs();
+    const schema = buildSchema(typeDefs);
+
+    const paginationInput = schema.getType("PaginationInput") as GraphQLInputObjectType;
+    expect(Object.keys(paginationInput.getFields())).toEqual(["start", "limit", "page", "pageSize"]);
+    expect(paginationInput.getFields().start.type.toString()).toBe("Int");
+    expect(paginationInput.getFields().limit.type.toString()).toBe("Int");
+    expect(paginationInput.getFields().page.type.toString()).toBe("Int");
+    expect(paginationInput.getFields().pageSize.type.toString()).toBe("Int");
+
+    const paginationMeta = schema.getType("PaginationMeta") as GraphQLObjectType;
+    expect(Object.keys(paginationMeta.getFields())).toEqual(["page", "pageSize", "total"]);
+    expect(paginationMeta.getFields().page.type.toString()).toBe("Int!");
+    expect(paginationMeta.getFields().pageSize.type.toString()).toBe("Int!");
+    expect(paginationMeta.getFields().total.type.toString()).toBe("Int!");
+
+    const listMeta = schema.getType("ListMeta") as GraphQLObjectType;
+    expect(Object.keys(listMeta.getFields())).toEqual(["pagination"]);
+    expect(listMeta.getFields().pagination.type.toString()).toBe("PaginationMeta!");
+
+    expect(typeDefs.match(/input PaginationInput /g)).toHaveLength(1);
+    expect(typeDefs.match(/type PaginationMeta /g)).toHaveLength(1);
+    expect(typeDefs.match(/type ListMeta /g)).toHaveLength(1);
   });
 
   it("emits <Type>Input mirroring the object type's shape, with media fields as ID and repeatable components as an optional list", async () => {
@@ -305,22 +397,22 @@ describe("SchemaBuilderService", () => {
     expect(mutationFields.createCvPage.args[0].type.toString()).toBe("CvPageInput!");
     expect(mutationFields.createCvPage.type.toString()).toBe("CvPage!");
 
-    expect(mutationFields.updateCvPage.args.map((a) => a.name)).toEqual(["Id", "data"]);
+    expect(mutationFields.updateCvPage.args.map((a) => a.name)).toEqual(["documentId", "data"]);
     expect(mutationFields.updateCvPage.args[0].type.toString()).toBe("ID!");
     expect(mutationFields.updateCvPage.args[1].type.toString()).toBe("CvPageInput!");
     expect(mutationFields.updateCvPage.type.toString()).toBe("CvPage!");
 
-    expect(mutationFields.deleteCvPage.args.map((a) => a.name)).toEqual(["Id"]);
+    expect(mutationFields.deleteCvPage.args.map((a) => a.name)).toEqual(["documentId"]);
     expect(mutationFields.deleteCvPage.type.toString()).toBe("Boolean!");
 
-    expect(mutationFields.publishCvPage.args.map((a) => a.name)).toEqual(["Id"]);
+    expect(mutationFields.publishCvPage.args.map((a) => a.name)).toEqual(["documentId"]);
     expect(mutationFields.publishCvPage.type.toString()).toBe("CvPage!");
 
-    expect(mutationFields.unpublishCvPage.args.map((a) => a.name)).toEqual(["Id"]);
+    expect(mutationFields.unpublishCvPage.args.map((a) => a.name)).toEqual(["documentId"]);
     expect(mutationFields.unpublishCvPage.type.toString()).toBe("CvPage!");
   });
 
-  it("emits save/publish/unpublish mutations (no create/update/delete/Id) for a single-kind definition", async () => {
+  it("emits save/publish/unpublish mutations (no create/update/delete/documentId) for a single-kind definition", async () => {
     const service = new SchemaBuilderService(buildSchemaLoader([singleTypeDef]));
 
     const schema = buildSchema(await service.buildTypeDefs());

@@ -13,7 +13,7 @@ describe("RefreshTokenService", () => {
   let service: RefreshTokenService;
   let users: jest.Mocked<IUserRepository>;
   let roles: jest.Mocked<IRoleRepository>;
-  let jwtTokenService: jest.Mocked<Pick<JwtTokenService, "signAccessToken" | "signRefreshToken" | "verifyRefreshToken" | "getRefreshTokenMaxAgeMs">>;
+  let jwtTokenService: jest.Mocked<Pick<JwtTokenService, "signAccessToken" | "signRefreshToken" | "getRefreshTokenMaxAgeMs">>;
 
   const adminRole = new RoleEntity("role-admin", "Admin", "admin", ["user:read"], 50, true, new Date(), new Date(), null);
   const verifiedUser = new UserEntity("user-1", "jane@example.com", "Jane Doe", "janedoe", "hashed-password", true, true, "role-admin", new Date(), new Date());
@@ -42,7 +42,7 @@ describe("RefreshTokenService", () => {
       delete: jest.fn(),
       hasAny: jest.fn(),
     };
-    jwtTokenService = { signAccessToken: jest.fn(), signRefreshToken: jest.fn(), verifyRefreshToken: jest.fn(), getRefreshTokenMaxAgeMs: jest.fn() };
+    jwtTokenService = { signAccessToken: jest.fn(), signRefreshToken: jest.fn(), getRefreshTokenMaxAgeMs: jest.fn() };
 
     const module = await Test.createTestingModule({
       providers: [
@@ -56,37 +56,40 @@ describe("RefreshTokenService", () => {
     service = module.get(RefreshTokenService);
   });
 
-  it("throws UnauthorizedException when the refresh token is invalid or expired", async () => {
-    jwtTokenService.verifyRefreshToken.mockImplementation(() => {
-      throw new Error("jwt expired");
-    });
-
-    await expect(service.execute("bad-token")).rejects.toThrow(UnauthorizedException);
-  });
-
+  // Refresh-token verification (signature/expiry) now happens in JwtRefreshStrategy before this
+  // service ever runs — see jwt-refresh.strategy.spec.ts. This service only re-derives state from
+  // an already-verified `sub`.
   it("throws UnauthorizedException when the token's subject no longer exists", async () => {
-    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1", rememberMe: false });
     users.findById.mockResolvedValue(null);
 
-    await expect(service.execute("refresh-token")).rejects.toThrow(UnauthorizedException);
+    await expect(service.execute("user-1", false)).rejects.toThrow(UnauthorizedException);
   });
 
   it("throws UnauthorizedException when the user has no role assigned", async () => {
-    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1", rememberMe: false });
     users.findById.mockResolvedValue(new UserEntity("user-1", "jane@example.com", "Jane Doe", "janedoe", "hashed-password", true, true, null, new Date(), new Date()));
 
-    await expect(service.execute("refresh-token")).rejects.toThrow(UnauthorizedException);
+    await expect(service.execute("user-1", false)).rejects.toThrow(UnauthorizedException);
+  });
+
+  it("throws UnauthorizedException when the user's assigned role no longer exists", async () => {
+    // IRoleRepository.findById's type says non-null, but prisma-role.repository.ts returns
+    // `null as unknown as RoleEntity` on a miss — e.g. the role was deleted after this user's
+    // session was established. Every other findById caller in the codebase guards this; this one
+    // must too, or it throws an unhandled TypeError instead of a controlled 401.
+    users.findById.mockResolvedValue(verifiedUser);
+    roles.findById.mockResolvedValue(null as unknown as RoleEntity);
+
+    await expect(service.execute("user-1", false)).rejects.toThrow(UnauthorizedException);
   });
 
   it("re-fetches the user and role fresh from the database and rotates both tokens, preserving rememberMe:true", async () => {
-    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1", rememberMe: true });
     users.findById.mockResolvedValue(verifiedUser);
     roles.findById.mockResolvedValue(adminRole);
     jwtTokenService.signAccessToken.mockReturnValue("new-access-token");
     jwtTokenService.signRefreshToken.mockReturnValue("new-refresh-token");
     jwtTokenService.getRefreshTokenMaxAgeMs.mockReturnValue(30 * 24 * 60 * 60 * 1000);
 
-    const result = await service.execute("refresh-token");
+    const result = await service.execute("user-1", true);
 
     expect(users.findById).toHaveBeenCalledWith("user-1");
     expect(roles.findById).toHaveBeenCalledWith("role-admin");
@@ -102,31 +105,13 @@ describe("RefreshTokenService", () => {
   });
 
   it("rotates both tokens preserving rememberMe:false", async () => {
-    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1", rememberMe: false });
     users.findById.mockResolvedValue(verifiedUser);
     roles.findById.mockResolvedValue(adminRole);
     jwtTokenService.signAccessToken.mockReturnValue("new-access-token");
     jwtTokenService.signRefreshToken.mockReturnValue("new-refresh-token");
     jwtTokenService.getRefreshTokenMaxAgeMs.mockReturnValue(7 * 24 * 60 * 60 * 1000);
 
-    const result = await service.execute("refresh-token");
-
-    expect(jwtTokenService.signRefreshToken).toHaveBeenCalledWith({ sub: "user-1", rememberMe: false });
-    expect(jwtTokenService.getRefreshTokenMaxAgeMs).toHaveBeenCalledWith(false);
-    expect(result).toEqual({ accessToken: "new-access-token", refreshToken: "new-refresh-token", refreshTokenMaxAgeMs: 7 * 24 * 60 * 60 * 1000 });
-  });
-
-  it("falls back to rememberMe:false for a pre-change token that has no rememberMe field at all", async () => {
-    // Simulates a refresh token minted before this feature shipped — `rememberMe` is optional
-    // precisely because a real legacy JWT payload won't carry it at runtime.
-    jwtTokenService.verifyRefreshToken.mockReturnValue({ sub: "user-1" });
-    users.findById.mockResolvedValue(verifiedUser);
-    roles.findById.mockResolvedValue(adminRole);
-    jwtTokenService.signAccessToken.mockReturnValue("new-access-token");
-    jwtTokenService.signRefreshToken.mockReturnValue("new-refresh-token");
-    jwtTokenService.getRefreshTokenMaxAgeMs.mockReturnValue(7 * 24 * 60 * 60 * 1000);
-
-    const result = await service.execute("refresh-token");
+    const result = await service.execute("user-1", false);
 
     expect(jwtTokenService.signRefreshToken).toHaveBeenCalledWith({ sub: "user-1", rememberMe: false });
     expect(jwtTokenService.getRefreshTokenMaxAgeMs).toHaveBeenCalledWith(false);

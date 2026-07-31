@@ -14,19 +14,7 @@ export class RefreshTokenService {
     private readonly jwtTokenService: JwtTokenService,
   ) {}
 
-  async execute(refreshToken: string): Promise<LoginResult> {
-    let sub: string;
-    let rememberMe: boolean;
-    try {
-      const payload = this.jwtTokenService.verifyRefreshToken(refreshToken);
-      sub = payload.sub;
-      // A refresh token minted before rememberMe shipped won't carry this field at runtime,
-      // even though the type says it's required — fall back to the pre-feature default.
-      rememberMe = payload.rememberMe ?? false;
-    } catch {
-      throw new UnauthorizedException("Invalid or expired refresh token");
-    }
-
+  async execute(sub: string, rememberMe: boolean): Promise<LoginResult> {
     const user = await this.users.findById(sub);
     if (!user) {
       throw new UnauthorizedException("Invalid or expired refresh token");
@@ -37,6 +25,9 @@ export class RefreshTokenService {
     }
 
     const role = await this.roles.findById(user.roleId);
+    if (!role) {
+      throw new UnauthorizedException("Invalid or expired refresh token");
+    }
 
     const accessToken = this.jwtTokenService.signAccessToken({ sub: user.documentId, roleSlug: role.slug, level: role.level, permissions: role.permissions });
     const newRefreshToken = this.jwtTokenService.signRefreshToken({ sub: user.documentId, rememberMe });

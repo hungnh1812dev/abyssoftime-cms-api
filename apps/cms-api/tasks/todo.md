@@ -1,42 +1,45 @@
-# Todo — Dynamic GraphQL API
+# Todo — GraphQL Contract Parity Pass
 
-See `tasks/plan.md` for full context, dependency graph, and rationale.
+See `tasks/plan.md` for full context, dependency graph, and rationale. See `SPEC.md` for the full contract.
 
-## Phase 1 — Foundation + minimal single-query vertical slice
-- [x] Task 1.1 — Install `@nestjs/graphql`/`@nestjs/apollo`/`@apollo/server`/`graphql`; module skeleton + boot wiring + dev-only introspection gating
-- [x] Task 1.2 — `field-type-mapping.ts` + `naming.ts` (pure, unit-tested)
-- [x] Task 1.3 — Additive exports: `ContentTypeModule` (`SchemaLoaderService`), `DocumentModule` (`GetPublicDocumentService`, `GetDocumentForEditService`)
-- [x] Task 1.4 — `schema-builder.service.ts`: scalar-only SDL + single query
-- [x] Task 1.5 — `graphql-context.factory.ts` + `authorize.util.ts` (Bearer token, never throws on absent token)
-- [x] Task 1.6 — `resolver-factory.service.ts`: single-query resolver + real `graphql.module.ts` wiring
-- [x] **Checkpoint 1:** `bun run build` / `tsc --noEmit` / `bun run lint` / `test:cov` green; manual `start:dev` walkthrough (published/draft, with/without token) — commit
+## Phase 1 — Breaking renames (Areas 1 + 2)
+- [x] Task 1.1 — Pluralize `listQueryName` in `graphql/domain/naming.ts` (`<slug>List` → `<pluralSlug>`); rewrite `naming.spec.ts`
+- [x] Task 1.2 — Rename `Id` → `documentId` across `schema-builder.service.ts` (query + 4 mutations) and `resolver-factory.service.ts` (arg types + read sites + error string); update e2e query strings
+- [x] **Checkpoint A:** full e2e green — commit (covers Tasks 1.1 + 1.2)
 
-## Phase 2 — List query
-- [x] Task 2.1 — `ListDocumentsFullService` (new file, `document` module) — full-hydration, published-only, no listFields projection
-- [x] Task 2.2 — `list-args.translator.ts`: GraphQL `where`/`orderBy` → `ParsedFilter[]`
-- [x] Task 2.3 — SDL: `<Type>Filter`/`<Type>OrderBy` + list query; resolver wiring
-- [x] **Checkpoint 2:** automated checks green; manual filter+orderBy+pagination check — commit
+## Phase 2 — List envelope + pagination + orderBy default (Areas 3 + 4 + 8)
+- [x] Add `PaginationInput`/`PaginationMeta`/`ListMeta` SDL (as split-out named constants) + `<Type>List` envelope type; rewrite `buildListQueryField`
+- [x] Rewrite `list-args.translator.ts`: `pagination` arg replaces `start`/`size`; implement SPEC §3.3's 13-rule validation table with exact error strings; default order-by column → `createdAt`
+- [x] Resolver: build `{ items, meta: { pagination } }` envelope, computing `page`/`pageSize` post-resolution (incl. `limit: -1` unlimited case)
+- [x] `prisma-document.repository.ts`: additive branch in `listPaginated` to omit `LIMIT` when `opts.size === -1`
+- [x] Rewrite e2e list-query block for envelope shape; add all 13 pagination-rule cases + `limit: -1` case
+- [x] **Checkpoint:** all checks green — commit (note deliberate default-limit change 20→10 in message)
 
-## Phase 3 — Media + component recursive resolution
-- [x] Task 3.1 — `MediaModule` export + `MediaAsset` type + field resolver (dangling/null FK → `null`, never throws)
-- [x] Task 3.2 — Recursive component SDL + resolvers (arbitrary nesting depth)
-- [x] Task 3.3 — New `test/graphql.e2e-spec.ts`: full read-path e2e (real seeds + throwaway media-bearing content type)
-- [x] **Checkpoint 3:** `bun run test:e2e` green; manual nested+media query — commit
+## Phase 3 — `DateTime` scalar + system fields on `<Type>` (Area 9)
+- [x] New `graphql/domain/date-time-scalar.ts` (mirrors `json-scalar.ts`) + `date-time-scalar.spec.ts`
+- [x] `schema-builder.service.ts`: add `scalar DateTime`; `buildObjectType` appends `createdAt`/`updatedAt`/`publishedAt`
+- [x] `resolver-factory.service.ts`: register `DateTime` scalar; `toResolverValue` stops dropping the 3 timestamp fields
+- [x] `list-documents-full.service.ts`: items mapper stops dropping the 3 timestamp fields
+- [x] Extend e2e assertions (single/list/mutation) for real ISO timestamps
+- [x] **Checkpoint:** all checks green — commit
 
-## Phase 4 — Mutations (collection-type)
-- [x] Task 4.1 — Export remaining collection services; SDL for `<Type>Input` + 5 mutations
-- [x] Task 4.2 — Mutation resolvers + permission checks (create/update/delete/publish/unpublish; update re-reads after save)
-- [x] Task 4.3 — e2e: full CRUD lifecycle + permission-denied cases
-- [x] **Checkpoint 4:** `bun run test:e2e` green; manual full lifecycle via a real token — commit
+## Phase 4 — Expanded operators + system-field filters (Areas 5 + 7)
+- [x] `document/domain/entities/filter.ts`: widen `FilterOperator` with `$in`/`$notIn`
+- [x] `where-builder.ts`: add `$in`/`$notIn` branches to `buildFilterWhere` (confirmed shared-file edit)
+- [x] `schema-builder.service.ts`: `TextFilter`/`NumberFilter` gain `in`/`notIn`; add `IDFilter`/`TimeFilter`; `buildFilterType` prepends system-field filters
+- [x] `list-args.translator.ts`: add `in`/`notIn` operator mapping; add system-field (documentId/createdAt/updatedAt/publishedAt) filter resolution
+- [x] Extend e2e list-query block with `in`/`notIn` + system-field filter cases
+- [x] **Checkpoint:** all checks green — commit
 
-## Phase 5 — Single-type support
-- [x] Task 5.1 — Export 5 single-type services; SDL + resolvers (query/save/publish/unpublish, no `Id`); e2e extension
-- [x] **Checkpoint 5:** full e2e suite + all automated checks green — commit
-
-## Phase 6 — Hardening
-- [x] Task 6.1 — Error-shape audit (consistent `GraphQLError` codes); re-verify introspection gating; five-axis review; address findings
-- [x] **Checkpoint 6:** all checks green, findings addressed — commit
-
-## Phase 7 — Docs + close-out
-- [x] Task 7.1 — `docs/documents/graphql.md` (new), confirm/update `graphql-techstack.md`, `docs/ENTRYPOINT.md` index entry, `SPEC.md` trimmed to pointer
-- [x] **Checkpoint 7 (final):** all checks green — commit — feature complete
+## Phase 5 — Filter combinators `and`/`or`/`not` (Area 6)
+- [x] `filter.ts`: add `FilterNode` discriminated union
+- [x] `where-builder.ts`: new additive `buildFilterTree` (existing flat builder untouched)
+- [x] `document.repository.ts`: `ListOptions` gains optional `filterTree` (REST never populates it)
+- [x] `prisma-document.repository.ts`: additive AND-onto-existing branch in `listPaginated` when `filterTree` present
+- [x] `list-documents-full.service.ts`: `FullListOptions` gains `filterTree`
+- [x] `list-args.translator.ts`: `resolveFilters` → recursive `resolveFilterNode`, single root `FilterNode` always returned
+- [x] `schema-builder.service.ts`: `buildFilterType` appends self-referencing `and`/`or`/`not`
+- [x] New unit spec for `buildFilterTree` (nested AND/OR/NOT parenthesization)
+- [x] e2e: SPEC §3.5 example combinator query against real seeded rows
+- [x] Explicit re-run confirming REST's document e2e/unit suites unaffected
+- [x] **Final checkpoint:** `bun run build && bun run lint && bun run test:cov && bun run test:e2e` green; walk SPEC §7 checklist bullet-by-bullet — commit

@@ -1,0 +1,194 @@
+name: Project AbyssOfTime CI
+
+on:
+  push:
+    branches:
+      - develop
+      - master
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  change-detecter:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      cms-api: ${{ steps.changed.outputs.cms-api }}
+      cms-admin: ${{ steps.changed.outputs.cms-admin }}
+      frontend: ${{ steps.changed.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dorny/paths-filter@v4
+        id: changed
+        with:
+          base: ${{ github.event.before }}
+          filters: |
+            cms-api:
+                - 'apps/cms-api/**'
+            cms-admin:
+                - 'apps/cms-admin/**'
+            frontend:
+                - 'apps/frontend/**'
+
+      - name: Debug change detection
+        if: always()
+        run: |
+          {
+              echo "### Change detection debug"
+              echo "- event_name: \`${{ github.event_name }}\`"
+              echo "- ref: \`${{ github.ref }}\`"
+              echo "- before: \`${{ github.event.before }}\`"
+              echo "- after: \`${{ github.event.after }}\`"
+              echo "- cms-api changed: \`${{ steps.changed.outputs.cms-api }}\`"
+              echo "- cms-admin changed: \`${{ steps.changed.outputs.cms-admin }}\`"
+              echo "- frontend changed: \`${{ steps.changed.outputs.frontend }}\`"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  cms-api-test:
+    name: CMS API Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/cms-api
+    needs: [change-detecter]
+    if: needs.change-detecter.outputs.cms-api == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Unit Test
+        run: bun run test
+
+      - name: Build
+        run: bun run build
+
+  cms-admin-test:
+    name: CMS Admin Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/cms-admin
+    needs: [change-detecter]
+    if: needs.change-detecter.outputs.cms-admin == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Unit Test
+        run: bun run test
+
+      - name: Build
+        run: bun run build
+
+  frontend-test:
+    name: Frontend Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend
+    needs: [change-detecter]
+    if: needs.change-detecter.outputs.frontend == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Type Check
+        run: bunx tsc --noEmit
+
+      - name: Build
+        run: bun run build
+
+  deploy-cms-api:
+    name: Deploy CMS API
+    runs-on: ubuntu-latest
+    needs: [cms-api-test]
+    environment: Production
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+
+    steps:
+      - name: Debug deploy trigger condition
+        if: always()
+        run: |
+          echo "ref: ${{ github.ref }}, event_name: ${{ github.event_name }}"
+          echo "CMS_API_RENDER_DEPLOY_HOOK set: ${{ vars.CMS_API_RENDER_DEPLOY_HOOK != '' }}"
+
+      - name: Trigger Render Deploy Web Hook
+        if: vars.CMS_API_RENDER_DEPLOY_HOOK != ''
+        run: curl -fsSL "${{ vars.CMS_API_RENDER_DEPLOY_HOOK }}"
+
+  deploy-cms-admin:
+    name: Deploy CMS Admin
+    runs-on: ubuntu-latest
+    needs: [cms-admin-test]
+    environment: Production
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+
+    steps:
+      - name: Debug deploy trigger condition
+        if: always()
+        run: |
+          echo "ref: ${{ github.ref }}, event_name: ${{ github.event_name }}"
+          echo "CMS_ADMIN_RENDER_DEPLOY_HOOK set: ${{ vars.CMS_ADMIN_RENDER_DEPLOY_HOOK != '' }}"
+
+      - name: Trigger Render Deploy Web Hook
+        if: vars.CMS_ADMIN_RENDER_DEPLOY_HOOK != ''
+        run: curl -fsSL "${{ vars.CMS_ADMIN_RENDER_DEPLOY_HOOK }}"
+
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    needs: [frontend-test]
+    environment: Production
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install Vercel CLI
+        run: bun add -g vercel
+
+      - name: Deploy
+        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}

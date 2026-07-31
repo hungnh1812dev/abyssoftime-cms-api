@@ -248,6 +248,43 @@ describe("PrismaDocumentRepository", () => {
       expect(countParams).toEqual(["draft", "%hi%", true]);
     });
 
+    it("ANDs a filterTree onto the existing filters clause, each with its own sequential placeholders (SPEC.md §3.5)", async () => {
+      prisma.$queryRawUnsafe.mockResolvedValueOnce([{ count: 0 }]).mockResolvedValueOnce([]);
+
+      await repository.listPaginated(
+        "en-it-vocab",
+        "draft",
+        { ...opts, filters: [{ column: "wordGroup", operator: "$eq", value: "hello" }], filterTree: { or: [{ column: "isMain", operator: "$eq", value: true }] } },
+        FIELDS,
+      );
+
+      const [countSql, ...countParams] = prisma.$queryRawUnsafe.mock.calls[0];
+      expect(String(countSql)).toContain('("wordGroup" = $2)');
+      expect(String(countSql)).toContain('("isMain" = $3)');
+      expect(countParams).toEqual(["draft", "hello", true]);
+    });
+
+    it("ANDs a filterTree onto the version scope even with no flat filters present", async () => {
+      prisma.$queryRawUnsafe.mockResolvedValueOnce([{ count: 0 }]).mockResolvedValueOnce([]);
+
+      await repository.listPaginated("en-it-vocab", "draft", { ...opts, filterTree: { column: "wordGroup", operator: "$eq", value: "hi" } }, FIELDS);
+
+      const [countSql, ...countParams] = prisma.$queryRawUnsafe.mock.calls[0];
+      expect(String(countSql)).toContain('version = $1 AND "wordGroup" = $2');
+      expect(countParams).toEqual(["draft", "hi"]);
+    });
+
+    it("omits the LIMIT clause (keeps OFFSET) when size is -1 (unlimited, SPEC.md §3.3 rule 11)", async () => {
+      prisma.$queryRawUnsafe.mockResolvedValueOnce([{ count: 5 }]).mockResolvedValueOnce([]);
+
+      await repository.listPaginated("en-it-vocab", "draft", { ...opts, size: -1, start: 0 }, FIELDS);
+
+      const [dataSql, ...dataParams] = prisma.$queryRawUnsafe.mock.calls[1];
+      expect(String(dataSql)).not.toContain("LIMIT");
+      expect(String(dataSql)).toContain("OFFSET $2");
+      expect(dataParams).toEqual(["draft", 0]);
+    });
+
     it("rejects an orderBy column outside the schema allowlist", async () => {
       await expect(repository.listPaginated("en-it-vocab", "draft", { ...opts, orderBy: "techStack" }, FIELDS)).rejects.toThrow();
     });

@@ -112,7 +112,7 @@ describe("GraphqlModule", () => {
       const config = await invokeFactory();
 
       expect(config.typeDefs).toContain("type CvPage");
-      expect(config.typeDefs).toContain("cvPage(Id: ID!, status: String): CvPage");
+      expect(config.typeDefs).toContain("cvPage(documentId: ID!, status: String): CvPage");
       expect(config.typeDefs).toContain("type HomePage");
       expect(config.typeDefs).toContain("homePage(status: String): HomePage");
     });
@@ -122,7 +122,7 @@ describe("GraphqlModule", () => {
 
       const resolvers = config.resolvers as { Query: Record<string, unknown>; Mutation: Record<string, unknown>; SortDirection: Record<string, string> };
       expect(resolvers.Query.cvPage).toBeInstanceOf(Function);
-      expect(resolvers.Query.cvPageList).toBeInstanceOf(Function);
+      expect(resolvers.Query.cvPages).toBeInstanceOf(Function);
       expect(resolvers.Mutation.createCvPage).toBeInstanceOf(Function);
       expect(resolvers.Mutation.updateCvPage).toBeInstanceOf(Function);
       expect(resolvers.Mutation.deleteCvPage).toBeInstanceOf(Function);
@@ -132,7 +132,7 @@ describe("GraphqlModule", () => {
       expect(resolvers.Mutation.saveHomePage).toBeInstanceOf(Function);
       expect(resolvers.Mutation.publishHomePage).toBeInstanceOf(Function);
       expect(resolvers.Mutation.unpublishHomePage).toBeInstanceOf(Function);
-      expect(resolvers.SortDirection).toEqual({ ASC: "asc", DESC: "desc" });
+      expect(resolvers.SortDirection).toEqual({ ASC: "asc", DESC: "desc", asc: "asc", desc: "desc" });
     });
 
     it("gates introspection/playground to non-production", async () => {

@@ -117,6 +117,13 @@ describe("validateContentTypeDefinition", () => {
     expect(() => validateContentTypeDefinition(definition)).toThrow(SchemaValidationError);
   });
 
+  it.each(["documentId", "createdAt", "updatedAt", "publishedAt", "and", "or", "not"])("throws when a field name collides with the GraphQL-reserved camelCase name %s", (name) => {
+    const definition = cvPageLikeDefinition();
+    definition.fields.push({ name, type: "text" });
+
+    expect(() => validateContentTypeDefinition(definition)).toThrow(SchemaValidationError);
+  });
+
   it("throws when listFields references an unknown field", () => {
     const definition = { ...cvPageLikeDefinition(), listFields: ["doesNotExist"] };
 
