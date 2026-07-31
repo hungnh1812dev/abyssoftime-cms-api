@@ -1,3 +1,4 @@
+import { DateTimeScalar } from "../domain/date-time-scalar";
 import { JSONScalar } from "../domain/json-scalar";
 import {
   componentTypeName,
@@ -69,7 +70,13 @@ type FieldResolver = (parent: unknown, args: any, context: GraphqlContext, info?
 type MediaFieldResolver = (parent: Record<string, unknown>) => Promise<MediaAssetEntity | null>;
 
 function toResolverValue(document: DocumentEntity): Record<string, unknown> {
-  return { documentId: document.documentId, ...document.fields };
+  return {
+    documentId: document.documentId,
+    ...document.fields,
+    createdAt: document.createdAt,
+    updatedAt: document.updatedAt,
+    publishedAt: document.publishedAt,
+  };
 }
 
 function assertValidDocumentId(id: string): void {
@@ -277,6 +284,6 @@ export class ResolverFactoryService {
       };
     }
 
-    return { Query: query, Mutation: mutation, SortDirection: { ASC: "asc", DESC: "desc" }, JSON: JSONScalar, ...typeResolvers };
+    return { Query: query, Mutation: mutation, SortDirection: { ASC: "asc", DESC: "desc" }, JSON: JSONScalar, DateTime: DateTimeScalar, ...typeResolvers };
   }
 }

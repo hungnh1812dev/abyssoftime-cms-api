@@ -61,6 +61,11 @@ function buildPngBuffer(width: number, height: number): Buffer {
   return Buffer.concat([signature, length, chunkType, widthBuf, heightBuf, rest]);
 }
 
+function expectISODateTime(value: unknown): void {
+  expect(typeof value).toBe("string");
+  expect(new Date(value as string).toISOString()).toBe(value);
+}
+
 describe("GraphQL (e2e)", () => {
   const runId = randomUUID().slice(0, 8);
   const mediaSlug = `e2e-gql-media-${runId}`;
@@ -250,11 +255,15 @@ describe("GraphQL (e2e)", () => {
     });
 
     it("returns the published document for a document:read-scoped token", async () => {
-      const response = await gql(`{ cvPage(documentId: "${documentId}") { position company } }`, undefined, readScopedApiToken).expect(200);
+      const response = await gql(`{ cvPage(documentId: "${documentId}") { position company createdAt updatedAt publishedAt } }`, undefined, readScopedApiToken).expect(200);
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
-      expect(body.data).toEqual({ cvPage: { position: `GraphQL Engineer ${runId}`, company: `Acme-${runId}` } });
+      const cvPage = (body.data as { cvPage: Record<string, unknown> }).cvPage;
+      expect(cvPage).toMatchObject({ position: `GraphQL Engineer ${runId}`, company: `Acme-${runId}` });
+      expectISODateTime(cvPage.createdAt);
+      expectISODateTime(cvPage.updatedAt);
+      expectISODateTime(cvPage.publishedAt);
     });
 
     it("returns null (not a GraphQL error) for a nonexistent documentId", async () => {
@@ -315,7 +324,7 @@ describe("GraphQL (e2e)", () => {
       const query = `
         query($where: CvPageFilter, $orderBy: CvPageOrderBy, $pagination: PaginationInput) {
           cvPages(where: $where, orderBy: $orderBy, pagination: $pagination) {
-            items { position isMain }
+            items { position isMain createdAt }
             meta { pagination { page pageSize total } }
           }
         }
@@ -328,12 +337,14 @@ describe("GraphQL (e2e)", () => {
 
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
-      const result = (body.data as { cvPages: { items: { position: string; isMain: boolean }[]; meta: { pagination: { page: number; pageSize: number; total: number } } } })
-        .cvPages;
-      expect(result.items).toEqual([
+      const result = (
+        body.data as { cvPages: { items: { position: string; isMain: boolean; createdAt: unknown }[]; meta: { pagination: { page: number; pageSize: number; total: number } } } }
+      ).cvPages;
+      expect(result.items.map(({ position, isMain }) => ({ position, isMain }))).toEqual([
         { position: `${filterTag} Primary`, isMain: true },
         { position: `${filterTag} Secondary`, isMain: false },
       ]);
+      result.items.forEach((item) => expectISODateTime(item.createdAt));
       expect(result.meta.pagination).toEqual({ page: 1, pageSize: 10, total: 2 });
     });
 
@@ -535,6 +546,7 @@ describe("GraphQL (e2e)", () => {
           createCvPage(data: $data) {
             documentId position isMain company
             experiences { company location roles { position techStack } }
+            createdAt updatedAt publishedAt
           }
         }`,
         {
@@ -565,6 +577,9 @@ describe("GraphQL (e2e)", () => {
         company: `MutationCo-${runId}`,
         experiences: [{ company: "Acme", location: "Remote", roles: [{ position: "Engineer", techStack: ["ts", "graphql"] }] }],
       });
+      expectISODateTime(created.createdAt);
+      expectISODateTime(created.updatedAt);
+      expect(created.publishedAt).toBeNull();
 
       const updateResult = await gql(
         `mutation($documentId: ID!, $data: CvPageInput!) { updateCvPage(documentId: $documentId, data: $data) { documentId company } }`,
@@ -576,13 +591,15 @@ describe("GraphQL (e2e)", () => {
       expect(updateBody.data).toEqual({ updateCvPage: { documentId, company: `UpdatedCo-${runId}` } });
 
       const publishResult = await gql(
-        `mutation($documentId: ID!) { publishCvPage(documentId: $documentId) { documentId company } }`,
+        `mutation($documentId: ID!) { publishCvPage(documentId: $documentId) { documentId company publishedAt } }`,
         { documentId: documentId },
         publishOnlyApiToken,
       ).expect(200);
       const publishBody = publishResult.body as GraphQLResponseBody;
       expect(publishBody.errors).toBeUndefined();
-      expect(publishBody.data).toEqual({ publishCvPage: { documentId, company: `UpdatedCo-${runId}` } });
+      const published = (publishBody.data as { publishCvPage: Record<string, unknown> }).publishCvPage;
+      expect(published).toMatchObject({ documentId, company: `UpdatedCo-${runId}` });
+      expectISODateTime(published.publishedAt);
 
       const publicReadAfterPublish = await gql(`{ cvPage(documentId: "${documentId}") { company } }`, undefined, readScopedApiToken).expect(200);
       expect((publicReadAfterPublish.body as GraphQLResponseBody).data).toEqual({ cvPage: { company: `UpdatedCo-${runId}` } });

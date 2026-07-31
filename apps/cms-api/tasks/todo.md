@@ -16,11 +16,11 @@ See `tasks/plan.md` for full context, dependency graph, and rationale. See `SPEC
 - [x] **Checkpoint:** all checks green — commit (note deliberate default-limit change 20→10 in message)
 
 ## Phase 3 — `DateTime` scalar + system fields on `<Type>` (Area 9)
-- [ ] New `graphql/domain/date-time-scalar.ts` (mirrors `json-scalar.ts`) + `date-time-scalar.spec.ts`
-- [ ] `schema-builder.service.ts`: add `scalar DateTime`; `buildObjectType` appends `createdAt`/`updatedAt`/`publishedAt`
-- [ ] `resolver-factory.service.ts`: register `DateTime` scalar; `toResolverValue` stops dropping the 3 timestamp fields
-- [ ] `list-documents-full.service.ts`: items mapper stops dropping the 3 timestamp fields
-- [ ] Extend e2e assertions (single/list/mutation) for real ISO timestamps
+- [x] New `graphql/domain/date-time-scalar.ts` (mirrors `json-scalar.ts`) + `date-time-scalar.spec.ts`
+- [x] `schema-builder.service.ts`: add `scalar DateTime`; `buildObjectType` appends `createdAt`/`updatedAt`/`publishedAt`
+- [x] `resolver-factory.service.ts`: register `DateTime` scalar; `toResolverValue` stops dropping the 3 timestamp fields
+- [x] `list-documents-full.service.ts`: items mapper stops dropping the 3 timestamp fields
+- [x] Extend e2e assertions (single/list/mutation) for real ISO timestamps
 - [ ] **Checkpoint:** all checks green — commit
 
 ## Phase 4 — Expanded operators + system-field filters (Areas 5 + 7)

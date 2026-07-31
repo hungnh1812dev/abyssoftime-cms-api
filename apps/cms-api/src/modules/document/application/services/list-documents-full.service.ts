@@ -42,6 +42,9 @@ export class ListDocumentsFullService {
         documentId: row.documentId,
         ...row.fields,
         ...(await this.componentIo.hydrateComponents(slug, row.documentId, "published", contentType.fields)),
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        publishedAt: row.publishedAt,
       })),
     );
 

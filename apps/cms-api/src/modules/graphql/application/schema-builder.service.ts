@@ -33,6 +33,8 @@ const MEDIA_ASSET_TYPE = `type MediaAsset {
 
 const JSON_SCALAR_TYPE = `scalar JSON`;
 
+const DATE_TIME_SCALAR_TYPE = `scalar DateTime`;
+
 // Mirrors list-args.translator.ts's OPERATORS_BY_FIELD_TYPE (SPEC.md decision #7): the shared
 // per-field-kind filter input types below must stay in lockstep with what that translator accepts.
 const FILTER_INPUT_TYPE_BY_FIELD_TYPE: Partial<Record<FieldType, string>> = {
@@ -101,7 +103,13 @@ function buildObjectType(definition: ContentTypeDefinition): string {
   // documentId isn't a schema-defined field, but every resolver (query and mutation) already
   // attaches it (toResolverValue) — without it in the SDL, a client has no way to learn a newly
   // created document's id, since create<Type>'s caller doesn't know it up front.
-  const fieldLines = ["  documentId: ID!", ...definition.fields.map((field) => buildFieldLine(definition.slug, field))];
+  const fieldLines = [
+    "  documentId: ID!",
+    ...definition.fields.map((field) => buildFieldLine(definition.slug, field)),
+    "  createdAt: DateTime!",
+    "  updatedAt: DateTime!",
+    "  publishedAt: DateTime",
+  ];
 
   return `type ${typeName(definition.slug)} {\n${fieldLines.join("\n")}\n}`;
 }
@@ -268,6 +276,7 @@ export class SchemaBuilderService {
     return [
       MEDIA_ASSET_TYPE,
       JSON_SCALAR_TYPE,
+      DATE_TIME_SCALAR_TYPE,
       ...objectTypes,
       ...inputTypes,
       FILTER_INPUT_TYPES,

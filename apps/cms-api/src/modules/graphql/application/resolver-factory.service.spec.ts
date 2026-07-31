@@ -1,3 +1,4 @@
+import { DateTimeScalar } from "../domain/date-time-scalar";
 import { JSONScalar } from "../domain/json-scalar";
 
 import { BadRequestException, NotFoundException } from "@nestjs/common";
@@ -327,6 +328,24 @@ describe("ResolverFactoryService", () => {
     const resolvers = await service.buildResolvers();
 
     expect(resolvers.JSON).toBe(JSONScalar);
+  });
+
+  it("registers the DateTime scalar resolver", async () => {
+    const resolvers = await service.buildResolvers();
+
+    expect(resolvers.DateTime).toBe(DateTimeScalar);
+  });
+
+  it("includes createdAt/updatedAt/publishedAt from the document entity in the resolved value", async () => {
+    const createdAt = new Date("2026-01-01T00:00:00.000Z");
+    const updatedAt = new Date("2026-01-02T00:00:00.000Z");
+    const publishedAt = new Date("2026-01-03T00:00:00.000Z");
+    getPublicDocument.execute.mockResolvedValue(new DocumentEntity(validId, "published", { position: "Engineer" }, createdAt, updatedAt, publishedAt, null, null, null));
+    const resolvers = await service.buildResolvers();
+
+    const result = await resolvers.Query.cvPage(undefined, { documentId: validId }, readScopedToken, undefined);
+
+    expect(result).toEqual(expect.objectContaining({ createdAt, updatedAt, publishedAt }));
   });
 
   describe("mutations", () => {
