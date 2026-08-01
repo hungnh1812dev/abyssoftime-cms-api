@@ -1,0 +1,66 @@
+@media print {
+  @page {
+    margin: 8mm 14mm;
+  }
+
+  .printHide {
+    display: none !important;
+  }
+
+  .cvContainer {
+    /* Force light-mode CSS variables so Tailwind color utilities render correctly on white paper */
+    --foreground: 20 14.3% 4.1%;
+    --background: 0 0% 100%;
+    --border: 20 5.9% 90%;
+    --muted: 60 4.8% 95.9%;
+    --muted-foreground: 25 5.3% 44.7%;
+    --card: 0 0% 100%;
+    --card-foreground: 20 14.3% 4.1%;
+    --primary: 24 9.8% 10%;
+    --secondary: 60 4.8% 95.9%;
+    --secondary-foreground: 24 9.8% 10%;
+
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+    color: black !important;
+    font-size: 12.5px !important;
+    line-height: 1.3 !important;
+  }
+
+  .cvContainer section {
+    margin-bottom: 14px !important;
+  }
+
+  .cvContainer header {
+    margin-bottom: 10px !important;
+    padding-bottom: 10px !important;
+  }
+
+  .cvContainer li {
+    padding-bottom: 2px !important;
+  }
+
+  .cvContainer h4 a[href^="http"]::after {
+    content: none;
+  }
+
+  .cvContainer a[href^="http"]::after {
+    content: none;
+  }
+
+  .cvContainer a[href^="tel"]::after,
+  .cvContainer a[href^="mailto"]::after {
+    content: none;
+  }
+
+  .cvContainer header a[href^="http"]::after {
+    content: attr(href);
+    display: block;
+    font-size: 0.78em;
+    color: #444;
+    font-weight: 400;
+    margin-top: 1px;
+  }
+}

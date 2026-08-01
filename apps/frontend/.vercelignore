@@ -1,0 +1,18 @@
+# ─── Testing (không cần khi deploy) ─────────────────────────────────────────
+e2e/
+test-results/
+playwright-report/
+playwright.config.ts
+__mocks/
+coverage/
+
+# ─── TypeScript cache ─────────────────────────────────────────────────────────
+*.tsbuildinfo
+
+# ─── Development config ───────────────────────────────────────────────────────
+.vscode/
+.claude/
+
+# ─── Env files (Vercel tự quản lý qua dashboard) ────────────────────────────
+.env.local
+.env.*.local

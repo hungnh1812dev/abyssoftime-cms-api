@@ -1,0 +1,9 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "bun run build",
+  "installCommand": "bun install --frozen-lockfile",
+  "outputDirectory": ".next",
+  "github": {
+    "enabled": false
+  }
+}
