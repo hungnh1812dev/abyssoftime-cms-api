@@ -1,0 +1,11 @@
+@media print {
+  .skillsGrid {
+    /* CSS columns bị Chrome print engine bỏ qua khi child có break-inside:avoid.
+       Dùng Grid thay thế — reliable hơn trong print context.
+       Row-major flow (default) đảm bảo luôn có 3 cột bất kể số lượng item. */
+    columns: unset !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 0 1.5rem !important;
+  }
+}
