@@ -6,10 +6,29 @@ import { ConfigService } from "@nestjs/config";
 import { type EnvironmentVariables } from "@/config/env.validation";
 
 import { ConsoleEmailSender } from "./console-email.sender";
+import { GmailApiEmailSender } from "./gmail-api-email.sender";
 import { IEmailTemplateRenderer } from "./renderers/email-template-renderer";
 import { SmtpEmailSender } from "./smtp-email.sender";
 
 export function resolveEmailSender(configService: ConfigService<EnvironmentVariables, true>, mailerService: MailerService, templateRenderer: IEmailTemplateRenderer): IEmailSender {
+  const provider = configService.get("EMAIL_PROVIDER", { infer: true });
+
+  if (provider === "gmail") {
+    return new GmailApiEmailSender(configService, templateRenderer);
+  }
+  if (provider === "smtp") {
+    return new SmtpEmailSender(configService, mailerService, templateRenderer);
+  }
+  if (provider === "console") {
+    return new ConsoleEmailSender();
+  }
+
+  // "auto": Gmail if GMAIL_CLIENT_ID is set, else SMTP if SMTP_HOST is set, else console logging.
+  const gmailClientId = configService.get("GMAIL_CLIENT_ID", { infer: true });
+  if (gmailClientId) {
+    return new GmailApiEmailSender(configService, templateRenderer);
+  }
+
   const smtpHost = configService.get("SMTP_HOST", { infer: true });
 
   return smtpHost ? new SmtpEmailSender(configService, mailerService, templateRenderer) : new ConsoleEmailSender();
