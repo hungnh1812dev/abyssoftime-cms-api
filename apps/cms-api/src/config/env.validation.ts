@@ -85,6 +85,12 @@ export class EnvironmentVariables {
   @MinLength(1)
   TRUST_PROXY: string = "1";
 
+  // Which email sender to use when both SMTP and Gmail API credentials are configured.
+  // "auto" keeps the old implicit behavior: Gmail if GMAIL_CLIENT_ID is set, else SMTP if
+  // SMTP_HOST is set, else console logging. See resolve-email-sender.ts.
+  @IsIn(["auto", "gmail", "smtp", "console"])
+  EMAIL_PROVIDER: "auto" | "gmail" | "smtp" | "console" = "auto";
+
   // SMTP — SMTP_HOST unset means "use ConsoleEmailSender" (dev/test fallback), see resolve-email-sender.ts
   @IsString()
   SMTP_HOST: string = "";
@@ -120,6 +126,20 @@ export class EnvironmentVariables {
   })
   @IsIn([true, false])
   SMTP_FORCE_IPV4_DNS: boolean = true;
+
+  // Gmail API (OAuth2 over HTTPS) — bypasses SMTP entirely, for hosts that block outbound SMTP
+  // ports (e.g. Render free tier). See EMAIL_PROVIDER above and resolve-email-sender.ts.
+  @IsString()
+  GMAIL_CLIENT_ID: string = "";
+
+  @IsString()
+  GMAIL_CLIENT_SECRET: string = "";
+
+  @IsString()
+  GMAIL_REFRESH_TOKEN: string = "";
+
+  @IsString()
+  GMAIL_SENDER_EMAIL: string = "";
 
   @IsString()
   @MinLength(1)
