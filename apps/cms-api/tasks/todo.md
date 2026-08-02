@@ -18,6 +18,6 @@ See `tasks/plan.md` for full context, design, and rationale. See
 - [x] **Checkpoint C:** `bun run test:e2e` green, timing improvement visible in output — commit.
 
 ## Phase 4 — Docs + workflow closeout
-- [ ] Task 6 — Update `docs/documents/document.md`'s "Services — bulk" section: schema resolved once per batch; chunked concurrency (`CHUNK_SIZE = 5`); rollback still all-or-nothing but failure-ordering no longer strictly request-order within a chunk; note eliminated redundant lookups.
+- [x] Task 6 — Update `docs/documents/document.md`'s "Services — bulk" section: schema resolved once per batch; chunked concurrency (`CHUNK_SIZE = 5`); rollback still all-or-nothing but failure-ordering no longer strictly request-order within a chunk; note eliminated redundant lookups.
 - [ ] Task 7 — Update `docs/specs/bulk-create-publish-performance.md` to reflect final implementation; run five-axis review (correctness/readability/architecture/security/performance); delete the spec file as cleanup step.
 - [ ] **Checkpoint D (final):** `bun run build && bun run lint && bun run test:cov && bun run test:e2e` all green; docs updated; spec cleaned up — commit.
