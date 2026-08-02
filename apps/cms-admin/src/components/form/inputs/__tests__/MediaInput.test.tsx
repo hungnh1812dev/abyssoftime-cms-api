@@ -8,6 +8,7 @@ import MockAdapter from "axios-mock-adapter";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "@/lib/api";
+import { displayFileName } from "@/lib/media";
 
 let mock: MockAdapter;
 
@@ -17,10 +18,10 @@ const mediaItems = [
     url: "https://cdn/a1.jpg",
     thumbnailUrl: "https://cdn/a1.jpg",
     publicId: "p1",
-    fileName: "a1_abc.jpg",
+    fileName: "avatar.jpg",
     mimeType: "image/jpeg",
     size: 1024,
-    hash: "abc",
+    hash: "3a7bd3e2360a3d8f9c1b2e4a5d6f7089",
     width: 800,
     height: 600,
     uploadedBy: null,
@@ -79,13 +80,15 @@ describe("MediaInput", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("stores documentId and shows preview URL when an asset is selected", async () => {
+  it("stores documentId, shows preview URL, and submits a plain string value when an asset is selected", async () => {
+    const mutationFn = vi.fn().mockResolvedValue(undefined);
     render(
       <Wrapper>
-        <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)}>
+        <FormProvider mutationFn={mutationFn}>
           <FormField name="image">
             <MediaInput />
           </FormField>
+          <button type="submit">Submit</button>
         </FormProvider>
       </Wrapper>,
     );
@@ -93,11 +96,66 @@ describe("MediaInput", () => {
     await userEvent.click(screen.getByTestId("media-upload-zone"));
 
     await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(1));
-    await userEvent.click(screen.getByRole("img", { name: mediaItems[0].fileName }));
+    await userEvent.click(screen.getByRole("img", { name: displayFileName(mediaItems[0]) }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    const zoneImg = await screen.findByRole("img", { name: mediaItems[0].fileName });
+    const zoneImg = await screen.findByRole("img", { name: displayFileName(mediaItems[0]) });
     expect(zoneImg).toHaveAttribute("src", "https://cdn/a1.jpg");
+
+    await userEvent.click(screen.getByRole("button", { name: /submit/i }));
+    await waitFor(() => expect(mutationFn).toHaveBeenCalled());
+    expect(mutationFn.mock.calls[0][0]).toEqual({ image: mediaItems[0].documentId });
+  });
+
+  it("resolves an existing documentId value to the matching asset once /media responds", async () => {
+    render(
+      <Wrapper>
+        <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)} values={{ image: mediaItems[0].documentId }}>
+          <FormField name="image">
+            <MediaInput />
+          </FormField>
+        </FormProvider>
+      </Wrapper>,
+    );
+
+    const zoneImg = await screen.findByRole("img", { name: displayFileName(mediaItems[0]) });
+    expect(zoneImg).toHaveAttribute("src", "https://cdn/a1.jpg");
+  });
+
+  it("shows a loading placeholder while the media list is still fetching", async () => {
+    mock.onGet("/media").reply(() => new Promise((resolve) => setTimeout(() => resolve([200, mediaItems]), 50)));
+
+    render(
+      <Wrapper>
+        <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)} values={{ image: mediaItems[0].documentId }}>
+          <FormField name="image">
+            <MediaInput />
+          </FormField>
+        </FormProvider>
+      </Wrapper>,
+    );
+
+    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+    expect(screen.queryByText(/click to select media/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+
+    await screen.findByRole("img", { name: displayFileName(mediaItems[0]) });
+  });
+
+  it("shows a missing-asset placeholder when the documentId isn't found in the media list", async () => {
+    render(
+      <Wrapper>
+        <FormProvider mutationFn={vi.fn().mockResolvedValue(undefined)} values={{ image: "deleted-doc-id" }}>
+          <FormField name="image">
+            <MediaInput />
+          </FormField>
+        </FormProvider>
+      </Wrapper>,
+    );
+
+    await waitFor(() => expect(screen.getByText(/not found/i)).toBeInTheDocument());
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.queryByText(/click to select media/i)).not.toBeInTheDocument();
   });
 
   it("closes the library without changing value when Close is clicked", async () => {

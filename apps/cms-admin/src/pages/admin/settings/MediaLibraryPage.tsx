@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useDeleteMedia, useMediaList, useUploadMedia } from "@/hooks/useMedia";
+import { displayFileName } from "@/lib/media";
 import type { MediaAsset } from "@/types/cms";
 
 export function MediaLibraryPage() {
@@ -87,8 +88,8 @@ export function MediaLibraryPage() {
           {items.map((asset) => (
             <div key={asset.documentId} className="group relative">
               <div className="relative aspect-square overflow-hidden rounded border">
-                <img src={asset.thumbnailUrl || asset.url} alt={asset.fileName} className="h-full w-full object-contain" />
-                <span className="absolute right-0 bottom-0 left-0 truncate bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{asset.fileName}</span>
+                <img src={asset.thumbnailUrl || asset.url} alt={displayFileName(asset)} className="h-full w-full object-contain" />
+                <span className="absolute right-0 bottom-0 left-0 truncate bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{displayFileName(asset)}</span>
               </div>
               <button
                 type="button"
