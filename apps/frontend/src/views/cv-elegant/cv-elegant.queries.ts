@@ -1,6 +1,6 @@
 export const GET_MAIN_CV_ELEGANT = /* GraphQL */ `
   query GetMainCvElegant {
-    cvPages(filters: [{ isMain: { eq: true } }]) {
+    cvPages(where: { isMain: { eq: true } }) {
       items {
         company
         isMain
@@ -55,7 +55,7 @@ export const GET_MAIN_CV_ELEGANT = /* GraphQL */ `
 
 export const GET_CV_ELEGANT_LIST = /* GraphQL */ `
   query GetCvElegantList {
-    cvPages(filters: [{ isMain: { ne: true } }]) {
+    cvPages(where: { isMain: { ne: true } }) {
       items {
         documentId
         company
