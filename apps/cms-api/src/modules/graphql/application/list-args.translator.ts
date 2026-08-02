@@ -16,13 +16,13 @@ const MAX_LIMIT = 100;
 const UNLIMITED = -1;
 const DEFAULT_SORT_DIR = "desc";
 
-// SPEC.md decision #7 + SPEC.md §3.2 area 5: GraphQL v1 ships REST's operator set minus boolean
-// `ne`, plus `in`/`notIn` on text/number (Go parity) — narrower than document's own
-// filter-query.parser.ts, which allows `ne` on booleans too.
+// SPEC.md decision #7 + SPEC.md §3.2 area 5: GraphQL v1 ships REST's operator set, plus `in`/`notIn`
+// on text/number (Go parity) — matches document's own filter-query.parser.ts, which also allows
+// `ne` on booleans.
 const OPERATORS_BY_FIELD_TYPE: Partial<Record<FieldType, readonly FilterOperator[]>> = {
   text: ["$eq", "$ne", "$contains", "$in", "$notIn"],
   number: ["$eq", "$ne", "$gt", "$gte", "$lt", "$lte", "$in", "$notIn"],
-  boolean: ["$eq"],
+  boolean: ["$eq", "$ne"],
 };
 
 const OPERATOR_ARG_TO_FILTER_OPERATOR: Record<string, FilterOperator> = {
