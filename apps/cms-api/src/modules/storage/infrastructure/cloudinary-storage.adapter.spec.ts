@@ -46,9 +46,10 @@ describe("CloudinaryStorageAdapter", () => {
     });
 
     expect(upload).toHaveBeenCalledTimes(1);
-    const [dataUri, options] = upload.mock.calls[0] as [string, { eager: unknown }];
+    const [dataUri, options] = upload.mock.calls[0] as [string, { eager: unknown; public_id: string }];
     expect(dataUri).toBe(`data:image/png;base64,${Buffer.from("data").toString("base64")}`);
     expect(options.eager).toBeDefined();
+    expect(options.public_id).toMatch(/^photo_[0-9a-f]{8}$/);
 
     expect(result).toEqual({
       url: "https://res.cloudinary.com/my-cloud/image/upload/v1/abc.png",
