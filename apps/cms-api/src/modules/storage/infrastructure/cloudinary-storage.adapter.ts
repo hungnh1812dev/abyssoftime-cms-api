@@ -1,7 +1,6 @@
-import { randomBytes } from "crypto";
-
 import { StorageAdapter, UploadFile, UploadResult } from "../domain/repositories/storage-adapter.repository";
 import { v2 as cloudinary } from "cloudinary";
+import { randomBytes } from "crypto";
 
 export class CloudinaryStorageAdapter implements StorageAdapter {
   constructor(cloudName: string, apiKey: string, apiSecret: string) {

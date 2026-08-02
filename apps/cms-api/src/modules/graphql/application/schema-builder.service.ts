@@ -66,6 +66,7 @@ input NumberFilter {
 
 input BooleanFilter {
   eq: Boolean
+  ne: Boolean
 }
 
 input IDFilter {

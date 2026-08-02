@@ -201,7 +201,7 @@ describe("SchemaBuilderService", () => {
     expect(Object.keys(numberFilter.getFields())).toEqual(["eq", "ne", "gt", "gte", "lt", "lte", "in", "notIn"]);
 
     const booleanFilter = schema.getType("BooleanFilter") as GraphQLInputObjectType;
-    expect(Object.keys(booleanFilter.getFields())).toEqual(["eq"]);
+    expect(Object.keys(booleanFilter.getFields())).toEqual(["eq", "ne"]);
 
     const idFilter = schema.getType("IDFilter") as GraphQLInputObjectType;
     expect(Object.keys(idFilter.getFields())).toEqual(["eq", "ne", "in", "notIn"]);
