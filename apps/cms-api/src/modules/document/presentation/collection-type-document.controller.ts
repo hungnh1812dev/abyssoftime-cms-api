@@ -68,7 +68,10 @@ export class CollectionTypeDocumentController {
   @Post(":slug/bulk")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("document:create", "document:publish")
-  @ApiOperation({ summary: "Bulk create + publish, sequentially in order; a failure rolls back all prior successes, and the current item too if it failed at the publish step" })
+  @ApiOperation({
+    summary:
+      "Bulk create + publish, processed in concurrent chunks of 5; any failure rolls back every item created so far (not strictly request-ordered within the failing chunk), and the current item too if it failed at the publish step",
+  })
   @ApiResponse({ status: 201, type: BulkCreateResponseDto })
   async bulkCreate(@Param("slug") slug: string, @Body() dto: BulkCreateDto, @Req() req: AuthenticatedRequest): Promise<BulkCreateResponse> {
     validateSlugParam(slug);
