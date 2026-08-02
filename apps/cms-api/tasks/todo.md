@@ -14,8 +14,8 @@ See `tasks/plan.md` for full context, design, and rationale. See
 - [x] **Checkpoint B:** `bun run test:cov` and `bun run lint` green — commit.
 
 ## Phase 3 — E2E verification
-- [ ] Task 5 — Extend `test/content-engine.e2e-spec.ts`: 50-item `en-it-vocab` bulk create+publish case logging wall-clock duration (no hard threshold assertion); assert response shape + all 50 persisted+published; confirm existing 3-item case still passes.
-- [ ] **Checkpoint C:** `bun run test:e2e` green, timing improvement visible in output — commit.
+- [x] Task 5 — Extend `test/content-engine.e2e-spec.ts`: 50-item `en-it-vocab` bulk create+publish case logging wall-clock duration (no hard threshold assertion); assert response shape + all 50 persisted+published; confirm existing 3-item case still passes.
+- [x] **Checkpoint C:** `bun run test:e2e` green, timing improvement visible in output — commit.
 
 ## Phase 4 — Docs + workflow closeout
 - [ ] Task 6 — Update `docs/documents/document.md`'s "Services — bulk" section: schema resolved once per batch; chunked concurrency (`CHUNK_SIZE = 5`); rollback still all-or-nothing but failure-ordering no longer strictly request-order within a chunk; note eliminated redundant lookups.
