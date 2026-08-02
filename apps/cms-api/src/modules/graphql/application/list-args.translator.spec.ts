@@ -71,15 +71,12 @@ describe("translateListArgs", () => {
     expect(() => translateListArgs(contentType, { where: { skills: { eq: "x" } } })).toThrow(GraphQLError);
   });
 
-  it("throws BAD_USER_INPUT for an operator illegal for the field's type (boolean ne)", () => {
+  it("translates a boolean ne filter into a bare leaf FilterNode", () => {
     const contentType = buildContentType();
 
-    try {
-      translateListArgs(contentType, { where: { featured: { ne: true } } });
-      fail("expected translateListArgs to throw");
-    } catch (error) {
-      expect((error as GraphQLError).extensions?.code).toBe("BAD_USER_INPUT");
-    }
+    const result = translateListArgs(contentType, { where: { featured: { ne: true } } });
+
+    expect(result.filterTree).toEqual({ column: "featured", operator: "$ne", value: true });
   });
 
   it("throws BAD_USER_INPUT for an operator illegal for text (gt not allowed on text)", () => {

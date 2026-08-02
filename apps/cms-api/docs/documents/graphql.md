@@ -82,7 +82,7 @@ Every generated `<Type>` also carries `createdAt: DateTime!`, `updatedAt: DateTi
 **`<Type>Filter`/`<Type>OrderBy`** (collection-type only — single types have no list query, so no filter/orderBy input is emitted for them):
 
 - One field per *listable* content scalar (`text`/`number`/`boolean` — `richtext`/`json`/`media`/`component` are never filterable/sortable in v1), typed `TextFilter`/`NumberFilter`/`BooleanFilter`.
-- `TextFilter`: `eq`/`ne`/`contains`/`in`/`notIn`. `NumberFilter`: `eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`in`/`notIn`. `BooleanFilter`: `eq` only. These three are shared input types, emitted once.
+- `TextFilter`: `eq`/`ne`/`contains`/`in`/`notIn`. `NumberFilter`: `eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`in`/`notIn`. `BooleanFilter`: `eq`/`ne`. These three are shared input types, emitted once.
 - Four system-field filters prepended ahead of the content fields on every `<Type>Filter`: `documentId: IDFilter` (`eq`/`ne`/`in`/`notIn`), `createdAt`/`updatedAt`/`publishedAt: TimeFilter` (`eq`/`ne` only) — `IDFilter`/`TimeFilter` are also shared, emitted once.
 - Self-referencing combinators `and: [<Type>Filter!]`, `or: [<Type>Filter!]`, `not: <Type>Filter` — nest to unbounded depth, reached only through the existing `where` arg (never a separate `filters:` array). Every non-null field at one level (direct conditions and `and`/`or`/`not` alike) is implicitly ANDed together.
 - `OrderBy` additionally always includes the three system timestamps (`createdAt`/`updatedAt`/`publishedAt`); still exactly one non-null field accepted (see [Filtering & sorting](#filtering--sorting)).
@@ -119,11 +119,11 @@ Default `limit` when `pagination` is omitted is **10**, a deliberate change from
 | --- | --- |
 | `text` | `eq`, `ne`, `contains`, `in`, `notIn` |
 | `number` | `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn` |
-| `boolean` | `eq` |
+| `boolean` | `eq`, `ne` |
 | `documentId` (system) | `eq`, `ne`, `in`, `notIn` (via `IDFilter`) |
 | `createdAt`/`updatedAt`/`publishedAt` (system) | `eq`, `ne` (via `TimeFilter`) |
 
-A superset of REST's own `where-builder.ts` operator set, not strict Go parity — `contains` stays on `text` alongside the new `in`/`notIn` (Go doesn't have `contains`), and boolean keeps only `eq` (REST allows `ne` too; GraphQL v1 doesn't). `startsWith`/`endsWith` remain an explicit deferral. An unknown filter field, an operator illegal for that field's type, an unknown `orderBy` field, or a **multi-field `orderBy`** (still exactly one sort field accepted — a multi-key input throws rather than silently applying only the first key, see [Post-review hardening](#post-review-hardening)) all throw `BAD_USER_INPUT`, never silently coerced or ignored. `createdAt`/`updatedAt`/`publishedAt`/`documentId` alias to their raw snake_case columns (`created_at`/`updated_at`/`published_at`/`document_id`) internally; no `search` arg in v1 (source doc's GraphQL list query has none either).
+A superset of REST's own `where-builder.ts` operator set, not strict Go parity — `contains` stays on `text` alongside the new `in`/`notIn` (Go doesn't have `contains`), and boolean has full REST parity (`eq`/`ne`). `startsWith`/`endsWith` remain an explicit deferral. An unknown filter field, an operator illegal for that field's type, an unknown `orderBy` field, or a **multi-field `orderBy`** (still exactly one sort field accepted — a multi-key input throws rather than silently applying only the first key, see [Post-review hardening](#post-review-hardening)) all throw `BAD_USER_INPUT`, never silently coerced or ignored. `createdAt`/`updatedAt`/`publishedAt`/`documentId` alias to their raw snake_case columns (`created_at`/`updated_at`/`published_at`/`document_id`) internally; no `search` arg in v1 (source doc's GraphQL list query has none either).
 
 **Default sort** (no `orderBy`, or every field null): `createdAt DESC` — changed from the pre-parity-pass `id DESC` to match the Go reference. The existing hardening (throws `BAD_USER_INPUT` on more than one non-null `orderBy` field) is otherwise unchanged.
 
