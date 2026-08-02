@@ -524,6 +524,57 @@ describe("Content engine (e2e)", () => {
       pendingCleanupVocabIds.delete(items[0].data.documentId);
       pendingCleanupVocabIds.delete(items[1].data.documentId);
     });
+
+    it("creates+publishes a 50-item batch and logs wall-clock duration (perf benchmark, no hard threshold)", async () => {
+      const buildItem = (index: number) => ({
+        data: {
+          wordGroup: "Perf",
+          word: `perf-word-${runId}-${index}`,
+          partsOfSpeech: "noun",
+          searchKeywords: `perf,benchmark,${index}`,
+          phonetics: [
+            {
+              ipa: `/pɜːrf-${index}/`,
+              source: "US",
+              audio: `https://example.com/audio/${runId}-${index}.mp3`,
+              syllableParts: [
+                { text: "perf", stressed: true },
+                { text: `${index}`, stressed: false },
+              ],
+            },
+          ],
+          meanings: [{ posLabel: "noun", en: `Perf meaning ${index}`, vi: `Nghĩa perf ${index}` }],
+          examples: [{ en: `This is example ${index}.`, vi: `Đây là ví dụ ${index}.` }],
+          phrases: [{ en: `perf phrase ${index}`, vi: `cụm từ perf ${index}` }],
+          synonyms: `syn-${index}`,
+          antonyms: `ant-${index}`,
+        },
+      });
+
+      const items = Array.from({ length: 50 }, (_, index) => buildItem(index));
+
+      const startedAt = Date.now();
+      const bulkCreateResponse = await request(app.getHttpServer())
+        .post("/api/v1/documents/collection-type/en-it-vocab/bulk")
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .send({ items })
+        .expect(201);
+      const durationMs = Date.now() - startedAt;
+
+      console.log(`[perf] 50-item en-it-vocab bulk create+publish took ${durationMs}ms`);
+
+      const responseItems = (bulkCreateResponse.body as BulkCreateResponseBody).items;
+      expect(responseItems).toHaveLength(50);
+
+      const seenWords = new Set<string>();
+      for (const [index, item] of responseItems.entries()) {
+        expect(item.data.status).toBe("published");
+        expect(item.data.word).toBe(`perf-word-${runId}-${index}`);
+        seenWords.add(item.data.word as string);
+        pendingCleanupVocabIds.add(item.data.documentId);
+      }
+      expect(seenWords.size).toBe(50);
+    });
   });
 
   describe("auth", () => {

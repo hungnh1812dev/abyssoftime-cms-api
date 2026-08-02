@@ -115,4 +115,52 @@ describe("PublishDocumentService", () => {
     expect(published.publishedBy).toBe("user-1");
     expect(published.publishedAt).not.toBe(existingPublishedCreatedAt);
   });
+
+  it("skips schema resolve when a contentType is passed", async () => {
+    const contentType = buildContentType(true);
+    const { schemaResolver, documents, componentIo, prisma } = buildDeps(contentType);
+    const draft = new DocumentEntity("doc-1", "draft", { position: "Engineer" }, new Date(), new Date(), null, "user-0", "user-0", null);
+    documents.findByVersion.mockImplementation((_slug, _id, version) => Promise.resolve(version === "draft" ? draft : null));
+    const service = new PublishDocumentService(schemaResolver, documents, componentIo, prisma);
+
+    await service.execute("cv-page", "doc-1", "user-1", contentType);
+
+    expect(schemaResolver.resolve).not.toHaveBeenCalled();
+  });
+
+  it("uses draftOverride instead of looking up the draft row, merging in hydrated components", async () => {
+    const contentType = buildContentType(true);
+    const { schemaResolver, documents, componentIo, prisma } = buildDeps(contentType);
+    const draftOverride = new DocumentEntity(
+      "doc-1",
+      "draft",
+      { position: "Engineer", skills: [] },
+      new Date("2026-01-01"),
+      new Date("2026-01-01"),
+      null,
+      "user-0",
+      "user-0",
+      null,
+    );
+    componentIo.hydrateComponents.mockResolvedValue({ skills: [{ componentId: "skill-1", level: "expert" }] });
+
+    const service = new PublishDocumentService(schemaResolver, documents, componentIo, prisma);
+    const published = await service.execute("cv-page", "doc-1", "user-1", contentType, draftOverride);
+
+    expect(documents.findByVersion).not.toHaveBeenCalledWith("cv-page", "doc-1", "draft", contentType.fields);
+    expect(published.fields).toEqual({ position: "Engineer", skills: [{ componentId: "skill-1", level: "expert" }] });
+    expect(published.createdBy).toBe("user-0");
+  });
+
+  it("skips the published-row lookup when isNewDocument is true", async () => {
+    const contentType = buildContentType(true);
+    const { schemaResolver, documents, componentIo, prisma } = buildDeps(contentType);
+    const draftOverride = new DocumentEntity("doc-1", "draft", { position: "Engineer" }, new Date("2026-01-01"), new Date("2026-01-01"), null, "user-0", "user-0", null);
+
+    const service = new PublishDocumentService(schemaResolver, documents, componentIo, prisma);
+    const published = await service.execute("cv-page", "doc-1", "user-1", contentType, draftOverride, true);
+
+    expect(documents.findByVersion).not.toHaveBeenCalled();
+    expect(published.createdAt).toEqual(published.updatedAt);
+  });
 });

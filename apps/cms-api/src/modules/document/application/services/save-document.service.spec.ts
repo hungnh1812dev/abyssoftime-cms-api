@@ -125,4 +125,43 @@ describe("SaveDocumentService", () => {
     expect(documents.findByVersion).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
+
+  it("normalizes an omitted optional scalar field to null on doc.fields (bug fix)", async () => {
+    const fieldsWithOptionalBio: FieldDefinition[] = [
+      { name: "position", type: "text" },
+      { name: "bio", type: "text" },
+    ];
+    const contentType = new ContentTypeEntity("ct-1", "cv-page", "CV Page", "collection", true, fieldsWithOptionalBio, ["position"], new Date(), new Date());
+    const { schemaResolver, documents, componentIo, prisma } = buildDeps(contentType);
+    const service = new SaveDocumentService(schemaResolver, documents, componentIo, prisma);
+
+    const data = { position: "Engineer" };
+    const doc = await service.execute("cv-page", data, undefined, "user-1");
+
+    expect(doc.fields).toEqual({ position: "Engineer", bio: null });
+    expect(componentIo.saveComponents).toHaveBeenCalledWith("cv-page", doc.documentId, "draft", contentType.fields, { position: "Engineer", bio: null }, TX);
+  });
+
+  it("skips the schema resolve when a contentType is passed directly", async () => {
+    const contentType = buildContentType(true);
+    const { schemaResolver, documents, componentIo, prisma } = buildDeps(contentType);
+    const service = new SaveDocumentService(schemaResolver, documents, componentIo, prisma);
+
+    const doc = await service.execute("cv-page", { position: "Engineer" }, undefined, "user-1", contentType);
+
+    expect(schemaResolver.resolve).not.toHaveBeenCalled();
+    expect(doc.version).toBe("draft");
+  });
+
+  it("skips findByVersion when documentId is undefined, even for mode B (write-through) content types", async () => {
+    const contentType = buildContentType(false);
+    const { schemaResolver, documents, componentIo, prisma } = buildDeps(contentType);
+    const service = new SaveDocumentService(schemaResolver, documents, componentIo, prisma);
+
+    const doc = await service.execute("cv-page", { position: "Engineer" }, undefined, "user-1");
+
+    expect(documents.findByVersion).not.toHaveBeenCalled();
+    expect(doc.version).toBe("published");
+    expect(doc.createdAt).toEqual(doc.updatedAt);
+  });
 });

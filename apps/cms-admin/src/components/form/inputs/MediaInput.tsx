@@ -2,16 +2,14 @@ import { useState } from "react";
 import { type Control, Controller } from "react-hook-form";
 
 import { MediaLibrary } from "@/components/media/MediaLibrary";
+import { useMediaList } from "@/hooks/useMedia";
+import { displayFileName } from "@/lib/media";
 import type { MediaAsset } from "@/types/cms";
 
 interface MediaInputProps {
   name?: string;
   control?: Control;
   "aria-label"?: string;
-}
-
-function isMediaAssetObject(value: unknown): value is MediaAsset {
-  return typeof value === "object" && value !== null && "url" in value;
 }
 
 export function MediaInput({ name, control, "aria-label": ariaLabel }: MediaInputProps) {
@@ -25,13 +23,17 @@ interface MediaInputInnerProps {
 
 function MediaInputInner({ field, ariaLabel }: MediaInputInnerProps) {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const { data: mediaItems, isLoading } = useMediaList();
 
-  const asset = isMediaAssetObject(field.value) ? field.value : null;
+  const documentId = typeof field.value === "string" && field.value ? field.value : null;
+  const asset = documentId ? (mediaItems?.find((item) => item.documentId === documentId) ?? null) : null;
+  const isMissing = documentId !== null && !isLoading && asset === null;
+  const isResolving = documentId !== null && isLoading;
   const displayUrl = asset ? asset.thumbnailUrl || asset.url : null;
-  const displayName = asset?.fileName ?? null;
+  const displayName = asset ? displayFileName(asset) : null;
 
   function handleSelect(selected: MediaAsset) {
-    field.onChange(selected);
+    field.onChange(selected.documentId);
   }
 
   function handleRemove(event: React.MouseEvent) {
@@ -75,6 +77,15 @@ function MediaInputInner({ field, ariaLabel }: MediaInputInnerProps) {
               </svg>
             </button>
           </>
+        ) : isResolving ? (
+          <div className="text-muted-foreground flex h-28 flex-col items-center justify-center gap-2">
+            <span className="text-sm">Loading…</span>
+          </div>
+        ) : isMissing ? (
+          <div className="text-destructive flex h-28 flex-col items-center justify-center gap-2">
+            <span className="text-2xl">⚠</span>
+            <span className="text-sm">Media asset not found</span>
+          </div>
         ) : (
           <div className="text-muted-foreground flex h-28 flex-col items-center justify-center gap-2">
             <span className="text-2xl">↑</span>
