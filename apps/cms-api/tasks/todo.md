@@ -9,9 +9,9 @@ See `tasks/plan.md` for full context, design, and rationale. See
 - [x] **Checkpoint A:** `bun run test:cov` green for both files, `bun run lint` clean, no other spec files broken — commit.
 
 ## Phase 2 — Bulk service rewrite
-- [ ] Task 3 — Rewrite `bulk-create-publish.service.ts`: inject `SchemaResolverService`, hoist resolve, `CHUNK_SIZE = 5` chunked processing via `processItem`/discriminated outcomes, preserve rollback-on-any-failure + original item ordering.
-- [ ] Task 4 — Full rewrite of `bulk-create-publish.service.spec.ts` (existing suite is order-dependent, breaks under chunking). Cover: all-success across 2+ chunks; failure on very first item; failure in a later chunk rolls back prior chunks + same-chunk successes; two failures in same chunk; save-fails-before-publish vs. publish-fails-after-save; chunk-boundary batch sizes (`CHUNK_SIZE`, `CHUNK_SIZE + 1`); single-item batch.
-- [ ] **Checkpoint B:** `bun run test:cov` and `bun run lint` green — commit.
+- [x] Task 3 — Rewrite `bulk-create-publish.service.ts`: inject `SchemaResolverService`, hoist resolve, `CHUNK_SIZE = 5` chunked processing via `processItem`/discriminated outcomes, preserve rollback-on-any-failure + original item ordering.
+- [x] Task 4 — Full rewrite of `bulk-create-publish.service.spec.ts` (existing suite is order-dependent, breaks under chunking). Cover: all-success across 2+ chunks; failure on very first item; failure in a later chunk rolls back prior chunks + same-chunk successes; two failures in same chunk; save-fails-before-publish vs. publish-fails-after-save; chunk-boundary batch sizes (`CHUNK_SIZE`, `CHUNK_SIZE + 1`); single-item batch.
+- [x] **Checkpoint B:** `bun run test:cov` and `bun run lint` green — commit.
 
 ## Phase 3 — E2E verification
 - [ ] Task 5 — Extend `test/content-engine.e2e-spec.ts`: 50-item `en-it-vocab` bulk create+publish case logging wall-clock duration (no hard threshold assertion); assert response shape + all 50 persisted+published; confirm existing 3-item case still passes.
