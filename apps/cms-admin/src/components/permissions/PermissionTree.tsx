@@ -1,7 +1,7 @@
 import { buildDocumentPermissionSlug, groupByResource, parseDocumentPermissionSlug } from "@/components/permissions/permissionGrouping";
 import { useContentTypes } from "@/hooks/useContentTypes";
 import type { PermissionItem } from "@/hooks/usePermissions";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function TriStateCheckbox({ checked, indeterminate, onChange, label }: { checked: boolean; indeterminate: boolean; onChange: () => void; label: string }) {
   return (
@@ -46,6 +46,38 @@ function DocumentPermissionGroup({ perms, selected, onChange }: { perms: Permiss
     }
     return initial;
   });
+
+  // Re-derives mode whenever `selected` changes for reasons outside this component's own
+  // handlers (e.g. the parent's "Select All", or an async-loaded initial selection arriving
+  // after mount) — otherwise a scoped grant can end up hidden behind a stale "all" mode. This is
+  // the React-supported "adjust state during render" pattern (not a useEffect): it runs as part
+  // of this render rather than as a separate commit, so there's no flash of stale mode.
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const [prevSelected, setPrevSelected] = useState(selected);
+  if (selected !== prevSelected) {
+    setPrevSelected(selected);
+    const nextModes = { ...modes };
+    for (const { action } of actions) {
+      const hasScoped = selected.some((s) => isScopedForAction(s, action));
+      if (hasScoped) nextModes[action] = "specific";
+      else if (selected.includes(buildDocumentPermissionSlug(action))) nextModes[action] = "all";
+    }
+    setModes(nextModes);
+  }
+
+  // A scoped grant and the global grant for the same action shouldn't coexist invisibly: once
+  // scoped mode is showing (and thus hiding the global checkbox), drop the now-redundant global
+  // slug so the visible checkboxes always match what's actually granted. This notifies the
+  // parent's selection, so it belongs in an effect rather than during render.
+  useEffect(() => {
+    const globalSlugsToStrip = actions
+      .filter(({ action }) => selected.some((s) => isScopedForAction(s, action)) && selected.includes(buildDocumentPermissionSlug(action)))
+      .map(({ action }) => buildDocumentPermissionSlug(action));
+    if (globalSlugsToStrip.length > 0) {
+      onChange(selected.filter((s) => !globalSlugsToStrip.includes(s)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, actions]);
 
   function setMode(action: string, mode: DocumentScopeMode) {
     setModes((prev) => ({ ...prev, [action]: mode }));
