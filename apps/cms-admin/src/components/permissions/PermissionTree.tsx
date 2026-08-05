@@ -1,5 +1,7 @@
-import { groupByResource } from "@/components/permissions/permissionGrouping";
+import { buildDocumentPermissionSlug, groupByResource, parseDocumentPermissionSlug } from "@/components/permissions/permissionGrouping";
+import { useContentTypes } from "@/hooks/useContentTypes";
 import type { PermissionItem } from "@/hooks/usePermissions";
+import { useState } from "react";
 
 function TriStateCheckbox({ checked, indeterminate, onChange, label }: { checked: boolean; indeterminate: boolean; onChange: () => void; label: string }) {
   return (
@@ -15,6 +17,101 @@ function TriStateCheckbox({ checked, indeterminate, onChange, label }: { checked
       />
       {label}
     </label>
+  );
+}
+
+type DocumentScopeMode = "all" | "specific";
+
+function isScopedForAction(slug: string, action: string): boolean {
+  const parsed = parseDocumentPermissionSlug(slug);
+  return parsed?.action === action && Boolean(parsed.contentTypeSlug);
+}
+
+function DocumentPermissionGroup({ perms, selected, onChange }: { perms: PermissionItem[]; selected: string[]; onChange: (next: string[]) => void }) {
+  const { data: contentTypes } = useContentTypes();
+
+  const actions: { action: string; name: string }[] = [];
+  const seenActions = new Set<string>();
+  for (const p of perms) {
+    const parsed = parseDocumentPermissionSlug(p.slug);
+    if (!parsed || parsed.contentTypeSlug || seenActions.has(parsed.action)) continue;
+    seenActions.add(parsed.action);
+    actions.push({ action: parsed.action, name: p.name });
+  }
+
+  const [modes, setModes] = useState<Record<string, DocumentScopeMode>>(() => {
+    const initial: Record<string, DocumentScopeMode> = {};
+    for (const { action } of actions) {
+      initial[action] = selected.some((s) => isScopedForAction(s, action)) ? "specific" : "all";
+    }
+    return initial;
+  });
+
+  function setMode(action: string, mode: DocumentScopeMode) {
+    setModes((prev) => ({ ...prev, [action]: mode }));
+    if (mode === "all") {
+      onChange(selected.filter((s) => !isScopedForAction(s, action)));
+    } else {
+      const globalSlug = buildDocumentPermissionSlug(action);
+      onChange(selected.filter((s) => s !== globalSlug));
+    }
+  }
+
+  function toggleGlobal(action: string) {
+    const slug = buildDocumentPermissionSlug(action);
+    onChange(selected.includes(slug) ? selected.filter((s) => s !== slug) : [...selected, slug]);
+  }
+
+  function toggleScoped(action: string, contentTypeSlug: string) {
+    const slug = buildDocumentPermissionSlug(action, contentTypeSlug);
+    onChange(selected.includes(slug) ? selected.filter((s) => s !== slug) : [...selected, slug]);
+  }
+
+  return (
+    <div className="rounded-md border p-3">
+      <span className="text-sm font-medium">document</span>
+      <div className="mt-2 ml-5 space-y-3 border-l pl-3">
+        {actions.map(({ action, name }) => {
+          const mode = modes[action] ?? "all";
+          const globalSlug = buildDocumentPermissionSlug(action);
+          return (
+            <div key={action} data-testid={`document-permission-${action}`} className="space-y-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-medium capitalize">{action}</span>
+                <div className="flex gap-3 text-xs">
+                  <label className="flex cursor-pointer items-center gap-1">
+                    <input type="radio" name={`document-scope-${action}`} checked={mode === "all"} onChange={() => setMode(action, "all")} />
+                    All content types
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-1">
+                    <input type="radio" name={`document-scope-${action}`} checked={mode === "specific"} onChange={() => setMode(action, "specific")} />
+                    Specific content types
+                  </label>
+                </div>
+              </div>
+              {mode === "all" ? (
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input type="checkbox" checked={selected.includes(globalSlug)} onChange={() => toggleGlobal(action)} className="rounded" />
+                  <span>{name}</span>
+                </label>
+              ) : (
+                <div className="space-y-1 pl-2">
+                  {(contentTypes ?? []).map((ct) => {
+                    const slug = buildDocumentPermissionSlug(action, ct.slug);
+                    return (
+                      <label key={ct.slug} className="flex cursor-pointer items-center gap-2 text-sm">
+                        <input type="checkbox" checked={selected.includes(slug)} onChange={() => toggleScoped(action, ct.slug)} className="rounded" />
+                        <span>{ct.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -48,6 +145,10 @@ export function PermissionTree({ permissions, selected, onChange }: PermissionTr
       <TriStateCheckbox checked={allChecked} indeterminate={!allChecked && someChecked} onChange={toggleAll} label="Select All" />
       <div className="max-h-80 space-y-2 overflow-y-auto">
         {groups.map(([resource, perms]) => {
+          if (resource === "document") {
+            return <DocumentPermissionGroup key={resource} perms={perms} selected={selected} onChange={onChange} />;
+          }
+
           const groupSlugs = perms.map((p) => p.slug);
           const groupAllChecked = groupSlugs.every((s) => selected.includes(s));
           const groupSomeChecked = groupSlugs.some((s) => selected.includes(s));
