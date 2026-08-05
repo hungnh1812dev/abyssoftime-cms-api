@@ -294,6 +294,54 @@ describe("GraphQL (e2e)", () => {
     });
   });
 
+  describe("content-type-scoped document permissions", () => {
+    let scopedDocumentId: string;
+    let cvPageScopedToken: string;
+
+    beforeAll(async () => {
+      const createResponse = await request(app.getHttpServer())
+        .post("/api/v1/documents/collection-type/cv-page")
+        .set("Cookie", [superAdminCookie])
+        .send({ data: { position: `Scoped Engineer ${runId}`, isMain: true, company: `ScopedCo-${runId}`, summary: "<p>Summary</p>" } })
+        .expect(201);
+      scopedDocumentId = (createResponse.body as DocumentResponseBody).data.documentId;
+      pendingCleanupCvPageIds.add(scopedDocumentId);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/documents/collection-type/cv-page/${scopedDocumentId}/publish`)
+        .set("Cookie", [superAdminCookie])
+        .expect(200, { status: "published" });
+
+      const createAccessToken = app.get(CreateAccessTokenService);
+      const scoped = await createAccessToken.execute({ name: `e2e-graphql-scoped-cv-page-${runId}`, permissions: ["document:read:cv-page"], expiresIn: "1h" }, null);
+      cvPageScopedToken = scoped.plaintext;
+      createdApiTokenIds.push(scoped.entity.documentId);
+    });
+
+    it("succeeds on cv-page for a token scoped to document:read:cv-page", async () => {
+      const response = await gql(`{ cvPage(documentId: "${scopedDocumentId}") { position } }`, undefined, cvPageScopedToken).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.errors).toBeUndefined();
+      expect(body.data).toEqual({ cvPage: { position: `Scoped Engineer ${runId}` } });
+    });
+
+    it("returns FORBIDDEN when the same token queries a different content type (cv-contact)", async () => {
+      const response = await gql(`{ cvContact { email } }`, undefined, cvPageScopedToken).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.data).toEqual({ cvContact: null });
+      expect(body.errors?.[0].extensions?.code).toBe("FORBIDDEN");
+    });
+
+    it("still allows a global document:read-scoped token to query other content types (regression)", async () => {
+      const response = await gql(`{ cvContact { email } }`, undefined, readScopedApiToken).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.errors).toBeUndefined();
+    });
+  });
+
   describe("list query (cv-page)", () => {
     const filterTag = `GqlList-${runId}`;
     let primaryId: string;
