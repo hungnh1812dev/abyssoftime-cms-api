@@ -32,7 +32,6 @@ interface BulkCreateResponse {
 
 interface BulkDeleteResponse {
   deleted: string[];
-  failed: { documentId: string; error?: string }[];
 }
 
 @ApiTags("documents-collection-type")
@@ -90,16 +89,13 @@ export class CollectionTypeDocumentController {
   @Delete(":slug/bulk")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions("document:delete")
-  @ApiOperation({ summary: "Bulk delete — each ID's outcome is independent, no rollback on partial failure" })
+  @ApiOperation({ summary: "Bulk delete — all-or-nothing, one ID's failure rolls back the whole batch" })
   @ApiResponse({ status: 200, type: BulkDeleteResponseDto })
   async bulkDelete(@Param("slug") slug: string, @Body() dto: BulkDeleteDto): Promise<BulkDeleteResponse> {
     validateSlugParam(slug);
 
-    const results = await this.bulkDeleteService.execute(slug, dto.documentIds);
-    return {
-      deleted: results.filter((result) => !result.error).map((result) => result.documentId),
-      failed: results.filter((result) => result.error),
-    };
+    const deleted = await this.bulkDeleteService.execute(slug, dto.documentIds);
+    return { deleted };
   }
 
   @Post(":slug")

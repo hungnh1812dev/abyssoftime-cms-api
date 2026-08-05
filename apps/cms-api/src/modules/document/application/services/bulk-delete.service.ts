@@ -1,28 +1,25 @@
 import { Injectable } from "@nestjs/common";
 
-import { DeleteDocumentService } from "./delete-document.service";
+import { PrismaService } from "@/prisma/application/prisma.service";
 
-export interface BulkDeleteResult {
-  documentId: string;
-  error?: string;
-}
+import { DeleteDocumentService } from "./delete-document.service";
 
 @Injectable()
 export class BulkDeleteService {
-  constructor(private readonly deleteDocument: DeleteDocumentService) {}
+  constructor(
+    private readonly deleteDocument: DeleteDocumentService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  async execute(slug: string, documentIds: string[]): Promise<BulkDeleteResult[]> {
-    const results: BulkDeleteResult[] = [];
+  async execute(slug: string, documentIds: string[]): Promise<string[]> {
+    if (documentIds.length === 0) return [];
 
-    for (const documentId of documentIds) {
-      try {
-        await this.deleteDocument.execute(slug, documentId);
-        results.push({ documentId });
-      } catch (err) {
-        results.push({ documentId, error: err instanceof Error ? err.message : String(err) });
+    await this.prisma.$transaction(async (tx) => {
+      for (const documentId of documentIds) {
+        await this.deleteDocument.execute(slug, documentId, tx);
       }
-    }
+    });
 
-    return results;
+    return documentIds;
   }
 }

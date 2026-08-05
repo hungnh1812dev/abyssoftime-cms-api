@@ -83,18 +83,7 @@ export class BulkCreateResponseDto {
   items!: DocumentResponseDto[];
 }
 
-export class BulkDeleteFailureDto {
-  @ApiProperty()
-  documentId!: string;
-
-  @ApiProperty({ required: false })
-  error?: string;
-}
-
 export class BulkDeleteResponseDto {
-  @ApiProperty({ type: [String], description: "IDs that were successfully deleted." })
+  @ApiProperty({ type: [String], description: "IDs that were deleted. All-or-nothing: a failure rolls back the whole batch." })
   deleted!: string[];
-
-  @ApiProperty({ type: [BulkDeleteFailureDto], description: "IDs that failed, each with its own error — partial success, no rollback." })
-  failed!: BulkDeleteFailureDto[];
 }
