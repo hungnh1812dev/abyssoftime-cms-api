@@ -191,7 +191,7 @@ export class ResolverFactoryService {
 
       query[queryName(definition.slug)] = async (_parent: unknown, args: SingleQueryArgs, context: GraphqlContext) => {
         assertValidDocumentId(args.documentId);
-        assertApiTokenPermission(context, "document:read");
+        assertApiTokenPermission(context, "document:read", definition.slug);
 
         if (args.status === "draft") {
           const result = await resolveOrNull(() => this.getDocumentForEdit.execute(definition.slug, args.documentId));
@@ -203,21 +203,21 @@ export class ResolverFactoryService {
       };
 
       query[listQueryName(definition.slug)] = async (_parent: unknown, args: ListArgsInput, context: GraphqlContext) => {
-        assertApiTokenPermission(context, "document:read");
+        assertApiTokenPermission(context, "document:read", definition.slug);
         const options = translateListArgs(definition, args);
         const result = await withErrorMapping(() => this.listDocumentsFull.execute(definition.slug, options));
         return { items: result.items, meta: { pagination: buildPaginationMeta(options.start, options.size, result.total) } };
       };
 
       mutation[createMutationName(definition.slug)] = async (_parent: unknown, args: CreateMutationArgs, context: GraphqlContext) => {
-        assertApiTokenPermission(context, "document:create");
+        assertApiTokenPermission(context, "document:create", definition.slug);
         const document = await withErrorMapping(() => this.saveDocument.execute(definition.slug, args.data, undefined, context.apiToken!.documentId));
         return toResolverValue(document);
       };
 
       mutation[updateMutationName(definition.slug)] = async (_parent: unknown, args: UpdateMutationArgs, context: GraphqlContext) => {
         assertValidDocumentId(args.documentId);
-        assertApiTokenPermission(context, "document:update");
+        assertApiTokenPermission(context, "document:update", definition.slug);
         await withErrorMapping(() => this.saveDocument.execute(definition.slug, args.data, args.documentId, context.apiToken!.documentId));
         const result = await withErrorMapping(() => this.getDocumentForEdit.execute(definition.slug, args.documentId));
         return toResolverValue(result.document);
@@ -225,21 +225,21 @@ export class ResolverFactoryService {
 
       mutation[deleteMutationName(definition.slug)] = async (_parent: unknown, args: IdMutationArgs, context: GraphqlContext) => {
         assertValidDocumentId(args.documentId);
-        assertApiTokenPermission(context, "document:delete");
+        assertApiTokenPermission(context, "document:delete", definition.slug);
         await withErrorMapping(() => this.deleteDocument.execute(definition.slug, args.documentId));
         return true;
       };
 
       mutation[publishMutationName(definition.slug)] = async (_parent: unknown, args: IdMutationArgs, context: GraphqlContext) => {
         assertValidDocumentId(args.documentId);
-        assertApiTokenPermission(context, "document:publish");
+        assertApiTokenPermission(context, "document:publish", definition.slug);
         const published = await withErrorMapping(() => this.publishDocument.execute(definition.slug, args.documentId, context.apiToken!.documentId));
         return toResolverValue(published);
       };
 
       mutation[unpublishMutationName(definition.slug)] = async (_parent: unknown, args: IdMutationArgs, context: GraphqlContext) => {
         assertValidDocumentId(args.documentId);
-        assertApiTokenPermission(context, "document:unpublish");
+        assertApiTokenPermission(context, "document:unpublish", definition.slug);
         await withErrorMapping(() => this.unpublishDocument.execute(definition.slug, args.documentId));
         const result = await withErrorMapping(() => this.getDocumentForEdit.execute(definition.slug, args.documentId));
         return toResolverValue(result.document);
@@ -250,7 +250,7 @@ export class ResolverFactoryService {
       collectMediaFieldResolvers(typeName(definition.slug), definition.slug, definition.fields, typeResolvers);
 
       query[queryName(definition.slug)] = async (_parent: unknown, args: StatusOnlyArgs, context: GraphqlContext) => {
-        assertApiTokenPermission(context, "document:read");
+        assertApiTokenPermission(context, "document:read", definition.slug);
 
         if (args.status === "draft") {
           const result = await resolveOrNull(() => this.getSingleType.execute(definition.slug));
@@ -262,20 +262,20 @@ export class ResolverFactoryService {
       };
 
       mutation[saveMutationName(definition.slug)] = async (_parent: unknown, args: CreateMutationArgs, context: GraphqlContext) => {
-        assertApiTokenPermission(context, "document:update");
+        assertApiTokenPermission(context, "document:update", definition.slug);
         await withErrorMapping(() => this.saveSingleType.execute(definition.slug, args.data, context.apiToken!.documentId));
         const result = await withErrorMapping(() => this.getSingleType.execute(definition.slug));
         return toResolverValue(result.document);
       };
 
       mutation[publishMutationName(definition.slug)] = async (_parent: unknown, _args: Record<string, never>, context: GraphqlContext) => {
-        assertApiTokenPermission(context, "document:publish");
+        assertApiTokenPermission(context, "document:publish", definition.slug);
         const published = await withErrorMapping(() => this.publishSingleType.execute(definition.slug, context.apiToken!.documentId));
         return toResolverValue(published);
       };
 
       mutation[unpublishMutationName(definition.slug)] = async (_parent: unknown, _args: Record<string, never>, context: GraphqlContext) => {
-        assertApiTokenPermission(context, "document:unpublish");
+        assertApiTokenPermission(context, "document:unpublish", definition.slug);
         await withErrorMapping(() => this.unpublishSingleType.execute(definition.slug));
         const result = await withErrorMapping(() => this.getSingleType.execute(definition.slug));
         return toResolverValue(result.document);

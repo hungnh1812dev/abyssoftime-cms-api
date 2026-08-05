@@ -9,7 +9,7 @@ See `tasks/plan.md` for full context, design, and rationale. See
 - [x] **Checkpoint A:** `bun run build && bun run lint && bun run test:cov` green. Manual: boot locally, `GET /api/v1/permissions` shows the new scoped rows; re-boot → no duplicates. Commit.
 
 ## Phase 2 — GraphQL enforcement
-- [ ] Task 3 — `assertApiTokenPermission(context, requiredSlug, contentTypeSlug)` (new 3rd param) in `src/modules/graphql/application/authorize.util.ts`, delegating to `isDocumentActionGranted`. Update all 11 call sites in `resolver-factory.service.ts` (lines 194, 206, 213, 220, 228, 235, 242, 253, 265, 272, 278) to pass `definition.slug`. Tests: `authorize.util.spec.ts` (global grant, scoped grant, scoped-for-wrong-content-type denied); `resolver-factory.service.spec.ts` call-site assertions updated.
+- [x] Task 3 — `assertApiTokenPermission(context, requiredSlug, contentTypeSlug)` (new 3rd param) in `src/modules/graphql/application/authorize.util.ts`, delegating to `isDocumentActionGranted`. Update all 11 call sites in `resolver-factory.service.ts` (lines 194, 206, 213, 220, 228, 235, 242, 253, 265, 272, 278) to pass `definition.slug`. Tests: `authorize.util.spec.ts` (global grant, scoped grant, scoped-for-wrong-content-type denied); `resolver-factory.service.spec.ts` call-site assertions updated.
 - [ ] **Checkpoint B:** `bun run build && bun run lint && bun run test:cov` green. New `test/graphql.e2e-spec.ts` case: token scoped to `document:read:cv-page` succeeds on `cvPage`, 403s on another content type; global-slug token still works everywhere (regression). `bun run test:e2e` green. Commit.
 
 ## Phase 3 — REST enforcement
