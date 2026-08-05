@@ -365,6 +365,65 @@ describe("Content engine (e2e)", () => {
     });
   });
 
+  describe("cv-page update performance benchmark", () => {
+    it("updates a component-heavy document and logs wall-clock duration (perf benchmark, no hard threshold)", async () => {
+      const buildExperience = (offset: number, index: number) => ({
+        company: `PerfCo-${offset + index}`,
+        location: "Remote",
+        roles: Array.from({ length: 3 }, (_, roleIndex) => ({
+          position: `Role-${offset + index}-${roleIndex}`,
+          period: "2022-2024",
+          teamSize: 5,
+          projects: "CMS",
+          techStack: ["ts", "node"],
+          responsibilities: "<p>Led team</p>",
+        })),
+      });
+
+      const createResponse = await request(app.getHttpServer())
+        .post("/api/v1/documents/collection-type/cv-page")
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .send({
+          data: {
+            position: "Staff Engineer",
+            isMain: false,
+            company: `PerfBench-${runId}`,
+            experiences: Array.from({ length: 5 }, (_, index) => buildExperience(0, index)),
+          },
+        })
+        .expect(201);
+      const documentId = (createResponse.body as DocumentResponseBody).data.documentId;
+      pendingCleanupCvPageIds.add(documentId);
+
+      const startedAt = Date.now();
+      await request(app.getHttpServer())
+        .put(`/api/v1/documents/collection-type/cv-page/${documentId}`)
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .send({
+          data: {
+            position: "Staff Engineer",
+            isMain: false,
+            company: `PerfBench-${runId}`,
+            experiences: Array.from({ length: 5 }, (_, index) => buildExperience(100, index)),
+          },
+        })
+        .expect(200);
+      const durationMs = Date.now() - startedAt;
+
+      console.log(`[perf] cv-page update (5 experiences x 3 roles) took ${durationMs}ms`);
+
+      const readResponse = await request(app.getHttpServer())
+        .get(`/api/v1/documents/collection-type/cv-page/${documentId}`)
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .expect(200);
+      const experiences = (readResponse.body as DocumentResponseBody).data.experiences as Record<string, unknown>[];
+      expect(experiences).toHaveLength(5);
+      expect(experiences[0].company).toBe("PerfCo-100");
+      const firstRoles = experiences[0].roles as Record<string, unknown>[];
+      expect(firstRoles).toHaveLength(3);
+    });
+  });
+
   describe("list filter params (cv-page)", () => {
     it("filters via $contains and $eq, combines with search, and rejects invalid filters with 400", async () => {
       const filterTag = `FilterTag-${runId}`;
