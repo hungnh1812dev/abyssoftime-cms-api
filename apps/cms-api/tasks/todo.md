@@ -9,7 +9,7 @@ See `tasks/plan.md` for full context, design, and rationale. See
 - [x] **Checkpoint A:** `bun run test:cov` green for both files, `bun run lint` clean, no other spec files broken — commit.
 
 ## Phase 2 — Bulk delete all-or-nothing
-- [ ] Task 3 — `delete-document.service.ts`: add optional `tx?: Prisma.TransactionClient` param; use it directly when provided instead of opening a new `$transaction`; existence-check reads stay pool-scoped (unchanged, matches existing pattern).
+- [x] Task 3 — `delete-document.service.ts`: add optional `tx?: Prisma.TransactionClient` param; use it directly when provided instead of opening a new `$transaction`; existence-check reads stay pool-scoped (unchanged, matches existing pattern).
 - [ ] Task 4 — `bulk-delete.service.ts` rewrite: inject `PrismaService`; wrap the per-ID loop in one spanning `$transaction`, passing `tx` to each `deleteDocument.execute` call; return `string[]` (deleted IDs) instead of `BulkDeleteResult[]`; remove the per-item try/catch (a failure now throws and rolls back the whole batch).
 - [ ] Task 5 — Controller (`collection-type-document.controller.ts`) + DTOs: `bulkDelete` handler returns `{ deleted: string[] }` (drop `failed`); `BulkDeleteResponseDto` drops `failed`/`BulkDeleteFailureDto`; update `@ApiOperation` summary (no longer "no rollback on partial failure").
 - [ ] Task 6 — Rewrite `bulk-delete.service.spec.ts` for all-or-nothing (all-success returns all IDs; a failing ID rolls back every delete in the batch; empty array short-circuits without opening a transaction); extend `delete-document.service.spec.ts` for the new optional `tx` param.
