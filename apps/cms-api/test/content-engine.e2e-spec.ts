@@ -28,7 +28,6 @@ interface BulkCreateResponseBody {
 
 interface BulkDeleteResponseBody {
   deleted: string[];
-  failed: { documentId: string; error?: string }[];
 }
 
 const SUPER_ADMIN_REQUIRED_SLUGS = ["content_type:read", "document:read", "document:create", "document:update", "document:delete", "document:publish", "document:unpublish"];
@@ -548,7 +547,7 @@ describe("Content engine (e2e)", () => {
   });
 
   describe("bulk create+publish and bulk delete (en-it-vocab)", () => {
-    it("creates+publishes a batch, then deletes it with one bogus id (partial success, no rollback)", async () => {
+    it("creates+publishes a batch, then bulk-deletes it cleanly and returns the deleted ids", async () => {
       const bulkCreateResponse = await request(app.getHttpServer())
         .post("/api/v1/documents/collection-type/en-it-vocab/bulk")
         .set("Cookie", [`access_token=${superAdminToken}`])
@@ -556,19 +555,17 @@ describe("Content engine (e2e)", () => {
           items: [
             { data: { wordGroup: "Networking", word: `packet-${runId}`, partsOfSpeech: "noun" } },
             { data: { wordGroup: "Networking", word: `socket-${runId}`, partsOfSpeech: "noun" } },
-            { data: { wordGroup: "Networking", word: `latency-${runId}`, partsOfSpeech: "noun" } },
           ],
         })
         .expect(201);
       const items = (bulkCreateResponse.body as BulkCreateResponseBody).items;
-      expect(items).toHaveLength(3);
+      expect(items).toHaveLength(2);
       for (const item of items) {
         expect(item.data.status).toBe("published");
         pendingCleanupVocabIds.add(item.data.documentId);
       }
 
-      const bogusId = "00000000-0000-0000-0000-000000000000";
-      const idsToDelete = [items[0].data.documentId, items[1].data.documentId, bogusId];
+      const idsToDelete = items.map((item) => item.data.documentId);
 
       const bulkDeleteResponse = await request(app.getHttpServer())
         .delete("/api/v1/documents/collection-type/en-it-vocab/bulk")
@@ -577,11 +574,45 @@ describe("Content engine (e2e)", () => {
         .expect(200);
       const body = bulkDeleteResponse.body as BulkDeleteResponseBody;
 
-      expect(body.deleted.sort()).toEqual([items[0].data.documentId, items[1].data.documentId].sort());
-      expect(body.failed).toHaveLength(1);
-      expect(body.failed[0].documentId).toBe(bogusId);
-      pendingCleanupVocabIds.delete(items[0].data.documentId);
-      pendingCleanupVocabIds.delete(items[1].data.documentId);
+      expect(body.deleted.sort()).toEqual(idsToDelete.sort());
+      for (const documentId of idsToDelete) {
+        pendingCleanupVocabIds.delete(documentId);
+      }
+    });
+
+    it("fails the whole batch and deletes nothing when one id in it is unknown (all-or-nothing)", async () => {
+      const bulkCreateResponse = await request(app.getHttpServer())
+        .post("/api/v1/documents/collection-type/en-it-vocab/bulk")
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .send({
+          items: [
+            { data: { wordGroup: "Networking", word: `router-${runId}`, partsOfSpeech: "noun" } },
+            { data: { wordGroup: "Networking", word: `firewall-${runId}`, partsOfSpeech: "noun" } },
+          ],
+        })
+        .expect(201);
+      const items = (bulkCreateResponse.body as BulkCreateResponseBody).items;
+      expect(items).toHaveLength(2);
+      for (const item of items) {
+        expect(item.data.status).toBe("published");
+        pendingCleanupVocabIds.add(item.data.documentId);
+      }
+
+      const bogusId = "00000000-0000-0000-0000-000000000000";
+      const idsToDelete = [items[0].data.documentId, items[1].data.documentId, bogusId];
+
+      await request(app.getHttpServer())
+        .delete("/api/v1/documents/collection-type/en-it-vocab/bulk")
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .send({ documentIds: idsToDelete })
+        .expect(404);
+
+      for (const item of items) {
+        await request(app.getHttpServer())
+          .get(`/api/v1/documents/collection-type/en-it-vocab/${item.data.documentId}`)
+          .set("Cookie", [`access_token=${superAdminToken}`])
+          .expect(200);
+      }
     });
 
     it("creates+publishes a 50-item batch and logs wall-clock duration (perf benchmark, no hard threshold)", async () => {

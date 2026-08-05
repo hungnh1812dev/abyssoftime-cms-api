@@ -17,7 +17,7 @@ See `tasks/plan.md` for full context, design, and rationale. See
 
 ## Phase 3 — E2E verification
 - [x] Task 7 — `content-engine.e2e-spec.ts`: add a `cv-page` update wall-clock benchmark (same `Date.now()` pattern as the existing 50-item bulk-create benchmark), logged duration, no hard threshold assertion.
-- [ ] Task 8 — `content-engine.e2e-spec.ts`: bulk-delete all-or-nothing case — mix one unknown ID into a real batch, assert the request fails and zero documents were actually deleted (verify via `GET`), replacing/extending the existing bulk-delete assertions.
+- [x] Task 8 — `content-engine.e2e-spec.ts`: bulk-delete all-or-nothing case — mix one unknown ID into a real batch, assert the request fails and zero documents were actually deleted (verify via `GET`), replacing/extending the existing bulk-delete assertions.
 - [ ] **Checkpoint C:** `bun run test:e2e` green, timing improvement visible in output — commit.
 
 ## Phase 4 — Docs + workflow closeout
