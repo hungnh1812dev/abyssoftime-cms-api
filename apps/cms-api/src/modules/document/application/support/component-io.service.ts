@@ -28,41 +28,45 @@ export class ComponentIoService {
     tx?: Prisma.TransactionClient,
   ): Promise<void> {
     for (const field of fields.filter(isComponentField)) {
-      await this.saveComponentField(slug, [componentName(field)], documentId, version, null, field, data[field.name], tx);
+      await this.saveComponentTree(slug, [componentName(field)], documentId, version, field, [{ parentComponentId: null, rawValue: data[field.name] }], tx);
     }
   }
 
-  private async saveComponentField(
+  private async saveComponentTree(
     slug: string,
     componentPath: string[],
     documentId: string,
     version: DocumentVersion,
-    parentComponentId: string | null,
     field: FieldDefinition,
-    rawValue: unknown,
+    parentEntries: { parentComponentId: string | null; rawValue: unknown }[],
     tx?: Prisma.TransactionClient,
   ): Promise<void> {
     const subFields = field.fields ?? [];
-    const items = normalizeIncomingItems(field, rawValue);
+    const parentIds: (string | null)[] = [];
+    const allEntities: ComponentEntity[] = [];
+    const itemsWithEntity: { entity: ComponentEntity; item: Record<string, unknown> }[] = [];
 
-    const entities = items.map((item) => new ComponentEntity(randomUUID(), documentId, version, parentComponentId, scalarFieldsOf(subFields, item), {}));
-
-    await this.components.upsertAll(slug, componentPath, documentId, version, [parentComponentId], entities, subFields, tx);
-
-    const nestedComponentFields = subFields.filter(isComponentField);
-    for (let index = 0; index < items.length; index++) {
-      for (const nestedField of nestedComponentFields) {
-        await this.saveComponentField(
-          slug,
-          [...componentPath, componentName(nestedField)],
-          documentId,
-          version,
-          entities[index].componentId,
-          nestedField,
-          items[index][nestedField.name],
-          tx,
-        );
+    for (const { parentComponentId, rawValue } of parentEntries) {
+      parentIds.push(parentComponentId);
+      for (const item of normalizeIncomingItems(field, rawValue)) {
+        const entity = new ComponentEntity(randomUUID(), documentId, version, parentComponentId, scalarFieldsOf(subFields, item), {});
+        allEntities.push(entity);
+        itemsWithEntity.push({ entity, item });
       }
+    }
+
+    await this.components.upsertAll(slug, componentPath, documentId, version, parentIds, allEntities, subFields, tx);
+
+    if (itemsWithEntity.length === 0) {
+      return;
+    }
+
+    for (const nestedField of subFields.filter(isComponentField)) {
+      const nestedParentEntries = itemsWithEntity.map(({ entity, item }) => ({
+        parentComponentId: entity.componentId,
+        rawValue: item[nestedField.name],
+      }));
+      await this.saveComponentTree(slug, [...componentPath, componentName(nestedField)], documentId, version, nestedField, nestedParentEntries, tx);
     }
   }
 

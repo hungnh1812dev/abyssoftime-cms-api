@@ -5,8 +5,8 @@ See `tasks/plan.md` for full context, design, and rationale. See
 
 ## Phase 1 — Component I/O batching (the perf fix)
 - [x] Task 1 — `IComponentRepository`/`PrismaComponentRepository.upsertAll`: new `parentComponentIds: (string | null)[]` param replacing single `parentComponentId`; DELETE branches on `IS NULL` (top-level) vs. `= ANY($n::uuid[])` (nested); INSERT uses each entity's own `.parentComponentId`. Tests: `IS NULL` branch, `ANY(...)` branch, empty-entities-but-nonempty-parentIds (pure delete, no insert).
-- [ ] Task 2 — `ComponentIoService.saveComponents`/`saveComponentField` → rewrite as breadth-first `saveComponentTree`, batching all parents at one (documentId, componentPath) level into a single `upsertAll` call. Tests: extend existing 3-level nesting spec (`component-io.service.spec.ts`) to assert `upsertAll` called exactly once per component path (not once per parent); empty-nested-items parent still contributes to the DELETE scope.
-- [ ] **Checkpoint A:** `bun run test:cov` green for both files, `bun run lint` clean, no other spec files broken — commit.
+- [x] Task 2 — `ComponentIoService.saveComponents`/`saveComponentField` → rewrite as breadth-first `saveComponentTree`, batching all parents at one (documentId, componentPath) level into a single `upsertAll` call. Tests: extend existing 3-level nesting spec (`component-io.service.spec.ts`) to assert `upsertAll` called exactly once per component path (not once per parent); empty-nested-items parent still contributes to the DELETE scope.
+- [x] **Checkpoint A:** `bun run test:cov` green for both files, `bun run lint` clean, no other spec files broken — commit.
 
 ## Phase 2 — Bulk delete all-or-nothing
 - [ ] Task 3 — `delete-document.service.ts`: add optional `tx?: Prisma.TransactionClient` param; use it directly when provided instead of opening a new `$transaction`; existence-check reads stay pool-scoped (unchanged, matches existing pattern).
