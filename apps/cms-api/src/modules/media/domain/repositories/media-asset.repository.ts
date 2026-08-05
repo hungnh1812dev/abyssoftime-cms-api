@@ -16,7 +16,7 @@ export interface CreateMediaAssetData {
 export interface IMediaAssetRepository {
   create(data: CreateMediaAssetData): Promise<MediaAssetEntity>;
   findById(documentId: string): Promise<MediaAssetEntity | null>;
-  findByDocumentId(documentId: string): Promise<MediaAssetEntity | null>;
+  findByDocumentIds(documentIds: string[]): Promise<MediaAssetEntity[]>;
   findAll(): Promise<MediaAssetEntity[]>;
   delete(documentId: string): Promise<void>;
 }

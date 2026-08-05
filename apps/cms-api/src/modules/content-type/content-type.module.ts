@@ -1,6 +1,9 @@
+import { PermissionModule } from "../permissions/permission.module";
+
 import { Module } from "@nestjs/common";
 
 import { SchemaLoaderService } from "./application/schema/schema-loader.service";
+import { DocumentPermissionSyncService } from "./application/services/document-permission-sync.service";
 import { GetContentTypeService } from "./application/services/get-content-type.service";
 import { ListContentTypeService } from "./application/services/list-content-type.service";
 import { UpdateListFieldsService } from "./application/services/update-list-fields.service";
@@ -12,10 +15,12 @@ import { PrismaSchemaTableRepository } from "./infrastructure/persistence/prisma
 import { ContentTypeController } from "./presentation/content-type.controller";
 
 @Module({
+  imports: [PermissionModule],
   controllers: [ContentTypeController],
   providers: [
     SchemaLoaderService,
     ContentTypeSyncService,
+    DocumentPermissionSyncService,
     ListContentTypeService,
     GetContentTypeService,
     UpdateListFieldsService,

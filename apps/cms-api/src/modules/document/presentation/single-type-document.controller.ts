@@ -7,8 +7,8 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, Post, Put, 
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
+import { DocumentPermissionsGuard } from "@/common/guards/document-permissions.guard";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
-import { PermissionsGuard } from "@/common/guards/permissions.guard";
 import { type AuthenticatedRequest } from "@/common/types/authenticated-request";
 import { type IUserRepository, USER_REPOSITORY } from "@/modules/users/domain/repositories/user.repository";
 
@@ -31,7 +31,7 @@ export class SingleTypeDocumentController {
   ) {}
 
   @Get(":slug")
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, DocumentPermissionsGuard)
   @RequirePermissions("document:read")
   @ApiOperation({ summary: "Get the single-type document (draft in Mode A, published in Mode B)" })
   @ApiResponse({ status: 200, type: DocumentResponseDto })
@@ -45,7 +45,7 @@ export class SingleTypeDocumentController {
   }
 
   @Put(":slug")
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, DocumentPermissionsGuard)
   @RequirePermissions("document:update")
   @ApiOperation({ summary: "Create or update the single-type document" })
   @ApiResponse({ status: 200, type: DocumentResponseDto })
@@ -60,7 +60,7 @@ export class SingleTypeDocumentController {
 
   @Post(":slug/publish")
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, DocumentPermissionsGuard)
   @RequirePermissions("document:publish")
   @ApiOperation({ summary: "Publish the draft (Mode A only)" })
   @ApiResponse({ status: 200, type: PublishStatusResponseDto })
@@ -74,7 +74,7 @@ export class SingleTypeDocumentController {
 
   @Post(":slug/unpublish")
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, DocumentPermissionsGuard)
   @RequirePermissions("document:unpublish")
   @ApiOperation({ summary: "Unpublish (Mode A only) — draft is left untouched" })
   @ApiResponse({ status: 200, type: PublishStatusResponseDto })

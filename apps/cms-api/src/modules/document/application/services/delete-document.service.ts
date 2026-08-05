@@ -5,6 +5,7 @@ import { SchemaResolverService } from "../support/schema-resolver.service";
 
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 
+import { Prisma } from "@/prisma/application/client";
 import { PrismaService } from "@/prisma/application/prisma.service";
 
 @Injectable()
@@ -16,7 +17,7 @@ export class DeleteDocumentService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async execute(slug: string, documentId: string): Promise<void> {
+  async execute(slug: string, documentId: string, tx?: Prisma.TransactionClient): Promise<void> {
     const contentType = await this.schemaResolver.resolve(slug);
     assertKind(contentType, "collection");
 
@@ -28,10 +29,13 @@ export class DeleteDocumentService {
       throw new NotFoundException(`Document "${documentId}" not found`);
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await this.componentIo.deleteComponents(slug, documentId, "draft", contentType.fields, tx);
-      await this.componentIo.deleteComponents(slug, documentId, "published", contentType.fields, tx);
-      await this.documents.deleteAllVersions(slug, documentId, tx);
-    });
+    const run = async (transaction: Prisma.TransactionClient) => {
+      await this.componentIo.deleteComponents(slug, documentId, "draft", contentType.fields, transaction);
+      await this.componentIo.deleteComponents(slug, documentId, "published", contentType.fields, transaction);
+      await this.documents.deleteAllVersions(slug, documentId, transaction);
+    };
+
+    if (tx) await run(tx);
+    else await this.prisma.$transaction(run);
   }
 }

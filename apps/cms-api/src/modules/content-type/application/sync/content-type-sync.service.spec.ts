@@ -2,6 +2,7 @@ import { ContentTypeDefinition, ContentTypeEntity } from "../../domain/entities/
 import { IContentTypeRepository } from "../../domain/repositories/content-type.repository";
 import { ISchemaTableRepository } from "../../domain/repositories/schema-table.repository";
 import { SchemaLoaderService } from "../schema/schema-loader.service";
+import { DocumentPermissionSyncService } from "../services/document-permission-sync.service";
 
 import { ContentTypeSyncService } from "./content-type-sync.service";
 
@@ -34,6 +35,10 @@ function buildSchemaLoader(): jest.Mocked<SchemaLoaderService> {
   return { load: jest.fn(), loadFromDir: jest.fn() } as unknown as jest.Mocked<SchemaLoaderService>;
 }
 
+function buildDocumentPermissionSync(): jest.Mocked<DocumentPermissionSyncService> {
+  return { syncForContentTypes: jest.fn() } as unknown as jest.Mocked<DocumentPermissionSyncService>;
+}
+
 function entity(fields: ContentTypeEntity["fields"] = [{ name: "position", type: "text" }]): ContentTypeEntity {
   return new ContentTypeEntity("ct-1", "cv-page", "CV Page", "collection", true, fields, ["position"], new Date(), new Date());
 }
@@ -42,7 +47,7 @@ describe("ContentTypeSyncService", () => {
   it("new file: creates the document table, every component table, and inserts the ContentType row", async () => {
     const contentTypes = buildContentTypeRepository();
     const schemaTables = buildSchemaTableRepository();
-    const service = new ContentTypeSyncService(buildSchemaLoader(), contentTypes, schemaTables);
+    const service = new ContentTypeSyncService(buildSchemaLoader(), contentTypes, schemaTables, buildDocumentPermissionSync());
 
     const definition: ContentTypeDefinition = {
       slug: "cv-page",
@@ -81,7 +86,7 @@ describe("ContentTypeSyncService", () => {
   it("new file: passes the definition's kind through to ensureDocumentTable (single vs. collection)", async () => {
     const contentTypes = buildContentTypeRepository();
     const schemaTables = buildSchemaTableRepository();
-    const service = new ContentTypeSyncService(buildSchemaLoader(), contentTypes, schemaTables);
+    const service = new ContentTypeSyncService(buildSchemaLoader(), contentTypes, schemaTables, buildDocumentPermissionSync());
 
     const definition: ContentTypeDefinition = {
       slug: "site-settings",
@@ -105,7 +110,7 @@ describe("ContentTypeSyncService", () => {
     const schemaTables = buildSchemaTableRepository();
     schemaTables.listDocumentColumns.mockResolvedValue([{ name: "position", dataType: "text", isNullable: true }]);
 
-    const service = new ContentTypeSyncService(buildSchemaLoader(), contentTypes, schemaTables);
+    const service = new ContentTypeSyncService(buildSchemaLoader(), contentTypes, schemaTables, buildDocumentPermissionSync());
 
     const definition: ContentTypeDefinition = {
       slug: "cv-page",
@@ -147,7 +152,7 @@ describe("ContentTypeSyncService", () => {
     contentTypes.findAll.mockResolvedValue([previous]);
 
     const schemaTables = buildSchemaTableRepository();
-    const service = new ContentTypeSyncService(buildSchemaLoader(), contentTypes, schemaTables);
+    const service = new ContentTypeSyncService(buildSchemaLoader(), contentTypes, schemaTables, buildDocumentPermissionSync());
 
     await service.sync([]);
 
@@ -156,10 +161,30 @@ describe("ContentTypeSyncService", () => {
     expect(contentTypes.delete).toHaveBeenCalledWith("cv-page");
   });
 
+  it("syncs document permissions for the desired definitions as the last step", async () => {
+    const contentTypes = buildContentTypeRepository();
+    const schemaTables = buildSchemaTableRepository();
+    const documentPermissions = buildDocumentPermissionSync();
+    const service = new ContentTypeSyncService(buildSchemaLoader(), contentTypes, schemaTables, documentPermissions);
+
+    const definition: ContentTypeDefinition = {
+      slug: "cv-page",
+      name: "CV Page",
+      kind: "collection",
+      draftToPublish: true,
+      fields: [{ name: "position", type: "text" }],
+      listFields: ["position"],
+    };
+
+    await service.sync([definition]);
+
+    expect(documentPermissions.syncForContentTypes).toHaveBeenCalledWith([definition]);
+  });
+
   it("throws loudly for a malformed definition instead of silently syncing", async () => {
     const contentTypes = buildContentTypeRepository();
     const schemaTables = buildSchemaTableRepository();
-    const service = new ContentTypeSyncService(buildSchemaLoader(), contentTypes, schemaTables);
+    const service = new ContentTypeSyncService(buildSchemaLoader(), contentTypes, schemaTables, buildDocumentPermissionSync());
 
     const malformed: ContentTypeDefinition = {
       slug: "Bad Slug!",
@@ -189,7 +214,7 @@ describe("ContentTypeSyncService", () => {
     };
     schemaLoader.load.mockResolvedValue([definition]);
 
-    const service = new ContentTypeSyncService(schemaLoader, contentTypes, schemaTables);
+    const service = new ContentTypeSyncService(schemaLoader, contentTypes, schemaTables, buildDocumentPermissionSync());
     await service.onApplicationBootstrap();
 
     expect(schemaLoader.load).toHaveBeenCalled();

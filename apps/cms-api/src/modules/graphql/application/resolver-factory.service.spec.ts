@@ -19,7 +19,6 @@ import { UnpublishDocumentService } from "@/modules/document/application/service
 import { UnpublishSingleTypeService } from "@/modules/document/application/services/unpublish-single-type.service";
 import { DocumentEntity } from "@/modules/document/domain/entities/document.entity";
 import { MediaAssetEntity } from "@/modules/media/domain/entities/media-asset.entity";
-import { type IMediaAssetRepository } from "@/modules/media/domain/repositories/media-asset.repository";
 
 import { type GraphqlContext } from "./graphql-context.factory";
 import { ResolverFactoryService } from "./resolver-factory.service";
@@ -66,7 +65,6 @@ describe("ResolverFactoryService", () => {
   let getPublicDocument: jest.Mocked<GetPublicDocumentService>;
   let getDocumentForEdit: jest.Mocked<GetDocumentForEditService>;
   let listDocumentsFull: jest.Mocked<ListDocumentsFullService>;
-  let mediaAssets: jest.Mocked<IMediaAssetRepository>;
   let saveDocument: jest.Mocked<SaveDocumentService>;
   let publishDocument: jest.Mocked<PublishDocumentService>;
   let unpublishDocument: jest.Mocked<UnpublishDocumentService>;
@@ -78,20 +76,20 @@ describe("ResolverFactoryService", () => {
   let unpublishSingleType: jest.Mocked<UnpublishSingleTypeService>;
   let service: ResolverFactoryService;
 
-  const noToken: GraphqlContext = { apiToken: null };
-  const readScopedToken: GraphqlContext = { apiToken: { documentId: "token-1", name: "CI", permissions: ["document:read"] } };
-  const createScopedToken: GraphqlContext = { apiToken: { documentId: "token-1", name: "CI", permissions: ["document:create"] } };
-  const updateScopedToken: GraphqlContext = { apiToken: { documentId: "token-1", name: "CI", permissions: ["document:update"] } };
-  const deleteScopedToken: GraphqlContext = { apiToken: { documentId: "token-1", name: "CI", permissions: ["document:delete"] } };
-  const publishScopedToken: GraphqlContext = { apiToken: { documentId: "token-1", name: "CI", permissions: ["document:publish"] } };
-  const unpublishScopedToken: GraphqlContext = { apiToken: { documentId: "token-1", name: "CI", permissions: ["document:unpublish"] } };
+  const mediaAssetLoader = { load: jest.fn() } as unknown as GraphqlContext["mediaAssetLoader"];
+  const noToken: GraphqlContext = { apiToken: null, mediaAssetLoader };
+  const readScopedToken: GraphqlContext = { apiToken: { documentId: "token-1", name: "CI", permissions: ["document:read"] }, mediaAssetLoader };
+  const createScopedToken: GraphqlContext = { apiToken: { documentId: "token-1", name: "CI", permissions: ["document:create"] }, mediaAssetLoader };
+  const updateScopedToken: GraphqlContext = { apiToken: { documentId: "token-1", name: "CI", permissions: ["document:update"] }, mediaAssetLoader };
+  const deleteScopedToken: GraphqlContext = { apiToken: { documentId: "token-1", name: "CI", permissions: ["document:delete"] }, mediaAssetLoader };
+  const publishScopedToken: GraphqlContext = { apiToken: { documentId: "token-1", name: "CI", permissions: ["document:publish"] }, mediaAssetLoader };
+  const unpublishScopedToken: GraphqlContext = { apiToken: { documentId: "token-1", name: "CI", permissions: ["document:unpublish"] }, mediaAssetLoader };
 
   beforeEach(() => {
     schemaLoader = { load: jest.fn().mockResolvedValue([cvPage]), loadFromDir: jest.fn() } as unknown as jest.Mocked<SchemaLoaderService>;
     getPublicDocument = { execute: jest.fn() } as unknown as jest.Mocked<GetPublicDocumentService>;
     getDocumentForEdit = { execute: jest.fn() } as unknown as jest.Mocked<GetDocumentForEditService>;
     listDocumentsFull = { execute: jest.fn().mockResolvedValue({ items: [], total: 0, start: 0, size: 10 }) } as unknown as jest.Mocked<ListDocumentsFullService>;
-    mediaAssets = { findByDocumentId: jest.fn() } as unknown as jest.Mocked<IMediaAssetRepository>;
     saveDocument = { execute: jest.fn() } as unknown as jest.Mocked<SaveDocumentService>;
     publishDocument = { execute: jest.fn() } as unknown as jest.Mocked<PublishDocumentService>;
     unpublishDocument = { execute: jest.fn() } as unknown as jest.Mocked<UnpublishDocumentService>;
@@ -106,7 +104,6 @@ describe("ResolverFactoryService", () => {
       getPublicDocument,
       getDocumentForEdit,
       listDocumentsFull,
-      mediaAssets,
       saveDocument,
       publishDocument,
       unpublishDocument,
@@ -285,41 +282,48 @@ describe("ResolverFactoryService", () => {
       new Date(),
     );
 
-    it("resolves a media-typed field's raw FK to the full MediaAsset via MEDIA_ASSET_REPOSITORY.findByDocumentId", async () => {
-      mediaAssets.findByDocumentId.mockResolvedValue(mediaAsset);
+    type ParentOnlyResolver = (parent: unknown, args: unknown, context: GraphqlContext) => Promise<unknown>;
+
+    it("resolves a media-typed field's raw FK to the full MediaAsset via context.mediaAssetLoader.load", async () => {
+      const loader = { load: jest.fn().mockResolvedValue(mediaAsset) } as unknown as GraphqlContext["mediaAssetLoader"];
+      const context: GraphqlContext = { apiToken: null, mediaAssetLoader: loader };
       const resolvers = await service.buildResolvers();
 
-      const result = await (resolvers.CvPage as Record<string, (parent: unknown) => Promise<unknown>>).coverImage({ coverImage: "media-1" });
+      const result = await (resolvers.CvPage as Record<string, ParentOnlyResolver>).coverImage({ coverImage: "media-1" }, {}, context);
 
-      expect(mediaAssets.findByDocumentId).toHaveBeenCalledWith("media-1");
+      expect(loader.load).toHaveBeenCalledWith("media-1");
       expect(result).toBe(mediaAsset);
     });
 
-    it("resolves a null FK to null without calling the repository", async () => {
+    it("resolves a null FK to null without calling the loader", async () => {
+      const loader = { load: jest.fn() } as unknown as GraphqlContext["mediaAssetLoader"];
+      const context: GraphqlContext = { apiToken: null, mediaAssetLoader: loader };
       const resolvers = await service.buildResolvers();
 
-      const result = await (resolvers.CvPage as Record<string, (parent: unknown) => Promise<unknown>>).coverImage({ coverImage: null });
+      const result = await (resolvers.CvPage as Record<string, ParentOnlyResolver>).coverImage({ coverImage: null }, {}, context);
 
-      expect(mediaAssets.findByDocumentId).not.toHaveBeenCalled();
+      expect(loader.load).not.toHaveBeenCalled();
       expect(result).toBeNull();
     });
 
     it("resolves a dangling (deleted) FK to null, never throws", async () => {
-      mediaAssets.findByDocumentId.mockResolvedValue(null);
+      const loader = { load: jest.fn().mockResolvedValue(null) } as unknown as GraphqlContext["mediaAssetLoader"];
+      const context: GraphqlContext = { apiToken: null, mediaAssetLoader: loader };
       const resolvers = await service.buildResolvers();
 
-      const result = await (resolvers.CvPage as Record<string, (parent: unknown) => Promise<unknown>>).coverImage({ coverImage: "gone" });
+      const result = await (resolvers.CvPage as Record<string, ParentOnlyResolver>).coverImage({ coverImage: "gone" }, {}, context);
 
       expect(result).toBeNull();
     });
 
     it("resolves a media-typed field nested inside a component type the same way, at any nesting depth", async () => {
-      mediaAssets.findByDocumentId.mockResolvedValue(mediaAsset);
+      const loader = { load: jest.fn().mockResolvedValue(mediaAsset) } as unknown as GraphqlContext["mediaAssetLoader"];
+      const context: GraphqlContext = { apiToken: null, mediaAssetLoader: loader };
       const resolvers = await service.buildResolvers();
 
-      const result = await (resolvers.CvPageGalleryItem as Record<string, (parent: unknown) => Promise<unknown>>).photo({ photo: "media-1" });
+      const result = await (resolvers.CvPageGalleryItem as Record<string, ParentOnlyResolver>).photo({ photo: "media-1" }, {}, context);
 
-      expect(mediaAssets.findByDocumentId).toHaveBeenCalledWith("media-1");
+      expect(loader.load).toHaveBeenCalledWith("media-1");
       expect(result).toBe(mediaAsset);
     });
   });

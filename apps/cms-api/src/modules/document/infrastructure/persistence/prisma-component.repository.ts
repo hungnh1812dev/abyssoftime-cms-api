@@ -35,20 +35,25 @@ export class PrismaComponentRepository implements IComponentRepository {
     componentPath: string[],
     documentId: string,
     version: DocumentVersion,
-    parentComponentId: string | null,
+    parentComponentIds: (string | null)[],
     components: ComponentEntity[],
     fields: FieldDefinition[],
     tx?: Prisma.TransactionClient,
   ): Promise<void> {
     const table = quoteIdent(componentTableName(slug, componentPath));
     const client = this.client(tx);
+    const isTopLevel = parentComponentIds.length === 1 && parentComponentIds[0] === null;
 
-    await client.$executeRawUnsafe(
-      `DELETE FROM ${table} WHERE document_id = $1 AND version = $2 AND parent_component_id IS NOT DISTINCT FROM $3`,
-      documentId,
-      version,
-      parentComponentId,
-    );
+    if (isTopLevel) {
+      await client.$executeRawUnsafe(`DELETE FROM ${table} WHERE document_id = $1 AND version = $2 AND parent_component_id IS NULL`, documentId, version);
+    } else {
+      await client.$executeRawUnsafe(
+        `DELETE FROM ${table} WHERE document_id = $1 AND version = $2 AND parent_component_id = ANY($3::uuid[])`,
+        documentId,
+        version,
+        parentComponentIds,
+      );
+    }
 
     if (components.length === 0) {
       return;
@@ -61,7 +66,7 @@ export class PrismaComponentRepository implements IComponentRepository {
     const values: unknown[] = [];
     const rowPlaceholders = components.map((component) => {
       const rowValues = fieldsToRowValues(component.fields, fields);
-      const rowValuesList = [component.componentId, documentId, version, parentComponentId, ...contentFields.map((field) => rowValues[field.name])];
+      const rowValuesList = [component.componentId, documentId, version, component.parentComponentId, ...contentFields.map((field) => rowValues[field.name])];
       const startIndex = values.length;
       values.push(...rowValuesList);
       return `(${rowValuesList.map((_, index) => `$${startIndex + index + 1}`).join(", ")})`;

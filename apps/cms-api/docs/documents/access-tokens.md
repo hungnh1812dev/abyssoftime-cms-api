@@ -46,6 +46,17 @@ Unlike `IRoleRepository` (domain error classes translated in the Prisma layer), 
 
 `revoke-access-token.dto.ts` — same three fields, all `@IsOptional()` (provide only what you want to change; the secret rotates regardless of what's provided).
 
+## Content-type-scoped document permissions
+
+`permissions: string[]` accepts two shapes for a `document:<action>` grant (`read`/`create`/`update`/`delete`/`publish`/`unpublish`):
+
+- **Global** (unchanged): `document:read` — grants the action across every content type, today's only behavior.
+- **Content-type-scoped** (new): `document:read:cv-page` — grants the action only for the `cv-page` content type. The 3rd segment is a content-type slug, synced into the permission catalog at boot by `content-type`'s `DocumentPermissionSyncService` (see [content-type.md](content-type.md#document-permission-catalog-sync)) — one row per content type × document action, so `dto.permissions`' existing catalog-membership check (`assertPermissionsExist`, [Services & business rules](#services--business-rules) above) validates a scoped slug exactly like any other, no special-casing in `Create`/`Revoke`.
+
+Both shapes can coexist in the same token's `permissions` array (e.g. `document:read` global alongside a scoped `document:create:cv-page`), though there's no dedup/conflict check today — an admin building a token with both a global and a redundant scoped slug for the same action gets no warning.
+
+Enforcement (not this module's concern, documented for context) reads `request.user.permissions`/`context.apiToken.permissions` through the shared `isDocumentActionGranted(granted, action, contentTypeSlug)` util (`src/common/authorization/document-permission.util.ts`): the global slug always satisfies every content type; the scoped slug only satisfies its own. REST's `DocumentPermissionsGuard` and GraphQL's `assertApiTokenPermission` both call it — see `document.md` and `graphql.md`. Scoping applies to `document:*` actions only; `media:*`/`permission:*`/`role:*`/`user:*`/`content_type:*`/`api_token:*` slugs stay global-only, unaffected by this feature. A token holding only pre-existing global slugs needs no changes and keeps working identically (no migration, no schema change — `permissions` was already `string[]`).
+
 ## Token lifecycle: secrets, hashing, plaintext exposure
 
 `application/services/access-token-secret.util.ts`:

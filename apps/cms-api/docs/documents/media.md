@@ -43,7 +43,7 @@ Maps 1:1 to the `MediaAsset` Prisma model (`prisma/postgresql/schema.prisma`, `@
 
 - `create(data: CreateMediaAssetData): Promise<MediaAssetEntity>`
 - `findById(documentId): Promise<MediaAssetEntity | null>`
-- `findByDocumentId(documentId): Promise<MediaAssetEntity | null>` — identical to `findById`; kept as a separate named method because the source doc's port shape distinguished the two call sites (an internal "does it exist" check vs. a public "fetch by id" lookup) even though the implementation is the same `prisma.mediaAsset.findUnique({ where: { documentId } })` call.
+- `findByDocumentIds(documentIds: string[]): Promise<MediaAssetEntity[]>` — one `prisma.mediaAsset.findMany({ where: { documentId: { in: documentIds } } })`; missing ids are simply absent from the result (no `null` padding — the caller, `GraphqlContextFactory`'s `DataLoader` batch function, maps results back to key order itself). Used by the GraphQL media field resolver's per-request `DataLoader` to batch what would otherwise be one lookup per resolved object — see [`graphql.md`](graphql.md#resolvers).
 - `findAll(): Promise<MediaAssetEntity[]>` — ordered `createdAt: "desc"` (newest first).
 - `delete(documentId): Promise<void>` — throws `MediaAssetNotFoundError` on a caught Prisma `P2025`.
 
@@ -122,7 +122,7 @@ Unit tests (Jest, mocked repositories/adapters via `Test.createTestingModule` + 
 - `upload-media.service.spec.ts` — `413` over the size limit (storage/repository never touched); `422` for a non-image buffer (storage/repository never touched); happy path (uploads to storage, hashes, persists mapped metadata); storage-before-persist ordering; `uploadedBy: null` passthrough when no uploader is known; a spoofed `mimeType`/extension (e.g. `text/html`/`.html` on real PNG bytes) is ignored — storage and the persisted entity both get the canonical `image/png`/`.png` derived from the sniffed format, not the caller's input.
 - `list-media.service.spec.ts` — returns all assets from the repository, passthrough.
 - `delete-media.service.spec.ts` — `404` when the target doesn't exist; a storage-delete failure propagates **uncaught** and does _not_ delete the DB row; `MediaAssetNotFoundError` from the repository translates to `NotFoundException`; unrelated repository errors rethrow unchanged; happy path deletes storage by `publicId` then the DB row by `documentId`.
-- `prisma-media.repository.spec.ts` — `findAll` ordering + entity mapping; `findById`/`findByDocumentId` found/not-found; `create` passes every field through (including `uploadedBy: null`); `delete` removes the record, translates a caught `P2025` into `MediaAssetNotFoundError`, and rethrows unrelated errors.
+- `prisma-media.repository.spec.ts` — `findAll` ordering + entity mapping; `findById` found/not-found; `findByDocumentIds` batches multiple ids via one `findMany`, omits unmatched ids, and returns `[]` for empty input without matching everything; `create` passes every field through (including `uploadedBy: null`); `delete` removes the record, translates a caught `P2025` into `MediaAssetNotFoundError`, and rethrows unrelated errors.
 - `media.controller.spec.ts` — `list()`/`upload()`/`delete()` delegate to the corresponding service; `upload()` throws `BadRequestException` when no file is attached.
 - `media.module.spec.ts` — imports `StorageModule` and a `MulterModule` registered with `MEDIA_MAX_UPLOAD_BYTES` as the `fileSize` limit; registers `MediaController`; registers the three services and binds the repository token to `PrismaMediaRepository`.
 
@@ -154,7 +154,6 @@ Two new `test/utils/*` files, not media-specific — the first reusable e2e help
 
 ## Known quirks / deviations (preserved intentionally)
 
-- `findById` and `findByDocumentId` on `IMediaAssetRepository` are identical in implementation (both `prisma.mediaAsset.findUnique({ where: { documentId } })`) — kept as two named methods to match the source doc's port shape rather than collapsed into one, since the two call sites (`DeleteMediaService`'s existence check vs. a hypothetical future public "get by id" endpoint) are conceptually distinct even though today's implementation is the same line of code.
 - No soft-delete — `delete` is a real hard `DELETE`, matching the "assets are immutable, deletion is permanent" design; no `deletedAt` column exists.
 - `DeleteMediaService`'s check-then-act (`findById` then `storage.delete` then `mediaAssets.delete`) has no transaction wrapping across the storage call — a concurrent delete of the same asset between the initial check and the storage call could attempt to delete an already-gone storage object. Acceptable per the source doc's explicit ordering requirement (storage-before-DB, uncaught) — the alternative (wrapping in a DB transaction) can't span an external HTTP call to S3/Cloudinary anyway.
 - `size` on `CreateMediaAssetData` is always derived from `buffer.length` server-side, never trusted from a client-supplied field — there is no client-supplied size field to begin with (Multer sets `file.size`, but `UploadMediaService` deliberately reads `input.buffer.length` instead).
