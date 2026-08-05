@@ -21,6 +21,6 @@ See `tasks/plan.md` for full context, design, and rationale. See
 - [x] **Checkpoint C:** `bun run test:e2e` green, timing improvement visible in output — commit.
 
 ## Phase 4 — Docs + workflow closeout
-- [ ] Task 9 — Update `docs/documents/document.md`: "Services — bulk" bulk-delete line + the endpoint table row (all-or-nothing behavior, new `{ deleted }` response shape); note the `ComponentIoService` batching behavior in the relevant services section.
+- [x] Task 9 — Update `docs/documents/document.md`: "Services — bulk" bulk-delete line + the endpoint table row (all-or-nothing behavior, new `{ deleted }` response shape); note the `ComponentIoService` batching behavior in the relevant services section.
 - [ ] Task 10 — Correct `docs/specs/document-io-performance-and-rollback.md`'s Diagnosis section (the read-side/hydrate fan-out claim was wrong — already schema-bounded, no changes were needed there); run five-axis review (correctness/readability/architecture/security/performance); delete the spec file as cleanup step.
 - [ ] **Checkpoint D (final):** `bun run build && bun run lint && bun run test:cov && bun run test:e2e` all green; docs updated; spec cleaned up — commit.
