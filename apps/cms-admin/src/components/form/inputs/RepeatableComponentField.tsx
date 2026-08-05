@@ -56,8 +56,8 @@ function RepeatableEntry({ entryId: _entryId, entryIndex, totalEntries, parentNa
 
   return (
     <div className={cn("bg-background relative rounded-md border", expanded ? "p-4" : "p-2")}>
-      <div className={cn("flex items-center justify-between", expanded && "mb-3")}>
-        <button type="button" className="flex items-center gap-1" onClick={() => setExpanded((prev) => !prev)} aria-expanded={expanded}>
+      <div className={cn("flex  justify-between", expanded && "mb-3")}>
+        <button type="button" className="flex items-center gap-1 flex-1 cursor-pointer" onClick={() => setExpanded((prev) => !prev)} aria-expanded={expanded}>
           <ChevronRight className={cn("size-3.5 shrink-0 transition-transform duration-200", expanded && "rotate-90")} />
           <span className="text-muted-foreground text-xs font-medium">#{entryIndex + 1}</span>
           {hintText && (
@@ -72,7 +72,7 @@ function RepeatableEntry({ entryId: _entryId, entryIndex, totalEntries, parentNa
             type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 cursor-pointer"
             disabled={entryIndex === 0}
             onClick={() => onSwap(entryIndex, entryIndex - 1)}
             aria-label={`Move item ${entryIndex + 1} up`}>
@@ -82,7 +82,7 @@ function RepeatableEntry({ entryId: _entryId, entryIndex, totalEntries, parentNa
             type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 cursor-pointer"
             disabled={entryIndex === totalEntries - 1}
             onClick={() => onSwap(entryIndex, entryIndex + 1)}
             aria-label={`Move item ${entryIndex + 1} down`}>
@@ -92,7 +92,7 @@ function RepeatableEntry({ entryId: _entryId, entryIndex, totalEntries, parentNa
             type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-destructive hover:text-destructive"
+            className="h-7 w-7 cursor-pointer text-destructive hover:text-destructive"
             onClick={() => onRemove(entryIndex)}
             aria-label={`Remove item ${entryIndex + 1}`}>
             <Trash2 className="h-3.5 w-3.5" />
