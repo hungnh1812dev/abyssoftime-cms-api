@@ -13,7 +13,7 @@ See `tasks/plan.md` for full context, design, and rationale. See
 - [x] Task 4 — `bulk-delete.service.ts` rewrite: inject `PrismaService`; wrap the per-ID loop in one spanning `$transaction`, passing `tx` to each `deleteDocument.execute` call; return `string[]` (deleted IDs) instead of `BulkDeleteResult[]`; remove the per-item try/catch (a failure now throws and rolls back the whole batch).
 - [x] Task 5 — Controller (`collection-type-document.controller.ts`) + DTOs: `bulkDelete` handler returns `{ deleted: string[] }` (drop `failed`); `BulkDeleteResponseDto` drops `failed`/`BulkDeleteFailureDto`; update `@ApiOperation` summary (no longer "no rollback on partial failure"). *(Combined with Task 4 in the same commit — the service's return-type change and the controller's consumption of it are one atomic interface change; splitting them would leave a non-compiling intermediate state.)*
 - [x] Task 6 — Rewrite `bulk-delete.service.spec.ts` for all-or-nothing (all-success returns all IDs; a failing ID rolls back every delete in the batch; empty array short-circuits without opening a transaction); extend `delete-document.service.spec.ts` for the new optional `tx` param. *(`bulk-delete.service.spec.ts` rewritten alongside Task 4 for the same reason; `delete-document.service.spec.ts` was already extended in Task 3.)*
-- [ ] **Checkpoint B:** `bun run test:cov` and `bun run lint` green — commit.
+- [x] **Checkpoint B:** `bun run test:cov` and `bun run lint` green — commit.
 
 ## Phase 3 — E2E verification
 - [ ] Task 7 — `content-engine.e2e-spec.ts`: add a `cv-page` update wall-clock benchmark (same `Date.now()` pattern as the existing 50-item bulk-create benchmark), logged duration, no hard threshold assertion.
