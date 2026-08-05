@@ -1,23 +1,27 @@
-# Todo — Bulk Create+Publish Performance Fix
+# Todo — Content-Type-Scoped Document Permissions for API Tokens
 
 See `tasks/plan.md` for full context, design, and rationale. See
-`docs/specs/bulk-create-publish-performance.md` for the full spec.
+`docs/specs/api-token-content-type-scoped-permissions.md` for the full spec.
 
-## Phase 1 — Single-item service changes (benefit bulk AND non-bulk callers)
-- [x] Task 1 — `save-document.service.ts`: optional `contentType` param; skip `findByVersion` when `documentId` is undefined; `withScalarDefaults` normalization fix. Tests: omitted-optional-field → `null`, 5-arg skips resolve, Mode B + `documentId=undefined`.
-- [x] Task 2 — `publish-document.service.ts`: optional `contentType`/`draftOverride`/`isNewDocument` params. Tests: `draftOverride` correctness (component keys still overwritten, scalar keys preserved), `isNewDocument` skip.
-- [x] **Checkpoint A:** `bun run test:cov` green for both files, `bun run lint` clean, no other spec files broken — commit.
+## Phase 1 — Backend foundation (additive, no enforcement change yet)
+- [x] Task 1 — Shared grant-check util: `src/common/authorization/document-permission.util.ts` exporting `isDocumentActionGranted(granted: string[], requiredSlug: string, contentTypeSlug: string): boolean` (`granted.includes(requiredSlug) || granted.includes(`${requiredSlug}:${contentTypeSlug}`)`). Tests: global-slug match, scoped-slug match, no-match, both-present.
+- [x] Task 2 — `DocumentPermissionSyncService` (`src/modules/content-type/application/services/document-permission-sync.service.ts`), `syncForContentTypes(definitions)`: idempotently `create()`s a `Permission` row per definition × 6 document actions (slug `document:<action>:<content-type-slug>`), bypassing `CreatePermissionDto`'s regex (direct repository call — system-managed rows). `ContentTypeSyncService.sync()` calls it as the last step; `ContentTypeModule` imports `PermissionModule` + registers the new provider. Tests: new content type → 6 creates; existing → 0 creates; removed content type → no delete call; `content-type-sync.service.spec.ts` updated.
+- [x] **Checkpoint A:** `bun run build && bun run lint && bun run test:cov` green. Manual: boot locally, `GET /api/v1/permissions` shows the new scoped rows; re-boot → no duplicates. Commit.
 
-## Phase 2 — Bulk service rewrite
-- [x] Task 3 — Rewrite `bulk-create-publish.service.ts`: inject `SchemaResolverService`, hoist resolve, `CHUNK_SIZE = 5` chunked processing via `processItem`/discriminated outcomes, preserve rollback-on-any-failure + original item ordering.
-- [x] Task 4 — Full rewrite of `bulk-create-publish.service.spec.ts` (existing suite is order-dependent, breaks under chunking). Cover: all-success across 2+ chunks; failure on very first item; failure in a later chunk rolls back prior chunks + same-chunk successes; two failures in same chunk; save-fails-before-publish vs. publish-fails-after-save; chunk-boundary batch sizes (`CHUNK_SIZE`, `CHUNK_SIZE + 1`); single-item batch.
-- [x] **Checkpoint B:** `bun run test:cov` and `bun run lint` green — commit.
+## Phase 2 — GraphQL enforcement
+- [x] Task 3 — `assertApiTokenPermission(context, requiredSlug, contentTypeSlug)` (new 3rd param) in `src/modules/graphql/application/authorize.util.ts`, delegating to `isDocumentActionGranted`. Update all 11 call sites in `resolver-factory.service.ts` (lines 194, 206, 213, 220, 228, 235, 242, 253, 265, 272, 278) to pass `definition.slug`. Tests: `authorize.util.spec.ts` (global grant, scoped grant, scoped-for-wrong-content-type denied). Correction (found during Task 6 review): `resolver-factory.service.spec.ts` was not touched — it only registers one content type and asserts on global 2-segment slugs, so it can't exercise the `definition.slug` wiring; that regression protection lives entirely in `test/graphql.e2e-spec.ts`'s cv-page/cv-contact case instead.
+- [x] **Checkpoint B:** `bun run build && bun run lint && bun run test:cov` green. New `test/graphql.e2e-spec.ts` case: token scoped to `document:read:cv-page` succeeds on `cvPage`, 403s on another content type; global-slug token still works everywhere (regression). `bun run test:e2e` green. Commit.
 
-## Phase 3 — E2E verification
-- [x] Task 5 — Extend `test/content-engine.e2e-spec.ts`: 50-item `en-it-vocab` bulk create+publish case logging wall-clock duration (no hard threshold assertion); assert response shape + all 50 persisted+published; confirm existing 3-item case still passes.
-- [x] **Checkpoint C:** `bun run test:e2e` green, timing improvement visible in output — commit.
+## Phase 3 — REST enforcement
+- [x] Task 4 — New `src/common/guards/document-permissions.guard.ts` (`DocumentPermissionsGuard`, sibling to `PermissionsGuard`, no `managerEquivalentOf` fallback): reads `PERMISSIONS_KEY` metadata + `request.params.slug`, requires every declared permission via `isDocumentActionGranted(request.user?.permissions ?? [], permission, request.params.slug)`. Swap `PermissionsGuard` → `DocumentPermissionsGuard` in `@UseGuards(...)` on every route of `CollectionTypeDocumentController` and `SingleTypeDocumentController` (`JwtAuthGuard` unchanged, stays first). Tests: `document-permissions.guard.spec.ts` (global match, scoped match, scoped-wrong-type denied, no-permissions denied); re-run existing controller specs unmodified in assertions.
+- [x] **Checkpoint C:** `bun run build && bun run lint && bun run test:cov` green. New REST e2e case: Bearer token scoped to `document:read:cv-page` succeeds on `GET /api/v1/documents/collection-type/cv-page`, 403s on another content type; global-slug token/role still works everywhere (regression). `bun run test:e2e` green. Commit.
 
-## Phase 4 — Docs + workflow closeout
-- [x] Task 6 — Update `docs/documents/document.md`'s "Services — bulk" section: schema resolved once per batch; chunked concurrency (`CHUNK_SIZE = 5`); rollback still all-or-nothing but failure-ordering no longer strictly request-order within a chunk; note eliminated redundant lookups.
-- [x] Task 7 — Update `docs/specs/bulk-create-publish-performance.md` to reflect final implementation; run five-axis review (correctness/readability/architecture/security/performance); delete the spec file as cleanup step.
-- [x] **Checkpoint D (final):** `bun run build && bun run lint && bun run test:cov && bun run test:e2e` all green; docs updated; spec cleaned up — commit.
+## Phase 4 — Backend docs + review + cleanup
+- [x] Task 5 — Update docs: `docs/documents/access-tokens.md` (slug convention, catalog sync), `docs/documents/content-type.md` (`DocumentPermissionSyncService` in boot sync), `docs/documents/document.md` (`DocumentPermissionsGuard` replacing `PermissionsGuard`), `docs/documents/graphql.md` (`assertApiTokenPermission` new signature), `docs/documents/permissions.md` (system-managed scoped rows, regex bypass). Update `SPEC.md` pointer.
+- [x] Task 6 — Five-axis review (correctness/readability/architecture/security/performance) via `agent-skills:code-reviewer`: **APPROVE**, no critical/important issues. Spec file deleted as cleanup (matches this project's established convention — see `93257f0`, `e7368fa` — of deleting `docs/specs/*` once `docs/documents/*.md` captures the final state, rather than editing the spec first); its content is fully superseded by Task 5's doc updates and `tasks/plan.md`'s "Corrections found during planning" section (which already documents the `DocumentAuthGuard` drop and source-agnostic enforcement).
+- [x] **Checkpoint D (backend final):** `bun run build && bun run lint && bun run test:cov && bun run test:e2e` all green; docs updated; spec cleaned up. Commit.
+
+## Phase 5 — Frontend (`apps/cms-admin`)
+- [x] Task 7 — `src/components/permissions/permissionGrouping.ts`: add `parseDocumentPermissionSlug(slug): { action, contentTypeSlug? } | null` (non-null only for 3-segment `document:*` slugs) and `buildDocumentPermissionSlug(action, contentTypeSlug?)`. Tests: round-trip for global/scoped slugs, ignores non-document slugs.
+- [x] Task 8 — `PermissionTree.tsx`: new rendering branch for the `"document"` group only — per action, toggle between "All content types" (global slug) and "Specific content types" (checkboxes from `useContentTypes()`, building scoped slugs); switching the toggle clears the other slug set for that action. All other groups unchanged. Applies to both `RolesPage.tsx` and `AccessTokensPage.tsx` (shared component, no new prop). Tests: toggle behavior, correct slug array produced, mocked `useContentTypes`.
+- [x] **Checkpoint E (final):** `apps/cms-admin`: build/lint/`vitest run` green (confirm actual script names first). Manual browser walkthrough: create a token scoped to `document:read:cv-page` only, verify via curl/GraphQL playground it reads `cv-page` and is rejected elsewhere; confirm the same picker renders correctly on `RolesPage`. Commit.

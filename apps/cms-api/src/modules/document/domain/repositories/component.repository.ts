@@ -11,7 +11,7 @@ export interface IComponentRepository {
     componentPath: string[],
     documentId: string,
     version: DocumentVersion,
-    parentComponentId: string | null,
+    parentComponentIds: (string | null)[],
     components: ComponentEntity[],
     fields: FieldDefinition[],
     tx?: Prisma.TransactionClient,

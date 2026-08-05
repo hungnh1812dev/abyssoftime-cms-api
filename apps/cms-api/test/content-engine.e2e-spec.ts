@@ -5,6 +5,8 @@ import { type App } from "supertest/types";
 import { type INestApplication } from "@nestjs/common";
 
 import { JwtTokenService } from "@/common/token/jwt-token.service";
+import { CreateAccessTokenService } from "@/modules/access-tokens/application/services/create-access-token.service";
+import { ACCESS_TOKEN_REPOSITORY, type IAccessTokenRepository } from "@/modules/access-tokens/domain/repositories/access-token.repository";
 import { SchemaLoaderService } from "@/modules/content-type/application/schema/schema-loader.service";
 import { ContentTypeSyncService } from "@/modules/content-type/application/sync/content-type-sync.service";
 import { type ContentTypeDefinition } from "@/modules/content-type/domain/entities/content-type.entity";
@@ -28,7 +30,6 @@ interface BulkCreateResponseBody {
 
 interface BulkDeleteResponseBody {
   deleted: string[];
-  failed: { documentId: string; error?: string }[];
 }
 
 const SUPER_ADMIN_REQUIRED_SLUGS = ["content_type:read", "document:read", "document:create", "document:update", "document:delete", "document:publish", "document:unpublish"];
@@ -43,13 +44,16 @@ describe("Content engine (e2e)", () => {
   let prisma: PrismaService;
   let schemaLoader: SchemaLoaderService;
   let syncService: ContentTypeSyncService;
+  let accessTokens: IAccessTokenRepository;
   let realDefs: ContentTypeDefinition[];
 
   let superAdminToken: string;
   let readOnlyToken: string;
   let noPermToken: string;
+  let cvPageScopedApiToken: string;
 
   const createdUserIds: string[] = [];
+  const createdApiTokenIds: string[] = [];
   const pendingCleanupCvPageIds = new Set<string>();
   const pendingCleanupVocabIds = new Set<string>();
 
@@ -89,7 +93,9 @@ describe("Content engine (e2e)", () => {
     prisma = app.get(PrismaService);
     schemaLoader = app.get(SchemaLoaderService);
     syncService = app.get(ContentTypeSyncService);
+    accessTokens = app.get(ACCESS_TOKEN_REPOSITORY);
     const jwtTokenService = app.get(JwtTokenService);
+    const createAccessToken = app.get(CreateAccessTokenService);
 
     realDefs = await schemaLoader.load();
     await syncService.sync([...realDefs, modeBDef(), schemaEditDefV1()]);
@@ -188,6 +194,10 @@ describe("Content engine (e2e)", () => {
       level: editorRole.level,
       permissions: editorRole.permissions as string[],
     });
+
+    const cvPageScoped = await createAccessToken.execute({ name: `e2e-rest-scoped-cv-page-${runId}`, permissions: ["document:read:cv-page"], expiresIn: "1h" }, null);
+    cvPageScopedApiToken = cvPageScoped.plaintext;
+    createdApiTokenIds.push(cvPageScoped.entity.documentId);
   });
 
   afterAll(async () => {
@@ -209,6 +219,10 @@ describe("Content engine (e2e)", () => {
     // Drop the throwaway content types (and their tables) via the same sync() the boot process
     // uses, keeping the two real seeds untouched.
     await syncService.sync(realDefs);
+
+    for (const tokenId of createdApiTokenIds) {
+      await accessTokens.delete(tokenId);
+    }
 
     if (createdUserIds.length > 0) {
       await prisma.user.deleteMany({ where: { documentId: { in: createdUserIds } } });
@@ -365,6 +379,65 @@ describe("Content engine (e2e)", () => {
     });
   });
 
+  describe("cv-page update performance benchmark", () => {
+    it("updates a component-heavy document and logs wall-clock duration (perf benchmark, no hard threshold)", async () => {
+      const buildExperience = (offset: number, index: number) => ({
+        company: `PerfCo-${offset + index}`,
+        location: "Remote",
+        roles: Array.from({ length: 3 }, (_, roleIndex) => ({
+          position: `Role-${offset + index}-${roleIndex}`,
+          period: "2022-2024",
+          teamSize: 5,
+          projects: "CMS",
+          techStack: ["ts", "node"],
+          responsibilities: "<p>Led team</p>",
+        })),
+      });
+
+      const createResponse = await request(app.getHttpServer())
+        .post("/api/v1/documents/collection-type/cv-page")
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .send({
+          data: {
+            position: "Staff Engineer",
+            isMain: false,
+            company: `PerfBench-${runId}`,
+            experiences: Array.from({ length: 5 }, (_, index) => buildExperience(0, index)),
+          },
+        })
+        .expect(201);
+      const documentId = (createResponse.body as DocumentResponseBody).data.documentId;
+      pendingCleanupCvPageIds.add(documentId);
+
+      const startedAt = Date.now();
+      await request(app.getHttpServer())
+        .put(`/api/v1/documents/collection-type/cv-page/${documentId}`)
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .send({
+          data: {
+            position: "Staff Engineer",
+            isMain: false,
+            company: `PerfBench-${runId}`,
+            experiences: Array.from({ length: 5 }, (_, index) => buildExperience(100, index)),
+          },
+        })
+        .expect(200);
+      const durationMs = Date.now() - startedAt;
+
+      console.log(`[perf] cv-page update (5 experiences x 3 roles) took ${durationMs}ms`);
+
+      const readResponse = await request(app.getHttpServer())
+        .get(`/api/v1/documents/collection-type/cv-page/${documentId}`)
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .expect(200);
+      const experiences = (readResponse.body as DocumentResponseBody).data.experiences as Record<string, unknown>[];
+      expect(experiences).toHaveLength(5);
+      expect(experiences[0].company).toBe("PerfCo-100");
+      const firstRoles = experiences[0].roles as Record<string, unknown>[];
+      expect(firstRoles).toHaveLength(3);
+    });
+  });
+
   describe("list filter params (cv-page)", () => {
     it("filters via $contains and $eq, combines with search, and rejects invalid filters with 400", async () => {
       const filterTag = `FilterTag-${runId}`;
@@ -489,7 +562,7 @@ describe("Content engine (e2e)", () => {
   });
 
   describe("bulk create+publish and bulk delete (en-it-vocab)", () => {
-    it("creates+publishes a batch, then deletes it with one bogus id (partial success, no rollback)", async () => {
+    it("creates+publishes a batch, then bulk-deletes it cleanly and returns the deleted ids", async () => {
       const bulkCreateResponse = await request(app.getHttpServer())
         .post("/api/v1/documents/collection-type/en-it-vocab/bulk")
         .set("Cookie", [`access_token=${superAdminToken}`])
@@ -497,19 +570,17 @@ describe("Content engine (e2e)", () => {
           items: [
             { data: { wordGroup: "Networking", word: `packet-${runId}`, partsOfSpeech: "noun" } },
             { data: { wordGroup: "Networking", word: `socket-${runId}`, partsOfSpeech: "noun" } },
-            { data: { wordGroup: "Networking", word: `latency-${runId}`, partsOfSpeech: "noun" } },
           ],
         })
         .expect(201);
       const items = (bulkCreateResponse.body as BulkCreateResponseBody).items;
-      expect(items).toHaveLength(3);
+      expect(items).toHaveLength(2);
       for (const item of items) {
         expect(item.data.status).toBe("published");
         pendingCleanupVocabIds.add(item.data.documentId);
       }
 
-      const bogusId = "00000000-0000-0000-0000-000000000000";
-      const idsToDelete = [items[0].data.documentId, items[1].data.documentId, bogusId];
+      const idsToDelete = items.map((item) => item.data.documentId);
 
       const bulkDeleteResponse = await request(app.getHttpServer())
         .delete("/api/v1/documents/collection-type/en-it-vocab/bulk")
@@ -518,11 +589,45 @@ describe("Content engine (e2e)", () => {
         .expect(200);
       const body = bulkDeleteResponse.body as BulkDeleteResponseBody;
 
-      expect(body.deleted.sort()).toEqual([items[0].data.documentId, items[1].data.documentId].sort());
-      expect(body.failed).toHaveLength(1);
-      expect(body.failed[0].documentId).toBe(bogusId);
-      pendingCleanupVocabIds.delete(items[0].data.documentId);
-      pendingCleanupVocabIds.delete(items[1].data.documentId);
+      expect(body.deleted.sort()).toEqual(idsToDelete.sort());
+      for (const documentId of idsToDelete) {
+        pendingCleanupVocabIds.delete(documentId);
+      }
+    });
+
+    it("fails the whole batch and deletes nothing when one id in it is unknown (all-or-nothing)", async () => {
+      const bulkCreateResponse = await request(app.getHttpServer())
+        .post("/api/v1/documents/collection-type/en-it-vocab/bulk")
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .send({
+          items: [
+            { data: { wordGroup: "Networking", word: `router-${runId}`, partsOfSpeech: "noun" } },
+            { data: { wordGroup: "Networking", word: `firewall-${runId}`, partsOfSpeech: "noun" } },
+          ],
+        })
+        .expect(201);
+      const items = (bulkCreateResponse.body as BulkCreateResponseBody).items;
+      expect(items).toHaveLength(2);
+      for (const item of items) {
+        expect(item.data.status).toBe("published");
+        pendingCleanupVocabIds.add(item.data.documentId);
+      }
+
+      const bogusId = "00000000-0000-0000-0000-000000000000";
+      const idsToDelete = [items[0].data.documentId, items[1].data.documentId, bogusId];
+
+      await request(app.getHttpServer())
+        .delete("/api/v1/documents/collection-type/en-it-vocab/bulk")
+        .set("Cookie", [`access_token=${superAdminToken}`])
+        .send({ documentIds: idsToDelete })
+        .expect(404);
+
+      for (const item of items) {
+        await request(app.getHttpServer())
+          .get(`/api/v1/documents/collection-type/en-it-vocab/${item.data.documentId}`)
+          .set("Cookie", [`access_token=${superAdminToken}`])
+          .expect(200);
+      }
     });
 
     it("creates+publishes a 50-item batch and logs wall-clock duration (perf benchmark, no hard threshold)", async () => {
@@ -595,6 +700,23 @@ describe("Content engine (e2e)", () => {
         .set("Cookie", [`access_token=${readOnlyToken}`])
         .send({ data: { position: "X", isMain: false, company: "X" } })
         .expect(403);
+    });
+  });
+
+  describe("content-type-scoped document permissions (REST)", () => {
+    it("succeeds on cv-page for a Bearer token scoped to document:read:cv-page", async () => {
+      await request(app.getHttpServer()).get("/api/v1/documents/collection-type/cv-page").set("Authorization", `Bearer ${cvPageScopedApiToken}`).expect(200);
+    });
+
+    it("returns 403 when the same token lists a different content type (en-it-vocab)", async () => {
+      await request(app.getHttpServer()).get("/api/v1/documents/collection-type/en-it-vocab").set("Authorization", `Bearer ${cvPageScopedApiToken}`).expect(403);
+    });
+
+    it("still allows a global document:read-scoped role to list other content types (regression)", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/documents/collection-type/en-it-vocab")
+        .set("Cookie", [`access_token=${readOnlyToken}`])
+        .expect(200);
     });
   });
 });

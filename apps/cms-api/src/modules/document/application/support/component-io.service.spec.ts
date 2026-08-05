@@ -57,7 +57,7 @@ describe("ComponentIoService", () => {
       expect(expPath).toEqual(["experience"]);
       expect(expDocId).toBe("doc-1");
       expect(expVersion).toBe("draft");
-      expect(expParentId).toBeNull();
+      expect(expParentId).toEqual([null]);
       expect(expEntities).toHaveLength(1);
       expect(expEntities[0].fields).toEqual({ company: "Acme", location: "Remote" });
       const experienceComponentId = expEntities[0].componentId;
@@ -68,10 +68,47 @@ describe("ComponentIoService", () => {
       expect(rolePath).toEqual(["experience", "role"]);
       expect(roleDocId).toBe("doc-1");
       expect(roleVersion).toBe("draft");
-      expect(roleParentId).toBe(experienceComponentId);
+      expect(roleParentId).toEqual([experienceComponentId]);
       expect(roleEntities).toHaveLength(2);
       expect(roleEntities[0].fields).toEqual({ position: "Dev", period: "2020-2021" });
       expect(roleEntities[1].fields).toEqual({ position: "Lead", period: "2021-2022" });
+    });
+
+    it("batches nested writes for ALL parents at one level into a single upsertAll call, and an empty-roles parent still contributes its id to the DELETE scope", async () => {
+      const components = buildRepository();
+      const service = new ComponentIoService(components);
+
+      const data = {
+        position: "Engineer",
+        experiences: [
+          { company: "Acme", location: "Remote", roles: [{ position: "Dev", period: "2020-2021" }] },
+          { company: "Globex", location: "NY", roles: [] },
+          {
+            company: "Initech",
+            location: "Austin",
+            roles: [
+              { position: "Lead", period: "2022-2023" },
+              { position: "Manager", period: "2023-2024" },
+            ],
+          },
+        ],
+      };
+
+      await service.saveComponents("cv-page", "doc-1", "draft", CONTENT_FIELDS, data);
+
+      expect(components.upsertAll).toHaveBeenCalledTimes(2);
+
+      const [, expPath, , , expParentIds, expEntities] = components.upsertAll.mock.calls[0];
+      expect(expPath).toEqual(["experience"]);
+      expect(expParentIds).toEqual([null]);
+      expect(expEntities).toHaveLength(3);
+      const [expId1, expId2, expId3] = expEntities.map((entity: ComponentEntity) => entity.componentId);
+
+      const [, rolePath, , , roleParentIds, roleEntities] = components.upsertAll.mock.calls[1];
+      expect(rolePath).toEqual(["experience", "role"]);
+      expect(roleParentIds).toEqual([expId1, expId2, expId3]);
+      expect(roleEntities).toHaveLength(3);
+      expect(roleEntities.map((entity: ComponentEntity) => entity.parentComponentId)).toEqual([expId1, expId3, expId3]);
     });
 
     it("passes the transaction client through to every upsertAll call", async () => {

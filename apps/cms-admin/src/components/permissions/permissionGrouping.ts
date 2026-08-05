@@ -14,3 +14,20 @@ export function groupByResource(permissions: PermissionItem[]): Array<[string, P
   }
   return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
+
+export interface ParsedDocumentPermissionSlug {
+  action: string;
+  contentTypeSlug?: string;
+}
+
+export function parseDocumentPermissionSlug(slug: string): ParsedDocumentPermissionSlug | null {
+  const segments = slug.split(":");
+  if (segments[0] !== "document") return null;
+  if (segments.length === 2) return { action: segments[1] };
+  if (segments.length === 3) return { action: segments[1], contentTypeSlug: segments[2] };
+  return null;
+}
+
+export function buildDocumentPermissionSlug(action: string, contentTypeSlug?: string): string {
+  return contentTypeSlug ? `document:${action}:${contentTypeSlug}` : `document:${action}`;
+}

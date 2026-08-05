@@ -1,148 +1,75 @@
-# Plan: Bulk Create+Publish Performance Fix
+# Plan: Content-Type-Scoped Document Permissions for API Tokens
 
-See `docs/specs/bulk-create-publish-performance.md` for the full spec (objective, diagnosis, decisions,
-scope, success criteria). This plan implements it.
+See `docs/specs/api-token-content-type-scoped-permissions.md` for the full spec (objective,
+decisions, boundaries). This plan implements it, with two corrections found during planning
+(below) that the spec did not anticipate.
 
 ## Context
 
-`POST /api/v1/documents/collection-type/:slug/bulk` takes ~5 minutes for 50 `en-it-vocab` items.
-`BulkCreateAndPublishService.execute()` (`bulk-create-publish.service.ts:21-35`) runs a `for` loop with
-`await` inside — fully sequential, ~28-36 unbatched raw SQL round trips per item, none concurrent. Locked
-decisions: (1) keep per-item transactions + compensating-delete rollback, no spanning transaction; (2)
-allow bounded concurrency in fixed-size chunks, with all-or-nothing rollback across the whole batch; (3)
-no fixed perf SLA, just a demonstrated before/after improvement; (4) redundant-work removal via
-backward-compatible optional parameters on `SaveDocumentService.execute`/`PublishDocumentService.execute`
-(single source of truth), not a duplicated bulk-only reimplementation.
+Today an API token's `permissions: string[]` grants a document action (`document:read`/`create`/
+`update`/`delete`/`publish`/`unpublish`) across every content type. The goal is to let a token be
+scoped to specific content types per action (e.g. only `read` on `cv-page`), while keeping "all
+content types" as the default/global option — and to give `cms-admin`'s token (and role) creation
+UI a matching picker.
 
-## Confirmed callers (verified by reading source, not assumed)
+## Corrections found during planning (supersede the spec's design)
 
-`SaveDocumentService.execute`/`PublishDocumentService.execute` are called from exactly two places besides
-the bulk service, both using today's 3-4 positional args (new params are trailing/optional, unaffected):
-`collection-type-document.controller.ts` (create/update/publish routes),
-`graphql/.../resolver-factory.service.ts` (~lines 216/223/238). `DuplicateDocumentService` and
-`DeleteDocumentService` do not call these services — not touched.
+1. **REST already accepts API tokens.** `JwtAuthGuard` (`src/common/guards/jwt-auth.guard.ts:9`)
+   is `extends AuthGuard(["jwt", "api-token"])` — it composes the cookie-based `JwtStrategy` and a
+   Bearer-header `ApiTokenStrategy` (`src/common/strategies/api-token.strategy.ts`), which already
+   sets `request.user = { sub, permissions }` from the token record. `PermissionsGuard`
+   (`src/common/guards/permissions.guard.ts`) already reads `request.user.permissions` uniformly
+   for both auth sources. **No new auth guard is needed** — the spec's planned `DocumentAuthGuard`
+   is dropped. Only one new guard (`DocumentPermissionsGuard`) is needed, to add the content-type-
+   scoped slug check on top of the existing check.
+2. **Scoping enforcement is source-agnostic, not API-token-only**, because `request.user.permissions`
+   is identical in shape whether it came from a role (JWT cookie) or a token (Bearer). Confirmed
+   with the user: the new per-content-type picker will appear on **both** `RolesPage.tsx` and
+   `AccessTokensPage.tsx` in `cms-admin` (they already share the exact same `PermissionTree`
+   component), and the backend check needs no role-vs-token discriminator.
+3. Content-type slugs are validated by `SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/`
+   (`src/modules/content-type/application/schema/sql-identifier.ts:4`) — safe to embed directly as
+   a permission slug's 3rd segment, no encoding needed (resolves spec open question #2).
 
-## Design
+## Architecture Decisions
 
-### 1. `SaveDocumentService.execute` — add optional `contentType`, skip guaranteed-empty lookup, fix a latent field-normalization bug
+- **Slug convention** (unchanged from spec): `document:<action>` (global, existing) sits alongside
+  a new `document:<action>:<content-type-slug>` (scoped). `AccessToken.permissions`/
+  `Role.permissions` stay `string[]` — no schema change.
+- **Shared "is granted" logic**: one new pure function
+  `isDocumentActionGranted(granted: string[], requiredSlug: string, contentTypeSlug: string): boolean`
+  in `src/common/authorization/document-permission.util.ts`, used by both the GraphQL
+  `assertApiTokenPermission` and the new REST `DocumentPermissionsGuard` — no duplicated
+  string-building.
+- **Catalog sync**: new `DocumentPermissionSyncService` in the `content-type` module, called as the
+  last step of `ContentTypeSyncService.sync()` (same `onApplicationBootstrap` hook — avoids the
+  cross-module bootstrap ordering race that exists between two independent `OnApplicationBootstrap`
+  providers). Idempotent create-if-missing, same pattern as `seed-default-data.service.ts`. Never
+  deletes rows for removed content types (matches `ContentTypeSyncService`'s existing
+  non-destructive philosophy).
+- **REST enforcement**: new `DocumentPermissionsGuard` (sibling to, not a subclass of,
+  `PermissionsGuard`) replaces `PermissionsGuard` only on
+  `CollectionTypeDocumentController`/`SingleTypeDocumentController` routes. `JwtAuthGuard` stays
+  as-is (already handles both auth sources). No other module's guard is touched.
+- **GraphQL enforcement**: `assertApiTokenPermission(context, slug)` becomes
+  `assertApiTokenPermission(context, slug, contentTypeSlug)`; every call site in
+  `resolver-factory.service.ts` already has `definition.slug` in closure scope.
+- **Frontend**: `PermissionTree.tsx`'s `"document"` resource group gets a new rendering branch (all
+  other groups unchanged); `useContentTypes()` (already exists) supplies the content-type checkbox
+  options. Applies to both `RolesPage` and `AccessTokensPage` automatically since they share the
+  component — no new prop.
+- **Commit sequencing**: backend (Phases 1-4) lands and is committed before frontend (Phase 5) —
+  the picker is inert without the new catalog rows/enforcement.
 
-```ts
-async execute(
-  slug: string,
-  data: Record<string, unknown>,
-  documentId: string | undefined,
-  userId: string | null,
-  contentType?: ContentTypeEntity,
-): Promise<DocumentEntity>
-```
-
-- If `contentType` passed, skip `schemaResolver.resolve(slug)`.
-- Only call `documents.findByVersion(...)` when `documentId` is truthy — when `undefined` (every
-  bulk-create item, and every non-bulk `POST /:slug` create), the lookup is guaranteed empty, so skip it.
-- **Bug fix**: `doc.fields` today is raw client `data` verbatim — an omitted optional scalar field is a
-  missing key, not `null`, unlike a DB round-trip (`extractRowFields`, `row-mapper.ts:11-21`) which always
-  normalizes every declared non-component field via `?? null`. Add the same normalization:
-  ```ts
-  function withScalarDefaults(data: Record<string, unknown>, fields: FieldDefinition[]): Record<string, unknown> {
-    const result = { ...data };
-    for (const field of fields) {
-      if (!isComponentField(field)) result[field.name] = data[field.name] ?? null;
-    }
-    return result;
-  }
-  ```
-  Additive-only (adds `null` keys, never removes/renames) but changes response shape for every create.
-  Required so `SaveDocumentService`'s returned entity is safe to reuse as Publish's `draftOverride` below.
-
-### 2. `PublishDocumentService.execute` — add optional `contentType`, `draftOverride`, `isNewDocument`
-
-```ts
-async execute(
-  slug: string,
-  documentId: string,
-  userId: string | null,
-  contentType?: ContentTypeEntity,
-  draftOverride?: DocumentEntity,
-  isNewDocument = false,
-): Promise<DocumentEntity>
-```
-
-- `contentType` passed → skip resolve.
-- `draftOverride` passed → use it instead of `documents.findByVersion(..., "draft", ...)`.
-- `isNewDocument: true` → skip `documents.findByVersion(..., "published", ...)`
-  (`existingPublished?.createdAt ?? now` already equals `now` when guaranteed null).
-
-### 3. `BulkCreateAndPublishService.execute` — hoist schema resolve, chunked concurrency, discriminated per-item outcomes
-
-Inject `SchemaResolverService` (already exists elsewhere). Resolve `contentType` once. Process
-`itemsData` in fixed-size chunks (`CHUNK_SIZE = 5` — `pg.Pool` default max is 10 per
-`src/prisma/application/client/runtime/client.js:77`, no explicit `max` set; 5 leaves headroom). Each
-item's worker never rejects — returns a discriminated outcome so a partial failure within one item (save
-succeeds, publish throws) still reports the created doc for rollback:
-
-```ts
-type ItemOutcome = { ok: true; result: DocumentEntity } | { ok: false; error: unknown; createdDoc?: DocumentEntity };
-
-private async processItem(slug: string, contentType: ContentTypeEntity, data: Record<string, unknown>, userId: string | null): Promise<ItemOutcome> {
-  let savedDoc: DocumentEntity | undefined;
-  try {
-    savedDoc = await this.saveDocument.execute(slug, data, undefined, userId, contentType);
-    if (savedDoc.version !== "draft") return { ok: true, result: savedDoc };
-    const published = await this.publishDocument.execute(slug, savedDoc.documentId, userId, contentType, savedDoc, true);
-    return { ok: true, result: published };
-  } catch (error) {
-    return { ok: false, error, createdDoc: savedDoc };
-  }
-}
-```
-
-Chunks processed strictly in order (await chunk N fully before starting chunk N+1). Original item order
-preserved in `results`:
-
-```ts
-for (const chunk of chunksOf(itemsData, CHUNK_SIZE)) {
-  const outcomes = await Promise.all(chunk.map((data) => this.processItem(slug, contentType, data, userId)));
-  let failure: unknown;
-  for (const outcome of outcomes) {
-    if (outcome.ok) {
-      created.push(outcome.result);
-      results.push(outcome.result);
-    } else {
-      if (outcome.createdDoc) created.push(outcome.createdDoc);
-      failure ??= outcome.error;
-    }
-  }
-  if (failure !== undefined) {
-    await this.rollback(slug, created);
-    throw failure;
-  }
-}
-```
-
-`rollback` unchanged (sequential compensating deletes via `DeleteDocumentService` — unhappy path, not
-optimized).
-
-## Explicitly deferred (documented, not part of this pass)
-
-- Batching nested `syllableParts` writes across sibling `phonetics` rows within one item's
-  `saveComponentField` recursion.
-- Merging the save and publish transactions into one combined transaction per item.
-- Bulk delete, single-type routes, the intentionally-preserved "missing/empty `data` not rejected" gap —
-  untouched.
-
-## Risks
+## Risks and Mitigations
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| `withScalarDefaults` changes response shape for all creates (adds `null` keys) | Low — additive only | Called out explicitly; easy to spot in review/diff |
-| Chunk size 5 too conservative/aggressive | Low-Med | Named constant, easy to tune later |
-| Full rewrite of `bulk-create-publish.service.spec.ts` loses coverage of an existing edge case | Med | Explicit acceptance list in Task 4 enumerates every old case plus new ones |
-| GraphQL resolver call sites regress silently | Low | Verified both call sites use positional args that stay valid; full suite covers them |
+| `DocumentPermissionSyncService` runs on every boot and does a `findBySlug` per action×content-type (6×N sequential lookups) | Low — small N (5 content types today), admin-only path, same acceptable-at-this-scale tradeoff already documented for `countReferences`'s unindexed JSONB queries | Accept for now; note as a future batch-lookup optimization if content-type count grows significantly |
+| Extending `PermissionTree` to both Roles and Access Tokens means a role can now be granted scoped document permissions too, which wasn't explicitly asked for | Low — purely additive capability, no existing behavior changes, confirmed with user | Already confirmed during planning |
+| REST `DocumentPermissionsGuard` swap could regress existing document-route tests if any test asserts on `PermissionsGuard` specifically rather than behavior | Medium if present | Re-run the existing controller spec files, not just new ones |
 
-## Verification (per phase and overall)
+## Open Questions
 
-1. `bun run build && bun run lint && bun run test:cov` — all green.
-2. `bun run test:e2e` against real local Postgres — all three e2e suites green, including the new 50-item
-   benchmark case with a logged duration.
-3. Manual sanity: hit `POST /api/v1/documents/collection-type/en-it-vocab/bulk` with 50 items via the
-   running dev server and confirm wall-clock time is materially lower than the reported ~5 minutes.
+None remaining — spec's open questions were resolved during planning (charset confirmed safe;
+`DEFAULT_ROLES` intentionally left untouched, consistent with "additive only, no forced grants").

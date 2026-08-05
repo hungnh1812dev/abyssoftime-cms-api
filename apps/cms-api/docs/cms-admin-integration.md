@@ -164,6 +164,15 @@ media:read  media:manager
 content_type:read
 ```
 
+`document:*` slugs are the one exception to plain `resource:action`: each also exists in a scoped 3-segment
+form, `document:<action>:<content-type-slug>` (e.g. `document:read:cv-page`), auto-synced into the catalog for
+every content type on boot. A grant of the global 2-segment slug still authorizes the action across every
+content type; the 3-segment form narrows it to just that one. Both forms are ordinary entries in
+`GET /api/v1/permissions` — CMS-Admin's picker (`PermissionTree`) renders the `document` group as a per-action
+"All content types" vs. "Specific content types" toggle (backed by `GET /api/v1/content-types` for the
+checkbox list) instead of a flat checkbox list, and builds/parses the 3-segment slug accordingly. No other
+resource has this scoping.
+
 Default seeded roles: `super_admin` (level 100, every permission), `admin` (level 50, read-only across every
 resource), `editor` (level 20, no permissions by default — grant explicitly), `guest` (level 0, no
 permissions). CMS-Admin should fetch `GET /api/v1/permissions` and `GET /api/v1/roles` to build its own

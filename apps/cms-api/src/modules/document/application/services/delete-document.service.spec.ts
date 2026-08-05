@@ -78,6 +78,23 @@ describe("DeleteDocumentService", () => {
     expect(documents.deleteAllVersions).toHaveBeenCalledWith("cv-page", "doc-1", TX);
   });
 
+  it("uses a provided tx directly instead of opening a new transaction", async () => {
+    const contentType = buildContentType(true);
+    const { schemaResolver, documents, componentIo, prisma } = buildDeps(contentType);
+    documents.findByVersion.mockImplementation((_slug, _id, version) =>
+      Promise.resolve(version === "draft" ? new DocumentEntity("doc-1", "draft", {}, new Date(), new Date(), null, null, null, null) : null),
+    );
+    const externalTx = { fake: "external-tx" };
+
+    const service = new DeleteDocumentService(schemaResolver, documents, componentIo, prisma);
+    await service.execute("cv-page", "doc-1", externalTx as never);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(componentIo.deleteComponents).toHaveBeenCalledWith("cv-page", "doc-1", "draft", contentType.fields, externalTx);
+    expect(componentIo.deleteComponents).toHaveBeenCalledWith("cv-page", "doc-1", "published", contentType.fields, externalTx);
+    expect(documents.deleteAllVersions).toHaveBeenCalledWith("cv-page", "doc-1", externalTx);
+  });
+
   it("propagates NotFoundException for an unknown slug without touching any repository", async () => {
     const schemaResolver = { resolve: jest.fn().mockRejectedValue(new NotFoundException()) } as unknown as jest.Mocked<SchemaResolverService>;
     const documents = { findByVersion: jest.fn() } as unknown as jest.Mocked<IDocumentRepository>;

@@ -20,9 +20,9 @@ export class PrismaMediaRepository implements IMediaAssetRepository {
     return asset ? this.toEntity(asset) : null;
   }
 
-  async findByDocumentId(documentId: string): Promise<MediaAssetEntity | null> {
-    const asset = await this.prisma.mediaAsset.findUnique({ where: { documentId } });
-    return asset ? this.toEntity(asset) : null;
+  async findByDocumentIds(documentIds: string[]): Promise<MediaAssetEntity[]> {
+    const assets = await this.prisma.mediaAsset.findMany({ where: { documentId: { in: documentIds } } });
+    return assets.map((asset) => this.toEntity(asset));
   }
 
   async create(data: CreateMediaAssetData): Promise<MediaAssetEntity> {

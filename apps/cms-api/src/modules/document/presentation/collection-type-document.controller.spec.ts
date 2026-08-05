@@ -122,13 +122,13 @@ describe("CollectionTypeDocumentController", () => {
   });
 
   describe("bulkDelete()", () => {
-    it("splits BulkDeleteService results into deleted/failed", async () => {
-      bulkDelete.execute.mockResolvedValue([{ documentId: "id-1" }, { documentId: "id-2", error: "not found" }]);
+    it("returns the deleted IDs from BulkDeleteService", async () => {
+      bulkDelete.execute.mockResolvedValue(["id-1", "id-2"]);
 
       const result = await controller.bulkDelete("cv-page", { documentIds: ["id-1", "id-2"] });
 
       expect(bulkDelete.execute).toHaveBeenCalledWith("cv-page", ["id-1", "id-2"]);
-      expect(result).toEqual({ deleted: ["id-1"], failed: [{ documentId: "id-2", error: "not found" }] });
+      expect(result).toEqual({ deleted: ["id-1", "id-2"] });
     });
 
     it("throws BadRequestException for an invalid slug, without touching the service", async () => {

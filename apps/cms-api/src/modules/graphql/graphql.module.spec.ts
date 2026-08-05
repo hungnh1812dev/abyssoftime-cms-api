@@ -157,9 +157,12 @@ describe("GraphqlModule", () => {
 
     it("builds a context function that resolves { req } to a GraphqlContext", async () => {
       const config = await invokeFactory();
-      const context = config.context as (arg: { req: unknown }) => Promise<{ apiToken: unknown }>;
+      const context = config.context as (arg: { req: unknown }) => Promise<{ apiToken: unknown; mediaAssetLoader: unknown }>;
 
-      await expect(context({ req: { headers: {} } })).resolves.toEqual({ apiToken: null });
+      const result = await context({ req: { headers: {} } });
+
+      expect(result.apiToken).toBeNull();
+      expect(result.mediaAssetLoader).toBeDefined();
     });
 
     it("wires formatGraphqlError as formatError, so unmapped errors never leak internal details to a client", async () => {

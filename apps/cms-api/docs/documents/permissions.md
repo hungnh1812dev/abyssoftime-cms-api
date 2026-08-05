@@ -42,6 +42,10 @@ Implementation: `infrastructure/persistence/prisma-permission.repository.ts` (`P
 
 `update-permission.dto.ts` — same fields, all `@IsOptional()`; `description` drops the `@IsNotEmpty()` constraint.
 
+## System-managed scoped permission rows
+
+Not every row in the `Permission` table is created through this module's `POST /permissions` endpoint (and its 2-segment `resource:action` slug regex above). `content-type`'s `DocumentPermissionSyncService` (see [content-type.md](content-type.md#document-permission-catalog-sync)) writes a 3-segment `document:<action>:<content-type-slug>` row per content type × document action directly via `IPermissionRepository.create()` at boot, bypassing `CreatePermissionDto` entirely — these rows are system-managed (derived from `content-types/*.json`), not admin-authored, so the public regex is deliberately **not** loosened to accept a 3rd segment. An admin can still see them via `GET /api/v1/permissions` like any other row (no filtering), but `PUT`/`DELETE` on one goes through the normal `UpdatePermissionService`/`DeletePermissionService` path same as any row — nothing prevents an admin from renaming or deleting a scoped row today; a future re-sync only re-creates a deleted one (`findBySlug`-guarded, idempotent), it doesn't guard against manual edits mid-flight.
+
 ## Services & business rules
 
 All four services inject `@Inject(PERMISSSION_REPOSITORY)`.

@@ -74,7 +74,6 @@ import { SchemaBuilderService } from "./application/schema-builder.service";
           getPublicDocument,
           getDocumentForEdit,
           listDocumentsFull,
-          mediaAssets,
           saveDocument,
           publishDocument,
           unpublishDocument,
@@ -85,7 +84,7 @@ import { SchemaBuilderService } from "./application/schema-builder.service";
           publishSingleType,
           unpublishSingleType,
         );
-        const contextFactory = new GraphqlContextFactory(accessTokens);
+        const contextFactory = new GraphqlContextFactory(accessTokens, mediaAssets);
 
         return {
           typeDefs: await schemaBuilder.buildTypeDefs(),
