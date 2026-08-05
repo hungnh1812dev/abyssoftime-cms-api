@@ -14,6 +14,6 @@ See `tasks/plan.md` for full context, design, and rationale. See
 - [x] **Checkpoint B:** `bun run test:e2e` green — commit.
 
 ## Phase 3 — Docs + workflow closeout
-- [ ] Task 5 — Update `docs/documents/graphql.md:138` (media field resolver line — describe DataLoader batching); update `docs/documents/media.md:46,125,157` (remove `findByDocumentId` references, document `findByDocumentIds`, drop the now-superseded "kept as two named methods" rationale).
-- [ ] Task 6 — Run the five-axis review (correctness/readability/architecture/security/performance); delete `docs/specs/graphql-media-field-n-plus-one.md` as cleanup step.
-- [ ] **Checkpoint C (final):** `bun run build && bun run lint && bun run test:cov && bun run test:e2e` all green; docs updated; spec cleaned up — commit.
+- [x] Task 5 — Update `docs/documents/graphql.md:138` (media field resolver line — describe DataLoader batching); update `docs/documents/media.md:46,125,157` (remove `findByDocumentId` references, document `findByDocumentIds`, drop the now-superseded "kept as two named methods" rationale).
+- [x] Task 6 — Run the five-axis review (correctness/readability/architecture/security/performance); delete `docs/specs/graphql-media-field-n-plus-one.md` as cleanup step.
+- [x] **Checkpoint C (final):** `bun run build && bun run lint && bun run test:cov && bun run test:e2e` all green; docs updated; spec cleaned up — commit.
