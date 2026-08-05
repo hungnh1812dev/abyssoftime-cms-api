@@ -1,26 +1,19 @@
-# Todo — Document I/O Performance + Bulk-Delete Rollback
+# Todo — GraphQL Media-Field N+1 Fix
 
 See `tasks/plan.md` for full context, design, and rationale. See
-`docs/specs/document-io-performance-and-rollback.md` for the full spec.
+`docs/specs/graphql-media-field-n-plus-one.md` for the full spec.
 
-## Phase 1 — Component I/O batching (the perf fix)
-- [x] Task 1 — `IComponentRepository`/`PrismaComponentRepository.upsertAll`: new `parentComponentIds: (string | null)[]` param replacing single `parentComponentId`; DELETE branches on `IS NULL` (top-level) vs. `= ANY($n::uuid[])` (nested); INSERT uses each entity's own `.parentComponentId`. Tests: `IS NULL` branch, `ANY(...)` branch, empty-entities-but-nonempty-parentIds (pure delete, no insert).
-- [x] Task 2 — `ComponentIoService.saveComponents`/`saveComponentField` → rewrite as breadth-first `saveComponentTree`, batching all parents at one (documentId, componentPath) level into a single `upsertAll` call. Tests: extend existing 3-level nesting spec (`component-io.service.spec.ts`) to assert `upsertAll` called exactly once per component path (not once per parent); empty-nested-items parent still contributes to the DELETE scope.
-- [x] **Checkpoint A:** `bun run test:cov` green for both files, `bun run lint` clean, no other spec files broken — commit.
+## Phase 1 — Batching fix
+- [x] Task 1 — `IMediaAssetRepository`/`PrismaMediaRepository`: remove `findByDocumentId` (byte-for-byte duplicate of `findById`, becomes dead code once the resolver switches to the loader); add `findByDocumentIds(documentIds: string[]): Promise<MediaAssetEntity[]>` via one `findMany({ where: { documentId: { in: documentIds } } } })`. Tests: multiple ids, partial matches, empty-array input.
+- [x] Task 2 — `bun add dataloader`. `GraphqlContextFactory`: inject `IMediaAssetRepository`; `createContext()` builds a fresh `DataLoader<string, MediaAssetEntity | null>` per call (batch fn calls `findByDocumentIds`, maps results back in key order, missing ids → `null`); add `mediaAssetLoader` to `GraphqlContext`. Tests: loader present on context, two calls return distinct instances (never shared), `load(id)` resolves correctly via the mocked repository, missing id resolves to `null` not a rejection.
+- [x] Task 3 — `resolver-factory.service.ts`: `MediaFieldResolver` gains a `context` param; `collectMediaFieldResolvers` drops its `mediaAssets` param, resolver body becomes `context.mediaAssetLoader.load(fk)`; `ResolverFactoryService` drops its `mediaAssets` constructor dep. `graphql.module.ts`: move `MEDIA_ASSET_REPOSITORY` wiring from `resolverFactory` construction to `contextFactory` construction. Tests: update `resolver-factory.service.spec.ts`'s media-field-resolution block for the new context-based call signature; update `graphql.module.spec.ts` if it asserts the old wiring.
+- [x] **Checkpoint A:** `bun run build && bun run lint && bun run test:cov` green — commit.
 
-## Phase 2 — Bulk delete all-or-nothing
-- [x] Task 3 — `delete-document.service.ts`: add optional `tx?: Prisma.TransactionClient` param; use it directly when provided instead of opening a new `$transaction`; existence-check reads stay pool-scoped (unchanged, matches existing pattern).
-- [x] Task 4 — `bulk-delete.service.ts` rewrite: inject `PrismaService`; wrap the per-ID loop in one spanning `$transaction`, passing `tx` to each `deleteDocument.execute` call; return `string[]` (deleted IDs) instead of `BulkDeleteResult[]`; remove the per-item try/catch (a failure now throws and rolls back the whole batch).
-- [x] Task 5 — Controller (`collection-type-document.controller.ts`) + DTOs: `bulkDelete` handler returns `{ deleted: string[] }` (drop `failed`); `BulkDeleteResponseDto` drops `failed`/`BulkDeleteFailureDto`; update `@ApiOperation` summary (no longer "no rollback on partial failure"). *(Combined with Task 4 in the same commit — the service's return-type change and the controller's consumption of it are one atomic interface change; splitting them would leave a non-compiling intermediate state.)*
-- [x] Task 6 — Rewrite `bulk-delete.service.spec.ts` for all-or-nothing (all-success returns all IDs; a failing ID rolls back every delete in the batch; empty array short-circuits without opening a transaction); extend `delete-document.service.spec.ts` for the new optional `tx` param. *(`bulk-delete.service.spec.ts` rewritten alongside Task 4 for the same reason; `delete-document.service.spec.ts` was already extended in Task 3.)*
-- [x] **Checkpoint B:** `bun run test:cov` and `bun run lint` green — commit.
+## Phase 2 — E2E proof
+- [ ] Task 4 — `test/graphql.e2e-spec.ts`: extend the "media field resolution (throwaway media-bearing content type)" describe block with a list-query case — seed 3 `mediaSlug` documents, each with its own uploaded media asset, publish each; spy `jest.spyOn(app.get(MEDIA_ASSET_REPOSITORY), "findByDocumentIds")`; run one `listQueryName(mediaSlug)` query selecting `title cover { documentId fileName }`; assert correct data for all 3 documents AND the spy was called exactly once with all 3 FKs.
+- [ ] **Checkpoint B:** `bun run test:e2e` green — commit.
 
-## Phase 3 — E2E verification
-- [x] Task 7 — `content-engine.e2e-spec.ts`: add a `cv-page` update wall-clock benchmark (same `Date.now()` pattern as the existing 50-item bulk-create benchmark), logged duration, no hard threshold assertion.
-- [x] Task 8 — `content-engine.e2e-spec.ts`: bulk-delete all-or-nothing case — mix one unknown ID into a real batch, assert the request fails and zero documents were actually deleted (verify via `GET`), replacing/extending the existing bulk-delete assertions.
-- [x] **Checkpoint C:** `bun run test:e2e` green, timing improvement visible in output — commit.
-
-## Phase 4 — Docs + workflow closeout
-- [x] Task 9 — Update `docs/documents/document.md`: "Services — bulk" bulk-delete line + the endpoint table row (all-or-nothing behavior, new `{ deleted }` response shape); note the `ComponentIoService` batching behavior in the relevant services section.
-- [x] Task 10 — Correct `docs/specs/document-io-performance-and-rollback.md`'s Diagnosis section (the read-side/hydrate fan-out claim was wrong — already schema-bounded, no changes were needed there); run five-axis review (correctness/readability/architecture/security/performance); delete the spec file as cleanup step. *(Review's one Important finding — bulk-delete's spanning transaction had no explicit timeout, risking Prisma's default 5000ms limit on a full 100-id batch under real Render latency — fixed with a batch-size-scaled `timeout` option, TDD'd.)*
-- [x] **Checkpoint D (final):** `bun run build && bun run lint && bun run test:cov && bun run test:e2e` all green; docs updated; spec cleaned up — commit.
+## Phase 3 — Docs + workflow closeout
+- [ ] Task 5 — Update `docs/documents/graphql.md:138` (media field resolver line — describe DataLoader batching); update `docs/documents/media.md:46,125,157` (remove `findByDocumentId` references, document `findByDocumentIds`, drop the now-superseded "kept as two named methods" rationale).
+- [ ] Task 6 — Run the five-axis review (correctness/readability/architecture/security/performance); delete `docs/specs/graphql-media-field-n-plus-one.md` as cleanup step.
+- [ ] **Checkpoint C (final):** `bun run build && bun run lint && bun run test:cov && bun run test:e2e` all green; docs updated; spec cleaned up — commit.

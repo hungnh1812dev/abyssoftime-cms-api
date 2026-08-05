@@ -49,7 +49,7 @@ describe("UploadMediaService", () => {
     mediaAssets = {
       create: jest.fn(),
       findById: jest.fn(),
-      findByDocumentId: jest.fn(),
+      findByDocumentIds: jest.fn(),
       findAll: jest.fn(),
       delete: jest.fn(),
     };

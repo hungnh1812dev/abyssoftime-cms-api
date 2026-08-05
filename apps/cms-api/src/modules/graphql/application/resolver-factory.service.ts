@@ -33,7 +33,6 @@ import { UnpublishDocumentService } from "@/modules/document/application/service
 import { UnpublishSingleTypeService } from "@/modules/document/application/services/unpublish-single-type.service";
 import { DocumentEntity } from "@/modules/document/domain/entities/document.entity";
 import { MediaAssetEntity } from "@/modules/media/domain/entities/media-asset.entity";
-import { type IMediaAssetRepository } from "@/modules/media/domain/repositories/media-asset.repository";
 
 import { assertApiTokenPermission } from "./authorize.util";
 import { type GraphqlContext } from "./graphql-context.factory";
@@ -67,7 +66,7 @@ interface IdMutationArgs {
 // typed generically. Individual resolver closures below still declare (and get checked against)
 // their own precise argument types.
 type FieldResolver = (parent: unknown, args: any, context: GraphqlContext, info?: unknown) => Promise<unknown>;
-type MediaFieldResolver = (parent: Record<string, unknown>) => Promise<MediaAssetEntity | null>;
+type MediaFieldResolver = (parent: Record<string, unknown>, args: unknown, context: GraphqlContext) => Promise<MediaAssetEntity | null>;
 
 function toResolverValue(document: DocumentEntity): Record<string, unknown> {
   return {
@@ -126,28 +125,28 @@ function buildPaginationMeta(start: number, size: number, total: number): { page
 
 // Walks a content type's field tree (arbitrary component-nesting depth) and, for every type
 // that has media-typed fields — the root object type or any nested component type — registers a
-// field resolver hydrating that field's raw FK via MEDIA_ASSET_REPOSITORY.findByDocumentId.
+// field resolver hydrating that field's raw FK via the per-request context.mediaAssetLoader
+// (batches all keys requested within one GraphQL execution tick into a single query).
 function collectMediaFieldResolvers(
   ownerTypeName: string,
   contentTypeSlug: string,
   fields: FieldDefinition[],
-  mediaAssets: IMediaAssetRepository,
   typeResolvers: Record<string, Record<string, MediaFieldResolver>>,
 ): void {
   const mediaFieldResolvers: Record<string, MediaFieldResolver> = {};
 
   for (const field of fields) {
     if (field.type === "media") {
-      mediaFieldResolvers[field.name] = async (parent) => {
+      mediaFieldResolvers[field.name] = async (parent, _args, context) => {
         const fk = parent[field.name];
         if (!fk || typeof fk !== "string") {
           return null;
         }
-        return mediaAssets.findByDocumentId(fk);
+        return context.mediaAssetLoader.load(fk);
       };
     } else if (field.type === "component") {
       const nestedTypeName = componentTypeName(contentTypeSlug, field.component!);
-      collectMediaFieldResolvers(nestedTypeName, contentTypeSlug, field.fields!, mediaAssets, typeResolvers);
+      collectMediaFieldResolvers(nestedTypeName, contentTypeSlug, field.fields!, typeResolvers);
     }
   }
 
@@ -163,7 +162,6 @@ export class ResolverFactoryService {
     private readonly getPublicDocument: GetPublicDocumentService,
     private readonly getDocumentForEdit: GetDocumentForEditService,
     private readonly listDocumentsFull: ListDocumentsFullService,
-    private readonly mediaAssets: IMediaAssetRepository,
     private readonly saveDocument: SaveDocumentService,
     private readonly publishDocument: PublishDocumentService,
     private readonly unpublishDocument: UnpublishDocumentService,
@@ -189,7 +187,7 @@ export class ResolverFactoryService {
     const mutation: Record<string, FieldResolver> = {};
     const typeResolvers: Record<string, Record<string, MediaFieldResolver>> = {};
     for (const definition of collectionDefinitions) {
-      collectMediaFieldResolvers(typeName(definition.slug), definition.slug, definition.fields, this.mediaAssets, typeResolvers);
+      collectMediaFieldResolvers(typeName(definition.slug), definition.slug, definition.fields, typeResolvers);
 
       query[queryName(definition.slug)] = async (_parent: unknown, args: SingleQueryArgs, context: GraphqlContext) => {
         assertValidDocumentId(args.documentId);
@@ -249,7 +247,7 @@ export class ResolverFactoryService {
     }
 
     for (const definition of singleDefinitions) {
-      collectMediaFieldResolvers(typeName(definition.slug), definition.slug, definition.fields, this.mediaAssets, typeResolvers);
+      collectMediaFieldResolvers(typeName(definition.slug), definition.slug, definition.fields, typeResolvers);
 
       query[queryName(definition.slug)] = async (_parent: unknown, args: StatusOnlyArgs, context: GraphqlContext) => {
         assertApiTokenPermission(context, "document:read");

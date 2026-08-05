@@ -106,21 +106,32 @@ describe("PrismaMediaRepository", () => {
     expect(result).toBeNull();
   });
 
-  it("findByDocumentId() looks up by documentId via findUnique", async () => {
-    prisma.mediaAsset.findUnique.mockResolvedValue(record);
+  it("findByDocumentIds() looks up all matching records via one findMany with an `in` filter", async () => {
+    prisma.mediaAsset.findMany.mockResolvedValue([record]);
 
-    const result = await repository.findByDocumentId("media-1");
+    const result = await repository.findByDocumentIds(["media-1", "media-2"]);
 
-    expect(prisma.mediaAsset.findUnique).toHaveBeenCalledWith({ where: { documentId: "media-1" } });
-    expectMappedEntity(result!);
+    expect(prisma.mediaAsset.findMany).toHaveBeenCalledWith({ where: { documentId: { in: ["media-1", "media-2"] } } });
+    expect(result).toHaveLength(1);
+    expectMappedEntity(result[0]);
   });
 
-  it("findByDocumentId() returns null when no record is found", async () => {
-    prisma.mediaAsset.findUnique.mockResolvedValue(null);
+  it("findByDocumentIds() returns only the records that matched, omitting missing ids", async () => {
+    prisma.mediaAsset.findMany.mockResolvedValue([record]);
 
-    const result = await repository.findByDocumentId("missing");
+    const result = await repository.findByDocumentIds(["media-1", "missing"]);
 
-    expect(result).toBeNull();
+    expect(result).toHaveLength(1);
+    expect(result[0].documentId).toBe("media-1");
+  });
+
+  it("findByDocumentIds() returns an empty array for empty input without matching everything", async () => {
+    prisma.mediaAsset.findMany.mockResolvedValue([]);
+
+    const result = await repository.findByDocumentIds([]);
+
+    expect(prisma.mediaAsset.findMany).toHaveBeenCalledWith({ where: { documentId: { in: [] } } });
+    expect(result).toEqual([]);
   });
 
   it("create() passes all fields through to prisma and maps the result", async () => {
