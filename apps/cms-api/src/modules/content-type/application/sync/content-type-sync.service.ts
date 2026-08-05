@@ -4,6 +4,7 @@ import { CONTENT_TYPE_REPOSITORY, type IContentTypeRepository } from "../../doma
 import { type ISchemaTableRepository, SCHEMA_TABLE_REPOSITORY } from "../../domain/repositories/schema-table.repository";
 import { SchemaLoaderService } from "../schema/schema-loader.service";
 import { validateContentTypeDefinition } from "../schema/schema-validator";
+import { DocumentPermissionSyncService } from "../services/document-permission-sync.service";
 
 import { Inject, Injectable, type OnApplicationBootstrap } from "@nestjs/common";
 
@@ -24,6 +25,7 @@ export class ContentTypeSyncService implements OnApplicationBootstrap {
     private readonly schemaLoader: SchemaLoaderService,
     @Inject(CONTENT_TYPE_REPOSITORY) private readonly contentTypes: IContentTypeRepository,
     @Inject(SCHEMA_TABLE_REPOSITORY) private readonly schemaTables: ISchemaTableRepository,
+    private readonly documentPermissions: DocumentPermissionSyncService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -45,6 +47,8 @@ export class ContentTypeSyncService implements OnApplicationBootstrap {
         await this.syncDeletion(contentType);
       }
     }
+
+    await this.documentPermissions.syncForContentTypes(definitions);
   }
 
   private async syncOne(definition: ContentTypeDefinition, previous: ContentTypeEntity | null): Promise<void> {

@@ -1,95 +1,75 @@
-# Plan: GraphQL Media-Field N+1 Fix
+# Plan: Content-Type-Scoped Document Permissions for API Tokens
 
-See `docs/specs/graphql-media-field-n-plus-one.md` for the full spec (objective, decision rationale,
-scope). This plan implements it, with one addition found during planning (below).
+See `docs/specs/api-token-content-type-scoped-permissions.md` for the full spec (objective,
+decisions, boundaries). This plan implements it, with two corrections found during planning
+(below) that the spec did not anticipate.
 
 ## Context
 
-An N+1 audit of the API found one real remaining N+1 (the document/component I/O batching work was
-already fixed in a prior project): `collectMediaFieldResolvers`
-(`src/modules/graphql/application/resolver-factory.service.ts:130-157`) registers a GraphQL field
-resolver per object type with a `media` field. GraphQL calls a field resolver once per object in a
-result set, so any list query (or single query touching a repeated component) selecting a `media` field
-fires one `mediaAsset.findUnique` per object instead of one batched query for the whole response.
+Today an API token's `permissions: string[]` grants a document action (`document:read`/`create`/
+`update`/`delete`/`publish`/`unpublish`) across every content type. The goal is to let a token be
+scoped to specific content types per action (e.g. only `read` on `cv-page`), while keeping "all
+content types" as the default/global option — and to give `cms-admin`'s token (and role) creation
+UI a matching picker.
 
-The spec already evaluated three approaches and the user chose the `dataloader` npm package: field
-resolvers run independently, so fixing this needs per-request key collection across resolver
-invocations in the same tick, not just a batched repository method. `GraphqlContextFactory.createContext()`
-already runs once per request, making it the natural place to construct a fresh `DataLoader` instance
-per request.
+## Corrections found during planning (supersede the spec's design)
 
-**Additional finding from this planning pass (not in the original spec):** `findByDocumentId` on
-`IMediaAssetRepository`/`PrismaMediaRepository` is *only* called from the code being replaced
-(`resolver-factory.service.ts:146`) — confirmed via full-repo grep. It is byte-for-byte identical to
-`findById` (`prisma.mediaAsset.findUnique({ where: { documentId } })`), and `docs/documents/media.md:157`
-already documents this duplication as deliberate ("kept as two named methods to match the source doc's
-port shape"). Once the resolver switches to the DataLoader, `findByDocumentId` becomes dead code with
-zero remaining callers. Per this repo's own rule against keeping confirmed-unused code, this plan
-**deletes `findByDocumentId` outright** (interface + implementation + its 2 spec cases) rather than
-leaving it orphaned — this overturns the existing documented rationale, called out here explicitly.
+1. **REST already accepts API tokens.** `JwtAuthGuard` (`src/common/guards/jwt-auth.guard.ts:9`)
+   is `extends AuthGuard(["jwt", "api-token"])` — it composes the cookie-based `JwtStrategy` and a
+   Bearer-header `ApiTokenStrategy` (`src/common/strategies/api-token.strategy.ts`), which already
+   sets `request.user = { sub, permissions }` from the token record. `PermissionsGuard`
+   (`src/common/guards/permissions.guard.ts`) already reads `request.user.permissions` uniformly
+   for both auth sources. **No new auth guard is needed** — the spec's planned `DocumentAuthGuard`
+   is dropped. Only one new guard (`DocumentPermissionsGuard`) is needed, to add the content-type-
+   scoped slug check on top of the existing check.
+2. **Scoping enforcement is source-agnostic, not API-token-only**, because `request.user.permissions`
+   is identical in shape whether it came from a role (JWT cookie) or a token (Bearer). Confirmed
+   with the user: the new per-content-type picker will appear on **both** `RolesPage.tsx` and
+   `AccessTokensPage.tsx` in `cms-admin` (they already share the exact same `PermissionTree`
+   component), and the backend check needs no role-vs-token discriminator.
+3. Content-type slugs are validated by `SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/`
+   (`src/modules/content-type/application/schema/sql-identifier.ts:4`) — safe to embed directly as
+   a permission slug's 3rd segment, no encoding needed (resolves spec open question #2).
 
-## Design
+## Architecture Decisions
 
-1. **`IMediaAssetRepository`** (`media-asset.repository.ts`): remove `findByDocumentId`; add
-   `findByDocumentIds(documentIds: string[]): Promise<MediaAssetEntity[]>`.
-2. **`PrismaMediaRepository`**: implement via one `findMany({ where: { documentId: { in: documentIds } } } })`;
-   remove the old `findByDocumentId` method.
-3. **`GraphqlContext`** (`graphql-context.factory.ts`): add `mediaAssetLoader: DataLoader<string, MediaAssetEntity | null>`.
-   `GraphqlContextFactory` gains a constructor dep on `IMediaAssetRepository` (`@Inject(MEDIA_ASSET_REPOSITORY)`)
-   and builds a **new** `DataLoader` instance inside `createContext()` (never shared across requests — a
-   shared instance would leak cached values and grow unbounded). Batch function:
-   ```ts
-   new DataLoader<string, MediaAssetEntity | null>(async (ids) => {
-     const found = await this.mediaAssets.findByDocumentIds([...ids]);
-     const byId = new Map(found.map((asset) => [asset.documentId, asset]));
-     return ids.map((id) => byId.get(id) ?? null);
-   });
-   ```
-   (DataLoader's contract requires the returned array to be the same length/order as the input keys array;
-   missing keys resolve to `null`, never an error or a thrown/rejected entry.)
-4. **`resolver-factory.service.ts`**:
-   - `MediaFieldResolver` type gains a `context: GraphqlContext` parameter.
-   - `collectMediaFieldResolvers` drops its `mediaAssets: IMediaAssetRepository` parameter; the resolver
-     body becomes `context.mediaAssetLoader.load(fk)` instead of `mediaAssets.findByDocumentId(fk)`.
-   - `ResolverFactoryService` drops its own `mediaAssets` constructor dependency (both call sites of
-     `collectMediaFieldResolvers`, lines 192 and 252, update accordingly).
-5. **`graphql.module.ts`**: move the `MEDIA_ASSET_REPOSITORY` inject/param from `resolverFactory`'s
-   construction to `contextFactory`'s (`new GraphqlContextFactory(accessTokens, mediaAssets)`); drop it
-   from `new ResolverFactoryService(...)`'s arg list.
-6. New dependency: `bun add dataloader` (no `@types/dataloader` needed — it ships its own types; verified
-   `esModuleInterop: true` in `tsconfig.json` so a default import works).
+- **Slug convention** (unchanged from spec): `document:<action>` (global, existing) sits alongside
+  a new `document:<action>:<content-type-slug>` (scoped). `AccessToken.permissions`/
+  `Role.permissions` stay `string[]` — no schema change.
+- **Shared "is granted" logic**: one new pure function
+  `isDocumentActionGranted(granted: string[], requiredSlug: string, contentTypeSlug: string): boolean`
+  in `src/common/authorization/document-permission.util.ts`, used by both the GraphQL
+  `assertApiTokenPermission` and the new REST `DocumentPermissionsGuard` — no duplicated
+  string-building.
+- **Catalog sync**: new `DocumentPermissionSyncService` in the `content-type` module, called as the
+  last step of `ContentTypeSyncService.sync()` (same `onApplicationBootstrap` hook — avoids the
+  cross-module bootstrap ordering race that exists between two independent `OnApplicationBootstrap`
+  providers). Idempotent create-if-missing, same pattern as `seed-default-data.service.ts`. Never
+  deletes rows for removed content types (matches `ContentTypeSyncService`'s existing
+  non-destructive philosophy).
+- **REST enforcement**: new `DocumentPermissionsGuard` (sibling to, not a subclass of,
+  `PermissionsGuard`) replaces `PermissionsGuard` only on
+  `CollectionTypeDocumentController`/`SingleTypeDocumentController` routes. `JwtAuthGuard` stays
+  as-is (already handles both auth sources). No other module's guard is touched.
+- **GraphQL enforcement**: `assertApiTokenPermission(context, slug)` becomes
+  `assertApiTokenPermission(context, slug, contentTypeSlug)`; every call site in
+  `resolver-factory.service.ts` already has `definition.slug` in closure scope.
+- **Frontend**: `PermissionTree.tsx`'s `"document"` resource group gets a new rendering branch (all
+  other groups unchanged); `useContentTypes()` (already exists) supplies the content-type checkbox
+  options. Applies to both `RolesPage` and `AccessTokensPage` automatically since they share the
+  component — no new prop.
+- **Commit sequencing**: backend (Phases 1-4) lands and is committed before frontend (Phase 5) —
+  the picker is inert without the new catalog rows/enforcement.
 
-## Proving the fix (key discovery from this planning pass)
+## Risks and Mitigations
 
-No *production* content type currently has a `media` field on a `collection` (list-capable) type or on a
-repeated component (`cv-contact.avatar` is the only real media field, and it's a `single`-kind type — one
-document, so a list-query proof isn't possible against real seeds). However, `test/graphql.e2e-spec.ts`
-already solves exactly this problem for its own single-item media test: it writes a **throwaway**
-collection-kind content type file (`e2e-gql-media-${runId}.json`, slug `mediaSlug`, fields
-`title`/`cover: media`) to `content-types/` in `beforeAll`, boots the real app against real Postgres so it
-loads into the live GraphQL schema, and deletes the file + re-syncs in `afterAll`
-(`test/graphql.e2e-spec.ts:104-114, 133-137, 214-218`). Its existing
-`describe("media field resolution (throwaway media-bearing content type)")` block (line 581) already
-uploads media and creates/publishes one document of this type for single-item query tests.
+| Risk | Impact | Mitigation |
+|---|---|---|
+| `DocumentPermissionSyncService` runs on every boot and does a `findBySlug` per action×content-type (6×N sequential lookups) | Low — small N (5 content types today), admin-only path, same acceptable-at-this-scale tradeoff already documented for `countReferences`'s unindexed JSONB queries | Accept for now; note as a future batch-lookup optimization if content-type count grows significantly |
+| Extending `PermissionTree` to both Roles and Access Tokens means a role can now be granted scoped document permissions too, which wasn't explicitly asked for | Low — purely additive capability, no existing behavior changes, confirmed with user | Already confirmed during planning |
+| REST `DocumentPermissionsGuard` swap could regress existing document-route tests if any test asserts on `PermissionsGuard` specifically rather than behavior | Medium if present | Re-run the existing controller spec files, not just new ones |
 
-This plan extends that same block with a **list-query** case: seed 3 documents of `mediaSlug`, each with
-its own uploaded media asset, publish them, run `listQueryName(mediaSlug)` selecting `cover { documentId }`
-over real HTTP, and assert batching by spying on the real DI-resolved repository instance
-(`jest.spyOn(app.get(MEDIA_ASSET_REPOSITORY), "findByDocumentIds")`) — asserting it was called **exactly
-once**, with all seeded FKs in one call. This is simpler and more precise than the spec's original idea of
-Prisma query-event logging, and matches this test file's existing `app.get(...)` patterns.
+## Open Questions
 
-## Verification
-
-- Unit: `bun run test:cov` — new/updated specs for `PrismaMediaRepository`, `GraphqlContextFactory`,
-  `ResolverFactoryService` all green, no coverage regressions.
-- E2E: `bun run test:e2e` — the new list-query batching assertion in `graphql.e2e-spec.ts` is the actual
-  proof this fixes the reported N+1 (one `findByDocumentIds` call, not N `findByDocumentId` calls) end to
-  end through real Apollo resolver execution and real Postgres.
-- `bun run build` and `bun run lint` clean throughout.
-
-## Files not touched
-
-`document`/`component` modules (already fixed, separate spec), any REST endpoint, GraphQL schema/SDL
-shape (`schema-builder.service.ts` untouched — only resolver wiring changes), any content type other than
-the existing throwaway e2e fixture.
+None remaining — spec's open questions were resolved during planning (charset confirmed safe;
+`DEFAULT_ROLES` intentionally left untouched, consistent with "additive only, no forced grants").
