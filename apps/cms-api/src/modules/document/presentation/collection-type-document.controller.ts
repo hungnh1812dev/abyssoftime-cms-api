@@ -13,8 +13,8 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Inject, Param, Pos
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
+import { DocumentPermissionsGuard } from "@/common/guards/document-permissions.guard";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
-import { PermissionsGuard } from "@/common/guards/permissions.guard";
 import { type AuthenticatedRequest } from "@/common/types/authenticated-request";
 import { type IUserRepository, USER_REPOSITORY } from "@/modules/users/domain/repositories/user.repository";
 
@@ -52,7 +52,7 @@ export class CollectionTypeDocumentController {
   ) {}
 
   @Get(":slug")
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, DocumentPermissionsGuard)
   @RequirePermissions("document:read")
   @ApiOperation({ summary: "List documents, paginated/sorted/searched" })
   @ApiResponse({ status: 200, type: ListDocumentsResponseDto })
@@ -65,7 +65,7 @@ export class CollectionTypeDocumentController {
   // Route-ordering: both /bulk routes must be declared before any /:documentId route,
   // or Nest captures "bulk" as :documentId (SPEC §10.3).
   @Post(":slug/bulk")
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, DocumentPermissionsGuard)
   @RequirePermissions("document:create", "document:publish")
   @ApiOperation({
     summary:
@@ -87,7 +87,7 @@ export class CollectionTypeDocumentController {
   }
 
   @Delete(":slug/bulk")
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, DocumentPermissionsGuard)
   @RequirePermissions("document:delete")
   @ApiOperation({ summary: "Bulk delete — all-or-nothing, one ID's failure rolls back the whole batch" })
   @ApiResponse({ status: 200, type: BulkDeleteResponseDto })
@@ -99,7 +99,7 @@ export class CollectionTypeDocumentController {
   }
 
   @Post(":slug")
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, DocumentPermissionsGuard)
   @RequirePermissions("document:create")
   @ApiOperation({ summary: "Create a document" })
   @ApiResponse({ status: 201, type: DocumentResponseDto })
@@ -112,7 +112,7 @@ export class CollectionTypeDocumentController {
   }
 
   @Get(":slug/:documentId")
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, DocumentPermissionsGuard)
   @RequirePermissions("document:read")
   @ApiOperation({ summary: "Get a document by ID (draft in Mode A, published in Mode B)" })
   @ApiResponse({ status: 200, type: DocumentResponseDto })
@@ -127,7 +127,7 @@ export class CollectionTypeDocumentController {
   }
 
   @Put(":slug/:documentId")
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, DocumentPermissionsGuard)
   @RequirePermissions("document:update")
   @ApiOperation({ summary: "Update a document" })
   @ApiResponse({ status: 200, type: DocumentResponseDto })
@@ -143,7 +143,7 @@ export class CollectionTypeDocumentController {
 
   @Delete(":slug/:documentId")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, DocumentPermissionsGuard)
   @RequirePermissions("document:delete")
   @ApiOperation({ summary: "Delete a document (both draft and published versions, plus their components)" })
   @ApiResponse({ status: 204, description: "Deleted" })
@@ -157,7 +157,7 @@ export class CollectionTypeDocumentController {
 
   @Post(":slug/:documentId/publish")
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, DocumentPermissionsGuard)
   @RequirePermissions("document:publish")
   @ApiOperation({ summary: "Publish the draft (Mode A only)" })
   @ApiResponse({ status: 200, type: PublishStatusResponseDto })
@@ -172,7 +172,7 @@ export class CollectionTypeDocumentController {
 
   @Post(":slug/:documentId/unpublish")
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, DocumentPermissionsGuard)
   @RequirePermissions("document:unpublish")
   @ApiOperation({ summary: "Unpublish (Mode A only) — draft is left untouched" })
   @ApiResponse({ status: 200, type: PublishStatusResponseDto })
@@ -186,7 +186,7 @@ export class CollectionTypeDocumentController {
   }
 
   @Post(":slug/:documentId/duplicate")
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, DocumentPermissionsGuard)
   @RequirePermissions("document:create")
   @ApiOperation({ summary: "Duplicate a document as a brand-new document (shares the same underlying media assets)" })
   @ApiResponse({ status: 201, type: DocumentResponseDto })

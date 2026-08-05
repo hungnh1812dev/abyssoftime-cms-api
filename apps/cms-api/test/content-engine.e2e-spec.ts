@@ -5,6 +5,8 @@ import { type App } from "supertest/types";
 import { type INestApplication } from "@nestjs/common";
 
 import { JwtTokenService } from "@/common/token/jwt-token.service";
+import { CreateAccessTokenService } from "@/modules/access-tokens/application/services/create-access-token.service";
+import { ACCESS_TOKEN_REPOSITORY, type IAccessTokenRepository } from "@/modules/access-tokens/domain/repositories/access-token.repository";
 import { SchemaLoaderService } from "@/modules/content-type/application/schema/schema-loader.service";
 import { ContentTypeSyncService } from "@/modules/content-type/application/sync/content-type-sync.service";
 import { type ContentTypeDefinition } from "@/modules/content-type/domain/entities/content-type.entity";
@@ -42,13 +44,16 @@ describe("Content engine (e2e)", () => {
   let prisma: PrismaService;
   let schemaLoader: SchemaLoaderService;
   let syncService: ContentTypeSyncService;
+  let accessTokens: IAccessTokenRepository;
   let realDefs: ContentTypeDefinition[];
 
   let superAdminToken: string;
   let readOnlyToken: string;
   let noPermToken: string;
+  let cvPageScopedApiToken: string;
 
   const createdUserIds: string[] = [];
+  const createdApiTokenIds: string[] = [];
   const pendingCleanupCvPageIds = new Set<string>();
   const pendingCleanupVocabIds = new Set<string>();
 
@@ -88,7 +93,9 @@ describe("Content engine (e2e)", () => {
     prisma = app.get(PrismaService);
     schemaLoader = app.get(SchemaLoaderService);
     syncService = app.get(ContentTypeSyncService);
+    accessTokens = app.get(ACCESS_TOKEN_REPOSITORY);
     const jwtTokenService = app.get(JwtTokenService);
+    const createAccessToken = app.get(CreateAccessTokenService);
 
     realDefs = await schemaLoader.load();
     await syncService.sync([...realDefs, modeBDef(), schemaEditDefV1()]);
@@ -187,6 +194,10 @@ describe("Content engine (e2e)", () => {
       level: editorRole.level,
       permissions: editorRole.permissions as string[],
     });
+
+    const cvPageScoped = await createAccessToken.execute({ name: `e2e-rest-scoped-cv-page-${runId}`, permissions: ["document:read:cv-page"], expiresIn: "1h" }, null);
+    cvPageScopedApiToken = cvPageScoped.plaintext;
+    createdApiTokenIds.push(cvPageScoped.entity.documentId);
   });
 
   afterAll(async () => {
@@ -208,6 +219,10 @@ describe("Content engine (e2e)", () => {
     // Drop the throwaway content types (and their tables) via the same sync() the boot process
     // uses, keeping the two real seeds untouched.
     await syncService.sync(realDefs);
+
+    for (const tokenId of createdApiTokenIds) {
+      await accessTokens.delete(tokenId);
+    }
 
     if (createdUserIds.length > 0) {
       await prisma.user.deleteMany({ where: { documentId: { in: createdUserIds } } });
@@ -685,6 +700,23 @@ describe("Content engine (e2e)", () => {
         .set("Cookie", [`access_token=${readOnlyToken}`])
         .send({ data: { position: "X", isMain: false, company: "X" } })
         .expect(403);
+    });
+  });
+
+  describe("content-type-scoped document permissions (REST)", () => {
+    it("succeeds on cv-page for a Bearer token scoped to document:read:cv-page", async () => {
+      await request(app.getHttpServer()).get("/api/v1/documents/collection-type/cv-page").set("Authorization", `Bearer ${cvPageScopedApiToken}`).expect(200);
+    });
+
+    it("returns 403 when the same token lists a different content type (en-it-vocab)", async () => {
+      await request(app.getHttpServer()).get("/api/v1/documents/collection-type/en-it-vocab").set("Authorization", `Bearer ${cvPageScopedApiToken}`).expect(403);
+    });
+
+    it("still allows a global document:read-scoped role to list other content types (regression)", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/documents/collection-type/en-it-vocab")
+        .set("Cookie", [`access_token=${readOnlyToken}`])
+        .expect(200);
     });
   });
 });
