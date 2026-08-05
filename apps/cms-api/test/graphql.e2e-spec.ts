@@ -14,7 +14,9 @@ import { ContentTypeSyncService } from "@/modules/content-type/application/sync/
 import { type ContentTypeDefinition } from "@/modules/content-type/domain/entities/content-type.entity";
 import {
   createMutationName,
+  filterTypeName,
   inputTypeName,
+  listQueryName,
   publishMutationName,
   queryName,
   saveMutationName,
@@ -22,6 +24,7 @@ import {
   unpublishMutationName,
   updateMutationName,
 } from "@/modules/graphql/domain/naming";
+import { type IMediaAssetRepository, MEDIA_ASSET_REPOSITORY } from "@/modules/media/domain/repositories/media-asset.repository";
 import { STORAGE_ADAPTER } from "@/modules/storage/domain/repositories/storage-adapter.repository";
 import { PrismaService } from "@/prisma/application/prisma.service";
 
@@ -638,6 +641,58 @@ describe("GraphQL (e2e)", () => {
       const body = response.body as GraphQLResponseBody;
       expect(body.errors).toBeUndefined();
       expect(body.data).toEqual({ [mediaQueryName]: { title: `No cover ${runId}`, cover: null } });
+    });
+
+    it("batches a list query's media-field resolution into a single DataLoader call, not one per row (N+1 fix)", async () => {
+      const seeds = await Promise.all(
+        [0, 1, 2].map(async (index) => {
+          const uploadResponse = await request(app.getHttpServer())
+            .post("/api/v1/media/upload")
+            .set("Cookie", [superAdminCookie])
+            .attach("file", buildPngBuffer(400, 300), `list-cover-${index}-${runId}.png`)
+            .expect(201);
+          const listMediaDocumentId = (uploadResponse.body as MediaUploadResponseBody).documentId;
+          createdMediaIds.push(listMediaDocumentId);
+
+          const createResponse = await request(app.getHttpServer())
+            .post(`/api/v1/documents/collection-type/${mediaSlug}`)
+            .set("Cookie", [superAdminCookie])
+            .send({ data: { title: `List media doc ${index} ${runId}`, cover: listMediaDocumentId } })
+            .expect(201);
+          const listDocumentId = (createResponse.body as DocumentResponseBody).data.documentId;
+          pendingCleanupMediaTypeIds.add(listDocumentId);
+
+          await request(app.getHttpServer()).post(`/api/v1/documents/collection-type/${mediaSlug}/${listDocumentId}/publish`).set("Cookie", [superAdminCookie]).expect(200);
+
+          return { listDocumentId, listMediaDocumentId };
+        }),
+      );
+
+      const mediaAssets = app.get<IMediaAssetRepository>(MEDIA_ASSET_REPOSITORY);
+      const findByDocumentIdsSpy = jest.spyOn(mediaAssets, "findByDocumentIds");
+
+      const query = `
+        query($where: ${filterTypeName(mediaSlug)}) {
+          ${listQueryName(mediaSlug)}(where: $where, pagination: { limit: -1 }) {
+            items { title cover { documentId fileName } }
+          }
+        }
+      `;
+      const response = await gql(query, { where: { documentId: { in: seeds.map((seed) => seed.listDocumentId) } } }, readScopedApiToken).expect(200);
+
+      const body = response.body as GraphQLResponseBody;
+      expect(body.errors).toBeUndefined();
+      const items = (body.data as Record<string, { items: { title: string; cover: { documentId: string; fileName: string } | null }[] }>)[listQueryName(mediaSlug)].items;
+      expect(items).toHaveLength(3);
+      seeds.forEach((seed, index) => {
+        const item = items.find((candidate) => candidate.title === `List media doc ${index} ${runId}`);
+        expect(item?.cover).toMatchObject({ documentId: seed.listMediaDocumentId, fileName: `list-cover-${index}-${runId}.png` });
+      });
+
+      expect(findByDocumentIdsSpy).toHaveBeenCalledTimes(1);
+      expect(findByDocumentIdsSpy.mock.calls[0][0].slice().sort()).toEqual(seeds.map((seed) => seed.listMediaDocumentId).sort());
+
+      findByDocumentIdsSpy.mockRestore();
     });
   });
 

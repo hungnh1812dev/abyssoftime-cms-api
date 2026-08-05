@@ -10,8 +10,8 @@ See `tasks/plan.md` for full context, design, and rationale. See
 - [x] **Checkpoint A:** `bun run build && bun run lint && bun run test:cov` green — commit.
 
 ## Phase 2 — E2E proof
-- [ ] Task 4 — `test/graphql.e2e-spec.ts`: extend the "media field resolution (throwaway media-bearing content type)" describe block with a list-query case — seed 3 `mediaSlug` documents, each with its own uploaded media asset, publish each; spy `jest.spyOn(app.get(MEDIA_ASSET_REPOSITORY), "findByDocumentIds")`; run one `listQueryName(mediaSlug)` query selecting `title cover { documentId fileName }`; assert correct data for all 3 documents AND the spy was called exactly once with all 3 FKs.
-- [ ] **Checkpoint B:** `bun run test:e2e` green — commit.
+- [x] Task 4 — `test/graphql.e2e-spec.ts`: extend the "media field resolution (throwaway media-bearing content type)" describe block with a list-query case — seed 3 `mediaSlug` documents, each with its own uploaded media asset, publish each; spy `jest.spyOn(app.get(MEDIA_ASSET_REPOSITORY), "findByDocumentIds")`; run one `listQueryName(mediaSlug)` query selecting `title cover { documentId fileName }`; assert correct data for all 3 documents AND the spy was called exactly once with all 3 FKs.
+- [x] **Checkpoint B:** `bun run test:e2e` green — commit.
 
 ## Phase 3 — Docs + workflow closeout
 - [ ] Task 5 — Update `docs/documents/graphql.md:138` (media field resolver line — describe DataLoader batching); update `docs/documents/media.md:46,125,157` (remove `findByDocumentId` references, document `findByDocumentIds`, drop the now-superseded "kept as two named methods" rationale).
