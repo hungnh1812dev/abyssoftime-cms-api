@@ -20,9 +20,11 @@ export interface TextInputProps extends Omit<ComponentProps<"input">, "defaultVa
   };
 }
 
-const TextInput: React.FC<TextInputProps> = ({ className, classes, name, label, rules, shouldUnregister, defaultValue, disabled, onChange, ...others }) => {
+const TextInput: React.FC<TextInputProps> = ({ className, classes, name, label, rules, shouldUnregister, defaultValue, disabled, onChange, type, ...others }) => {
   const { control } = useFormContext();
   const { field, fieldState } = useController({ name: name!, control, rules, shouldUnregister, defaultValue: defaultValue ?? "", disabled });
+  const { value, ...fieldWithoutValue } = field;
+  const isFileInput = type === "file";
 
   return (
     <Field className={cn("flex w-full flex-col items-start gap-1", className, classes?.root)} data-invalid={fieldState.invalid}>
@@ -33,10 +35,12 @@ const TextInput: React.FC<TextInputProps> = ({ className, classes, name, label, 
       )}
       <Input
         {...others}
-        {...field}
+        {...fieldWithoutValue}
+        {...(isFileInput ? {} : { value })}
+        type={type}
         id={`text-input-${name}`}
         onChange={(e: ChangeEvent<HTMLInputElement>) => {
-          field.onChange(e);
+          field.onChange(isFileInput ? e.target.files : e);
           onChange?.(e);
         }}
         className={classes?.input}
