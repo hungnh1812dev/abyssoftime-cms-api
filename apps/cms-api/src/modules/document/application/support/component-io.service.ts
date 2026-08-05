@@ -47,7 +47,7 @@ export class ComponentIoService {
 
     const entities = items.map((item) => new ComponentEntity(randomUUID(), documentId, version, parentComponentId, scalarFieldsOf(subFields, item), {}));
 
-    await this.components.upsertAll(slug, componentPath, documentId, version, parentComponentId, entities, subFields, tx);
+    await this.components.upsertAll(slug, componentPath, documentId, version, [parentComponentId], entities, subFields, tx);
 
     const nestedComponentFields = subFields.filter(isComponentField);
     for (let index = 0; index < items.length; index++) {

@@ -57,7 +57,7 @@ describe("ComponentIoService", () => {
       expect(expPath).toEqual(["experience"]);
       expect(expDocId).toBe("doc-1");
       expect(expVersion).toBe("draft");
-      expect(expParentId).toBeNull();
+      expect(expParentId).toEqual([null]);
       expect(expEntities).toHaveLength(1);
       expect(expEntities[0].fields).toEqual({ company: "Acme", location: "Remote" });
       const experienceComponentId = expEntities[0].componentId;
@@ -68,7 +68,7 @@ describe("ComponentIoService", () => {
       expect(rolePath).toEqual(["experience", "role"]);
       expect(roleDocId).toBe("doc-1");
       expect(roleVersion).toBe("draft");
-      expect(roleParentId).toBe(experienceComponentId);
+      expect(roleParentId).toEqual([experienceComponentId]);
       expect(roleEntities).toHaveLength(2);
       expect(roleEntities[0].fields).toEqual({ position: "Dev", period: "2020-2021" });
       expect(roleEntities[1].fields).toEqual({ position: "Lead", period: "2021-2022" });
