@@ -36,22 +36,29 @@ action's rollback guarantee preserved or strengthened, never weakened.
   which is already efficient *per call* (one batched `DELETE` + one multi-row `INSERT`), but the number of
   calls is what explodes: `cv-page`'s 6 top-level component fields + 1 nested-per-experience-item field
   means ~9-15+ sequential DELETE/INSERT pairs (18-30+ round trips) for a typical edit.
-- `hydrateComponents`/`hydrateRows` (lines 69-115) mirror the exact same fan-out for reads — one `SELECT`
-  per component field per parent row, sequential.
-- `deleteComponents`/`deleteComponentField` (lines 117-135) mirror it again for deletes (sequential, but
-  each still runs inside the caller's own transaction so is already atomic — see below).
+- **Correction (found during planning, not investigation):** `hydrateComponents`/`hydrateRows`
+  (lines 69-115) do **not** mirror the write path's fan-out. `hydrateRows` pre-fetches all rows for a
+  nested field name **once** before recursing into each parent row (`component-io.service.ts:96-101`), so
+  reads already issue exactly one `SELECT` per distinct component path in the schema (7 for `cv-page`),
+  independent of item count — the same shape `deleteByDocument` has (it deletes by `document_id` alone, no
+  parent scoping at all). Both are already schema-bounded; no changes were needed on the read or delete
+  side. The one real bottleneck is `saveComponentField`, which — unlike `hydrateRows` — recurses **per
+  item** instead of pre-batching across parents; see `tasks/plan.md`'s Context section for the corrected
+  diagnosis and the fix that came out of it.
 
-**Every caller inherits this cost**, confirmed by reading each service:
-`save-document.service.ts:54-57`, `get-document-for-edit.service.ts:33` (+ a second `findByVersion` for
-the published-status check when `draftToPublish`), `publish-document.service.ts:39,47`,
-`unpublish-document.service.ts:30`, `delete-document.service.ts:32-33`,
-`duplicate-document.service.ts:31,42`, `get-public-document.service.ts:26`,
-`list-documents-full.service.ts:49` (once per row in the page), `save-single-type.service.ts:45`,
-`publish-single-type.service.ts:31,39`, `unpublish-single-type.service.ts:30`, and their
-`get-single-type`/`get-public-single-type` counterparts (same pattern per `document.md:150-152`). A
-single `PUT` on `cv-page` alone chains a write fan-out (`save-document.service.ts`) *and* a read fan-out
-(`get-document-for-edit.service.ts`, called by the controller right after save to build the response —
-`collection-type-document.controller.ts:142-144`), roughly doubling the round-trip count.
+**Correction (continued):** only the *write-path* callers of `saveComponents` actually inherit the
+per-item scaling bug — `save-document.service.ts:54-57`, `duplicate-document.service.ts:42`,
+`save-single-type.service.ts:45` (and transitively `publish-document.service.ts:47`/
+`publish-single-type.service.ts:39`, which call `saveComponents` on the copied-forward published row).
+Every *read-path* caller (`get-document-for-edit.service.ts:33`, `get-public-document.service.ts:26`,
+`list-documents-full.service.ts:49`, `get-single-type`/`get-public-single-type`) and *delete-path* caller
+(`unpublish-document.service.ts:30`, `delete-document.service.ts:32-33`,
+`unpublish-single-type.service.ts:30`) only calls `hydrateComponents`/`deleteComponents`, both already
+schema-bounded — they pay a small fixed cost (7 calls for `cv-page`), not one that scales with item count.
+A single `PUT` on `cv-page` chains a write fan-out (`save-document.service.ts`, the one that scales) *and*
+a fixed-size read fan-out (`get-document-for-edit.service.ts`, called by the controller right after save to
+build the response — `collection-type-document.controller.ts:142-144`) — the read adds a small constant
+overhead on top, it does not double the write's own (data-dependent) round-trip count.
 
 On a local Postgres (sub-millisecond round trips) this is invisible. On Render.com, if the Postgres
 instance isn't colocated with the web service or is on a lower tier, each round trip can cost tens of
@@ -228,8 +235,13 @@ construction — different tables, no shared rows). Keep the recursive shape (pa
 
 - A `cv-page` update completes in materially less wall-clock time than today's 1-3s baseline, demonstrated
   by a real e2e timing (before/after), not just a query-count argument.
-- `ComponentIoService`'s sibling component-field and sibling repeatable-item calls run concurrently
-  instead of one-at-a-time, for both the save and hydrate paths.
+- **Superseded by the actual implementation** — `ComponentIoService`'s sibling repeatable-item calls are
+  batched into a single `upsertAll` per component path (one round trip per level, not one per parent row),
+  not run concurrently via `Promise.all`. `tasks/plan.md`'s Design section explains why: queries on one
+  Prisma transaction's single reserved connection serialize at the wire level regardless of JS-side
+  concurrency, so `Promise.all` here would add complexity without reducing round trips — the batching
+  itself, not concurrency, is what cuts the round-trip count. `hydrateComponents`'s read path needed no
+  change at all (see the corrected Diagnosis above).
 - Every currently-atomic single-item service (Diagnosis table) remains atomic — no regression, covered by
   existing/updated unit tests.
 - `bulk-delete.service.ts` is all-or-nothing: any item failure leaves zero deletes committed, covered by a
