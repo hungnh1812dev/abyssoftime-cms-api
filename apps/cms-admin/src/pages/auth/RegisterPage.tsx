@@ -1,7 +1,7 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,14 +19,6 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const { data: hasUsersData, isLoading: hasUsersLoading } = useQuery({
-    queryKey: ["auth-has-users"],
-    queryFn: () => api.get<{ hasUsers: boolean }>("/auth/has-users").then((response) => response.data),
-    retry: false,
-  });
-
-  const hasUsers = hasUsersData?.hasUsers ?? false;
-
   const {
     register,
     handleSubmit,
@@ -36,8 +28,8 @@ export function RegisterPage() {
   const mutation = useMutation({
     mutationFn: (data: RegisterFields) =>
       // accountType isn't surfaced in the UI — its semantics aren't documented
-      // (the first registrant becomes admin regardless of its value, per the
-      // API's own onboarding rules), so it's sent as a fixed true.
+      // (only the first-ever OTP verifier becomes super_admin, everyone else
+      // gets the guest role, regardless of this value), so it's sent as a fixed true.
       api.post("/auth/register", { ...data, accountType: true }),
     onSuccess: (_response, variables) => {
       navigate("/verify-otp", { state: { email: variables.email } });
@@ -47,24 +39,12 @@ export function RegisterPage() {
     },
   });
 
-  if (hasUsersLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground text-sm">Loading…</p>
-      </div>
-    );
-  }
-
-  if (hasUsers) {
-    return <Navigate to="/login" replace />;
-  }
-
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-sm space-y-6 px-4">
         <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-semibold">Set up admin account</h1>
-          <p className="text-muted-foreground text-sm">No admin account exists yet — the first account will be an admin</p>
+          <h1 className="text-2xl font-semibold">Create an account</h1>
+          <p className="text-muted-foreground text-sm">Sign up to get started</p>
         </div>
 
         {errorMsg && (
@@ -137,7 +117,7 @@ export function RegisterPage() {
           </div>
 
           <Button type="submit" className="w-full" disabled={mutation.isPending}>
-            {mutation.isPending ? "Creating account…" : "Create admin account"}
+            {mutation.isPending ? "Creating account…" : "Create account"}
           </Button>
         </form>
 
