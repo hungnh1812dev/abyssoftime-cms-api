@@ -9,6 +9,11 @@ import { api } from "@/lib/api";
 import { renderWithProviders } from "@/test-utils";
 import type { ContentType, ListedDocumentItem } from "@/types/cms";
 
+const mockUseAuth = vi.fn();
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 function LocationProbe() {
   const [params] = useSearchParams();
   const navType = useNavigationType();
@@ -58,6 +63,7 @@ const doc2: ListedDocumentItem = {
 let mock: MockAdapter;
 
 beforeEach(() => {
+  mockUseAuth.mockReturnValue({ permissions: ["document:create", "document:delete"] });
   mock = new MockAdapter(api);
 });
 
@@ -707,5 +713,52 @@ describe("CollectionListPage — column header sortability", () => {
     expect(screen.getByRole("button", { name: "Title" })).toBeInTheDocument();
     const bodyHeader = screen.getByRole("columnheader", { name: "Body" });
     expect(within(bodyHeader).queryByRole("button")).not.toBeInTheDocument();
+  });
+});
+
+describe("CollectionListPage — permission gating", () => {
+  it("enables Add/Duplicate/Delete/bulk-delete with bare document:create and document:delete grants", async () => {
+    mock.onGet("/documents/collection-type/blog-posts").reply(200, { items: [doc1, doc2], total: 2, start: 0, size: 20 });
+    const user = userEvent.setup();
+    renderWithProviders(<CollectionListPage contentType={ct} />);
+    await waitFor(() => screen.getByText("First Post"));
+
+    expect(screen.getByRole("button", { name: /add/i })).not.toBeDisabled();
+    expect(screen.getAllByRole("button", { name: /duplicate/i })[0]).not.toBeDisabled();
+    expect(screen.getAllByRole("button", { name: /^delete$/i })[0]).not.toBeDisabled();
+
+    await user.click(screen.getByRole("checkbox", { name: "Select all" }));
+    expect(screen.getByRole("button", { name: /delete selected/i })).not.toBeDisabled();
+  });
+
+  it("enables Add/Duplicate/Delete/bulk-delete with content-type-scoped grants for this slug", async () => {
+    mockUseAuth.mockReturnValue({ permissions: ["document:create:blog-posts", "document:delete:blog-posts"] });
+    mock.onGet("/documents/collection-type/blog-posts").reply(200, { items: [doc1, doc2], total: 2, start: 0, size: 20 });
+    renderWithProviders(<CollectionListPage contentType={ct} />);
+    await waitFor(() => screen.getByText("First Post"));
+
+    expect(screen.getByRole("button", { name: /add/i })).not.toBeDisabled();
+    expect(screen.getAllByRole("button", { name: /duplicate/i })[0]).not.toBeDisabled();
+    expect(screen.getAllByRole("button", { name: /^delete$/i })[0]).not.toBeDisabled();
+  });
+
+  it("disables Add/Duplicate/Delete/bulk-delete when the caller lacks a matching grant for this content type", async () => {
+    mockUseAuth.mockReturnValue({ permissions: ["document:create:other-type", "document:delete:other-type"] });
+    mock.onGet("/documents/collection-type/blog-posts").reply(200, { items: [doc1, doc2], total: 2, start: 0, size: 20 });
+    renderWithProviders(<CollectionListPage contentType={ct} />);
+    await waitFor(() => screen.getByText("First Post"));
+
+    expect(screen.getByRole("button", { name: /add/i })).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: /duplicate/i })[0]).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: /^delete$/i })[0]).toBeDisabled();
+  });
+
+  it("leaves Edit ungated regardless of permissions", async () => {
+    mockUseAuth.mockReturnValue({ permissions: [] });
+    mock.onGet("/documents/collection-type/blog-posts").reply(200, { items: [doc1], total: 1, start: 0, size: 20 });
+    renderWithProviders(<CollectionListPage contentType={ct} />);
+    await waitFor(() => screen.getByText("First Post"));
+
+    expect(screen.getByRole("button", { name: /edit/i })).not.toBeDisabled();
   });
 });

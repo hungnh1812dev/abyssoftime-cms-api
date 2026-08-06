@@ -17,10 +17,10 @@ each task completes.
 - [ ] **Checkpoint** — lint/test/build clean; live walkthrough with a read-only role; commit
 
 ## Phase 2: Content-type / document pages
-- [ ] 7. `CollectionListPage` — gate Add/Duplicate (`document:create`, scoped) and
+- [x] 7. `CollectionListPage` — gate Add/Duplicate (`document:create`, scoped) and
       Delete/bulk-delete (`document:delete`, scoped); extract `DeleteConfirmDialog` first to fix
       the pre-existing 500-line-cap overage
-- [ ] 8. `ContentTypeBuilder` + `ContentTypePanel` — gate Save (`document:create`/`update`,
+- [x] 8. `ContentTypeBuilder` + `ContentTypePanel` — gate Save (`document:create`/`update`,
       scoped) and Publish/Unpublish (`document:publish`/`unpublish`, scoped)
 - [ ] **Checkpoint** — lint/test/build clean; live walkthrough with a content-type-scoped role;
       commit

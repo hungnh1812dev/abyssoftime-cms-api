@@ -86,13 +86,13 @@ scoped document pages), not because of a real dependency between them.
 
 ### Phase 2: Content-type / document pages (scoped permission)
 
-- [ ] **Task 7: `CollectionListPage` — Add/Duplicate/Delete/bulk-delete**
+- [x] **Task 7: `CollectionListPage` — Add/Duplicate/Delete/bulk-delete**
   Gate "Add new item" (`:341`) and the row "Duplicate" button (`:460-462`, since duplicating creates a new record) on `hasDocumentPermission(permissions, "create", contentType.slug)`. Gate the row "Delete" (`:463-465`) and "Delete selected" bulk button (`:385-387`) on `hasDocumentPermission(permissions, "delete", contentType.slug)`. Leave "Edit" (pencil, navigation-only) ungated.
   **Risk:** this file is already 505 lines (over the project's 500-line module cap) before this change. Mitigation: extract the delete-confirmation `<Dialog>` (`:356-380`) into a sibling `DeleteConfirmDialog` component in the same directory as part of this task, to both offset the added gating code and bring the file back under budget — do this extraction first, verify it's a pure no-op refactor (existing tests still pass), then add the gating.
   **Acceptance:** spec AC 5. **Verify:** `bun run test -- src/pages/admin/panels/collection-type/layout/__tests__/CollectionListPage.test.tsx`; file line count back at or under 500 (`wc -l`).
   **Files:** `CollectionListPage.tsx`, new `DeleteConfirmDialog.tsx` (extraction), `__tests__/CollectionListPage.test.tsx`. **Scope:** M.
 
-- [ ] **Task 8: `ContentTypeBuilder` + `ContentTypePanel` — Save/Publish/Unpublish**
+- [x] **Task 8: `ContentTypeBuilder` + `ContentTypePanel` — Save/Publish/Unpublish**
   Add a `requiredPermission: string` prop to `ContentTypeBuilder` (threaded to `FormActions`'s Save button at `ContentTypeBuilder.tsx:24`, wrapped in `PermissionTooltip` with `contentTypeSlug`). Caller (`ContentTypePanel.tsx`) computes it per call site: line-102 branch → `isNew ? "create" : "update"` (single-type first-save is always `"update"`, no create endpoint exists for single types); line-163 branch (doc exists) → always `"update"`. Gate Publish (`:173-183`) on `hasDocumentPermission(permissions, "publish", contentType.slug)` and Unpublish (`:184-194`) on `"unpublish"`, layered on top of the existing `canPublish`/`canUnpublish` visibility conditions (unchanged).
   **Acceptance:** spec AC 6. **Verify:** `bun run test -- src/pages/admin/panels/content-type/__tests__/ContentTypeBuilder.test.tsx src/pages/admin/panels/content-type/__tests__/ContentTypePanel.test.tsx`.
   **Files:** `ContentTypeBuilder.tsx`, `ContentTypePanel.tsx`, both `__tests__` files. **Scope:** M.
