@@ -7,6 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import { renderWithProviders } from "@/test-utils";
 
+const mockUseAuth = vi.fn();
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 let mock: MockAdapter;
 
 const permissionsResponse = [
@@ -16,6 +21,7 @@ const permissionsResponse = [
 ];
 
 beforeEach(() => {
+  mockUseAuth.mockReturnValue({ permissions: ["api_token:manager"] });
   mock = new MockAdapter(api);
   mock.onGet("/access-tokens").reply(200, []);
   mock.onGet("/permissions").reply(200, permissionsResponse);
@@ -141,5 +147,26 @@ describe("AccessTokensPage — token list", () => {
 
     await waitFor(() => expect(mock.history.delete).toHaveLength(1));
     confirmSpy.mockRestore();
+  });
+});
+
+describe("AccessTokensPage — permission gating", () => {
+  it("enables Revoke and Delete when the caller holds api_token:manager", async () => {
+    mock.onGet("/access-tokens").reply(200, [{ documentId: "t1", name: "Existing", permissions: [], expiresAt: null, createdAt: "", updatedAt: "", updatedBy: null }]);
+    renderWithProviders(<AccessTokensPage />);
+
+    await waitFor(() => screen.getByText("Existing"));
+    expect(screen.getByRole("button", { name: /revoke/i })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: /delete/i })).not.toBeDisabled();
+  });
+
+  it("disables Revoke and Delete when the caller lacks api_token:manager", async () => {
+    mockUseAuth.mockReturnValue({ permissions: [] });
+    mock.onGet("/access-tokens").reply(200, [{ documentId: "t1", name: "Existing", permissions: [], expiresAt: null, createdAt: "", updatedAt: "", updatedBy: null }]);
+    renderWithProviders(<AccessTokensPage />);
+
+    await waitFor(() => screen.getByText("Existing"));
+    expect(screen.getByRole("button", { name: /revoke/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /delete/i })).toBeDisabled();
   });
 });

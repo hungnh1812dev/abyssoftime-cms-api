@@ -7,6 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import { renderWithProviders } from "@/test-utils";
 
+const mockUseAuth = vi.fn();
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 let mock: MockAdapter;
 
 const permissionsResponse = [
@@ -21,6 +26,7 @@ const rolesResponse = [
 ];
 
 beforeEach(() => {
+  mockUseAuth.mockReturnValue({ permissions: ["role:manager"] });
   mock = new MockAdapter(api);
   mock.onGet("/roles").reply(200, rolesResponse);
   mock.onGet("/permissions").reply(200, permissionsResponse);
@@ -150,5 +156,28 @@ describe("RolesPage", () => {
     await waitFor(() => expect(mock.history.post.filter((r) => r.url === "/roles")).toHaveLength(1));
     const body = JSON.parse(mock.history.post.filter((r) => r.url === "/roles")[0].data);
     expect(body).toEqual({ name: "New Role", slug: "new-role", permissions: ["document:read"], level: 50 });
+  });
+});
+
+describe("RolesPage — permission gating", () => {
+  it("enables Create/Edit/Delete when the caller holds role:manager", async () => {
+    renderWithProviders(<RolesPage />);
+    await waitFor(() => screen.getByText("Custom"));
+
+    expect(screen.getByRole("button", { name: /create role/i })).not.toBeDisabled();
+    const customRow = screen.getByText("Custom").closest("tr") as HTMLElement;
+    expect(within(customRow).getByRole("button", { name: /edit/i })).not.toBeDisabled();
+    expect(within(customRow).getByRole("button", { name: /delete/i })).not.toBeDisabled();
+  });
+
+  it("disables Create/Edit/Delete when the caller lacks role:manager", async () => {
+    mockUseAuth.mockReturnValue({ permissions: [] });
+    renderWithProviders(<RolesPage />);
+    await waitFor(() => screen.getByText("Custom"));
+
+    expect(screen.getByRole("button", { name: /create role/i })).toBeDisabled();
+    const customRow = screen.getByText("Custom").closest("tr") as HTMLElement;
+    expect(within(customRow).getByRole("button", { name: /edit/i })).toBeDisabled();
+    expect(within(customRow).getByRole("button", { name: /delete/i })).toBeDisabled();
   });
 });

@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 
+import { PermissionTooltip } from "@/components/permissions/PermissionTooltip";
 import { Button } from "@/components/ui/button";
 import type { BreadcrumbItem } from "@/hooks/useBreadcrumbs";
 import {
@@ -99,7 +100,12 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
             </Link>
           ) : undefined
         }>
-        <ContentTypeBuilder contentTypeSlug={contentType.slug} schema={schema} mutationFn={handleFirstSave} />
+        <ContentTypeBuilder
+          contentTypeSlug={contentType.slug}
+          schema={schema}
+          mutationFn={handleFirstSave}
+          requiredPermission={isNew ? "create" : "update"}
+        />
       </ContentDetailLayout>
     );
   }
@@ -168,29 +174,34 @@ export function ContentTypePanel({ contentType, id, isNew }: Props) {
           queryFn: () => api.get<CmsDocument>(apiBase).then((response) => stripSystemFields(response.data.data)),
         }}
         mutationFn={mutationFn}
+        requiredPermission="update"
         renderActions={({ isDirty: builderIsDirty, submitting }) => (
           <>
             {canPublish && (
-              <Button
-                type="button"
-                variant="success"
-                onClick={handlePublish}
-                disabled={builderIsDirty || submitting || isPublishing}
-                loading={isPublishing}
-                loadingText="Publishing...">
-                Publish
-              </Button>
+              <PermissionTooltip required="publish" contentTypeSlug={contentType.slug}>
+                <Button
+                  type="button"
+                  variant="success"
+                  onClick={handlePublish}
+                  disabled={builderIsDirty || submitting || isPublishing}
+                  loading={isPublishing}
+                  loadingText="Publishing...">
+                  Publish
+                </Button>
+              </PermissionTooltip>
             )}
             {canUnpublish && (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleUnpublish}
-                disabled={submitting || isUnpublishing}
-                loading={isUnpublishing}
-                loadingText="Unpublishing...">
-                Unpublish
-              </Button>
+              <PermissionTooltip required="unpublish" contentTypeSlug={contentType.slug}>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleUnpublish}
+                  disabled={submitting || isUnpublishing}
+                  loading={isUnpublishing}
+                  loadingText="Unpublishing...">
+                  Unpublish
+                </Button>
+              </PermissionTooltip>
             )}
           </>
         )}

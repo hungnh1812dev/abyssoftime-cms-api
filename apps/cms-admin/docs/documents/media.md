@@ -21,3 +21,7 @@ Opened by `MediaInput` (see [form-system.md](./form-system.md)) when a media-typ
 A near-duplicate, always-expanded-upload version of the same grid/delete UI as `MediaLibrary`, minus the "select an asset" callback (this is the standalone browse/manage view, not a picker) and minus pagination controls (removed along with `MediaLibrary`'s, since the list is no longer paginated). The upload dropzone markup, staged-file preview grid, and delete-confirmation dialog are still copy-pasted between this file and `MediaLibrary.tsx` almost verbatim — a candidate for extraction into a shared component the next time either needs a behavior change.
 
 No route-level `minLevel`/permission gate on `settings/media` in `router.tsx` (see [app-shell.md](./app-shell.md)) — unlike every other settings page. The sidebar link is still gated by `media:read` (see [navigation-shell.md](./navigation-shell.md)), so this is a UI-only gap: any authenticated user who knows/guesses the URL can reach the page directly.
+
+## Button-level permission gating
+
+The Upload button and per-asset delete icon-button are wrapped in `<PermissionTooltip required="media:manager">` in both `MediaLibrary` and `MediaLibraryPage` (see [access-control.md](./access-control.md) for the shared gating primitives) — disabled with a tooltip when the current user lacks `media:manager` (or the `:read`-satisfying-`:manager` equivalent doesn't apply, since these are write actions). The delete icon is a raw `<button>` rather than the shared `Button` component; `PermissionTooltip` accepts either.

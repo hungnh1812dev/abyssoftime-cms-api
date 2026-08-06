@@ -1,15 +1,15 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, ArrowUpDown, Copy, Pencil, Settings2, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Settings2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { ColumnChooserDialog } from "@/components/collection/ColumnChooserDialog";
 import { PageSizeSelector } from "@/components/collection/PageSizeSelector";
 import { CheckboxInput } from "@/components/form/inputs/CheckboxInput";
+import { PermissionTooltip } from "@/components/permissions/PermissionTooltip";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { type CollectionColumnDef, getRegistration } from "@/content-type-registry";
@@ -18,6 +18,9 @@ import { useUpdateListFields } from "@/hooks/useContentTypes";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { PAGE_SIZE_OPTIONS } from "@/lib/pageSize";
 import { type ContentType, type FieldDefinition, type ListedDocumentItem } from "@/types/cms";
+
+import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
+import { RowActions } from "./RowActions";
 
 interface Props {
   contentType: ContentType;
@@ -338,7 +341,9 @@ export function CollectionListPage({ contentType }: Props) {
               <Settings2 className="h-4 w-4" />
             </Button>
           )}
-          <Button onClick={handleCreate}>Add new item</Button>
+          <PermissionTooltip required="create" contentTypeSlug={contentType.slug}>
+            <Button onClick={handleCreate}>Add new item</Button>
+          </PermissionTooltip>
         </div>
       </div>
 
@@ -353,38 +358,26 @@ export function CollectionListPage({ contentType }: Props) {
         />
       )}
 
-      <Dialog
+      <DeleteConfirmDialog
         open={deleteTarget !== null || bulkDeleteConfirmOpen}
+        bulkCount={bulkDeleteConfirmOpen ? selectedIds.size : null}
         onOpenChange={(open) => {
           if (!open) {
             setDeleteTarget(null);
             setBulkDeleteConfirmOpen(false);
           }
-        }}>
-        <DialogContent showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>{bulkDeleteConfirmOpen ? `Delete ${selectedIds.size} entries` : "Delete entry"}</DialogTitle>
-            <DialogDescription>
-              {bulkDeleteConfirmOpen
-                ? `Are you sure you want to delete ${selectedIds.size} selected entries? This action cannot be undone.`
-                : "Are you sure you want to delete this entry? This action cannot be undone."}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-            <Button variant="destructive" onClick={bulkDeleteConfirmOpen ? confirmBulkDelete : confirmDelete}>
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        }}
+        onConfirm={bulkDeleteConfirmOpen ? confirmBulkDelete : confirmDelete}
+      />
 
       {selectedIds.size > 0 && (
         <div className="bg-muted/50 flex items-center justify-between rounded-md border px-3 py-2">
           <span className="text-sm">{selectedIds.size} selected</span>
-          <Button variant="destructive" size="sm" onClick={() => setBulkDeleteConfirmOpen(true)}>
-            Delete selected ({selectedIds.size})
-          </Button>
+          <PermissionTooltip required="delete" contentTypeSlug={contentType.slug}>
+            <Button variant="destructive" size="sm" onClick={() => setBulkDeleteConfirmOpen(true)}>
+              Delete selected ({selectedIds.size})
+            </Button>
+          </PermissionTooltip>
         </div>
       )}
 
@@ -453,17 +446,12 @@ export function CollectionListPage({ contentType }: Props) {
                       <Badge variant={statusVariant[doc.status] ?? "draft"}>{doc.status}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="outline" size="icon-xs" className="hover:bg-accent-foreground/10" aria-label="Edit" onClick={(event) => handleEdit(event, doc)}>
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button variant="outline" size="icon-xs" className="hover:bg-accent-foreground/10" aria-label="Duplicate" onClick={(event) => handleDuplicate(event, doc)}>
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                        <Button variant="destructive" size="icon-xs" aria-label="Delete" onClick={(event) => handleDelete(event, doc)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
+                      <RowActions
+                        contentTypeSlug={contentType.slug}
+                        onEdit={(event) => handleEdit(event, doc)}
+                        onDuplicate={(event) => handleDuplicate(event, doc)}
+                        onDelete={(event) => handleDelete(event, doc)}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

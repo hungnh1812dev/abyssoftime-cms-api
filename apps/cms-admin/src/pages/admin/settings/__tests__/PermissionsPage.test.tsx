@@ -7,6 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import { renderWithProviders } from "@/test-utils";
 
+const mockUseAuth = vi.fn();
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 let mock: MockAdapter;
 
 const permissionsResponse = [
@@ -15,6 +20,7 @@ const permissionsResponse = [
 ];
 
 beforeEach(() => {
+  mockUseAuth.mockReturnValue({ permissions: ["permission:manager"] });
   mock = new MockAdapter(api);
   mock.onGet("/permissions").reply(200, permissionsResponse);
 });
@@ -145,5 +151,28 @@ describe("PermissionsPage", () => {
 
     await waitFor(() => expect(mock.history.delete).toHaveLength(1));
     confirmSpy.mockRestore();
+  });
+});
+
+describe("PermissionsPage — permission gating", () => {
+  it("enables Create/Edit/Delete when the caller holds permission:manager", async () => {
+    renderWithProviders(<PermissionsPage />);
+    await waitFor(() => screen.getByText("document:read"));
+
+    expect(screen.getByRole("button", { name: /create permission/i })).not.toBeDisabled();
+    const row = screen.getByText("document:read").closest("tr") as HTMLElement;
+    expect(within(row).getByRole("button", { name: /edit/i })).not.toBeDisabled();
+    expect(within(row).getByRole("button", { name: /delete/i })).not.toBeDisabled();
+  });
+
+  it("disables Create/Edit/Delete when the caller lacks permission:manager", async () => {
+    mockUseAuth.mockReturnValue({ permissions: [] });
+    renderWithProviders(<PermissionsPage />);
+    await waitFor(() => screen.getByText("document:read"));
+
+    expect(screen.getByRole("button", { name: /create permission/i })).toBeDisabled();
+    const row = screen.getByText("document:read").closest("tr") as HTMLElement;
+    expect(within(row).getByRole("button", { name: /edit/i })).toBeDisabled();
+    expect(within(row).getByRole("button", { name: /delete/i })).toBeDisabled();
   });
 });

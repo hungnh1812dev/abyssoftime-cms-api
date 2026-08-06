@@ -7,6 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import { renderWithProviders } from "@/test-utils";
 
+const mockUseAuth = vi.fn();
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 let mock: MockAdapter;
 
 const mediaItems = [
@@ -43,6 +48,7 @@ const mediaItems = [
 ];
 
 beforeEach(() => {
+  mockUseAuth.mockReturnValue({ permissions: ["media:manager"] });
   mock = new MockAdapter(api);
 });
 
@@ -151,5 +157,36 @@ describe("MediaLibrary", () => {
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     await waitFor(() => expect(screen.queryByText(/are you sure you want to delete/i)).not.toBeInTheDocument());
+  });
+});
+
+describe("MediaLibrary — permission gating", () => {
+  it("enables the staged-files Upload button and per-asset Delete when the caller holds media:manager", async () => {
+    mock.onGet("/media").reply(200, mediaItems);
+    const user = userEvent.setup();
+    renderWithProviders(<MediaLibrary isOpen onClose={vi.fn()} onSelect={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(2));
+    expect(screen.getAllByRole("button", { name: "Delete asset" })[0]).not.toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: /upload more/i }));
+    const file = new File(["contents"], "photo.png", { type: "image/png" });
+    await user.upload(screen.getByLabelText(/choose files to upload/i), file);
+    expect(await screen.findByRole("button", { name: /upload 1 file/i })).not.toBeDisabled();
+  });
+
+  it("disables the staged-files Upload button and per-asset Delete when the caller lacks media:manager", async () => {
+    mockUseAuth.mockReturnValue({ permissions: [] });
+    mock.onGet("/media").reply(200, mediaItems);
+    const user = userEvent.setup();
+    renderWithProviders(<MediaLibrary isOpen onClose={vi.fn()} onSelect={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(2));
+    expect(screen.getAllByRole("button", { name: "Delete asset" })[0]).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: /upload more/i }));
+    const file = new File(["contents"], "photo.png", { type: "image/png" });
+    await user.upload(screen.getByLabelText(/choose files to upload/i), file);
+    expect(await screen.findByRole("button", { name: /upload 1 file/i })).toBeDisabled();
   });
 });
