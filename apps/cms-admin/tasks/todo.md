@@ -28,4 +28,4 @@ each task completes.
 ## Final
 - [x] Update docs (`access-control.md`, `content-type.md`/`documents.md`, `media.md`)
 - [x] Five-axis review (correctness, readability, architecture, security, performance)
-- [ ] Delete `specs/action-button-permission-gating.md`
+- [x] Delete `specs/action-button-permission-gating.md`

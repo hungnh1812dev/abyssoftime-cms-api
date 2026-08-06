@@ -108,7 +108,7 @@ scoped document pages), not because of a real dependency between them.
 - [x] Full `bun run lint` + `bun run test` + `bun run build` clean across the whole diff.
 - [x] **Update docs** (workflow step 5): mention button-level permission gating in `docs/documents/access-control.md` (settings pages), `docs/documents/content-type.md` or `documents.md` (scoped document actions), `docs/documents/media.md` (upload/delete gating).
 - [x] **Review**: five-axis code review (correctness, readability, architecture, security, performance) — security axis specifically checks that this is UI-only defense-in-depth, not a substitute for the (already-correct) backend guards. Verdict: APPROVE, no findings.
-- [ ] **Clean up**: delete `specs/action-button-permission-gating.md` per workflow step 7, after Review completes.
+- [x] **Clean up**: delete `specs/action-button-permission-gating.md` per workflow step 7, after Review completes.
 
 ## Risks and Mitigations
 
