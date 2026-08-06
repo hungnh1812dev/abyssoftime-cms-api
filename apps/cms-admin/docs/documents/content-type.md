@@ -28,6 +28,8 @@ The actual single-type-or-one-collection-entry edit screen — the densest file 
 
 Thin composition: wraps `FormProvider` (see [form-system.md](./form-system.md)) around a `Card` that maps `schema: FieldDefinition[]` through `renderSchemaField`, plus a `FormActions` row (Save button, keyed off `useCmsFormState()`, plus any caller-supplied `renderActions` — publish/unpublish buttons from `ContentTypePanel`).
 
+**Permission gating** — `ContentTypeBuilder` takes a `requiredPermission: string` prop, threaded into a `<PermissionTooltip required={requiredPermission} contentTypeSlug={contentType.slug}>` around the Save button (see [access-control.md](./access-control.md) for the shared primitives). `ContentTypePanel` computes it per call site: `isNew ? "create" : "update"` on first save (collections only — single types have no create endpoint, so their first save is always `"update"`), always `"update"` once a document exists. Publish/Unpublish in `ContentTypePanel` are gated the same way — `hasDocumentPermission(permissions, "publish"/"unpublish", contentType.slug)` — layered on top of the existing `canPublish`/`canUnpublish` visibility conditions (a button gated-but-disabled still only renders when the status makes the action meaningful).
+
 ## `renderSchemaField` (`panels/content-type/renderSchemaField.tsx`)
 
 Recursive field renderer, the actual schema→form-markup mapping:
