@@ -11,7 +11,6 @@ let mock: MockAdapter;
 
 beforeEach(() => {
   mock = new MockAdapter(api);
-  mock.onGet("/auth/has-users").reply(200, { hasUsers: false });
 });
 
 afterEach(() => {
@@ -33,7 +32,7 @@ describe("RegisterPage", () => {
     expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /create admin account/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create account/i })).toBeInTheDocument();
   });
 
   it("shows validation error for invalid email", async () => {
@@ -43,7 +42,7 @@ describe("RegisterPage", () => {
     await fillValidForm(user);
     await user.clear(screen.getByLabelText(/email/i));
     await user.type(screen.getByLabelText(/email/i), "bad-email");
-    await user.click(screen.getByRole("button", { name: /create admin account/i }));
+    await user.click(screen.getByRole("button", { name: /create account/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/valid email/i)).toBeInTheDocument();
@@ -57,7 +56,7 @@ describe("RegisterPage", () => {
     await fillValidForm(user);
     await user.clear(screen.getByLabelText(/username/i));
     await user.type(screen.getByLabelText(/username/i), "no spaces allowed");
-    await user.click(screen.getByRole("button", { name: /create admin account/i }));
+    await user.click(screen.getByRole("button", { name: /create account/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/letters, numbers, underscore/i)).toBeInTheDocument();
@@ -71,7 +70,7 @@ describe("RegisterPage", () => {
     await fillValidForm(user);
     await user.clear(screen.getByLabelText(/password/i));
     await user.type(screen.getByLabelText(/password/i), "short");
-    await user.click(screen.getByRole("button", { name: /create admin account/i }));
+    await user.click(screen.getByRole("button", { name: /create account/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/at least 8/i)).toBeInTheDocument();
@@ -88,7 +87,7 @@ describe("RegisterPage", () => {
     renderWithProviders(<RegisterPage />);
 
     await fillValidForm(user);
-    await user.click(screen.getByRole("button", { name: /create admin account/i }));
+    await user.click(screen.getByRole("button", { name: /create account/i }));
 
     await waitFor(() => {
       expect(capturedBody).toEqual({
@@ -101,22 +100,13 @@ describe("RegisterPage", () => {
     });
   });
 
-  it("redirects to /login when users already exist", async () => {
-    mock.onGet("/auth/has-users").reply(200, { hasUsers: true });
-    renderWithProviders(<RegisterPage />);
-
-    await waitFor(() => {
-      expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument();
-    });
-  });
-
   it("shows error message when registration fails", async () => {
     const user = userEvent.setup();
     mock.onPost("/auth/register").reply(409, { message: "Email already exists" });
     renderWithProviders(<RegisterPage />);
 
     await fillValidForm(user);
-    await user.click(screen.getByRole("button", { name: /create admin account/i }));
+    await user.click(screen.getByRole("button", { name: /create account/i }));
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
