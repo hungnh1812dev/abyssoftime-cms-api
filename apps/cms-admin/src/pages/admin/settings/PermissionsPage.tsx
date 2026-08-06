@@ -1,6 +1,7 @@
 import type { AxiosError } from "axios";
 import { useState } from "react";
 
+import { PermissionTooltip } from "@/components/permissions/PermissionTooltip";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -126,9 +127,11 @@ export function PermissionsPage() {
           <h1 className="text-xl font-semibold">Permissions</h1>
           <p className="text-muted-foreground mt-1 text-sm">Manage the permission catalog. Roles select which of these to grant.</p>
         </div>
-        <Button size="sm" onClick={openCreate}>
-          Create Permission
-        </Button>
+        <PermissionTooltip required="permission:manager">
+          <Button size="sm" onClick={openCreate}>
+            Create Permission
+          </Button>
+        </PermissionTooltip>
       </div>
 
       {isLoading ? (
@@ -154,19 +157,23 @@ export function PermissionsPage() {
                 <TableCell className="text-right">
                   <div className="flex flex-col items-end gap-1">
                     <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => openEdit(permission)}>
-                        Edit
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => {
-                          if (confirm(`Delete permission "${permission.slug}"?`)) {
-                            handleDelete(permission);
-                          }
-                        }}>
-                        Delete
-                      </Button>
+                      <PermissionTooltip required="permission:manager">
+                        <Button variant="outline" size="sm" onClick={() => openEdit(permission)}>
+                          Edit
+                        </Button>
+                      </PermissionTooltip>
+                      <PermissionTooltip required="permission:manager">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm(`Delete permission "${permission.slug}"?`)) {
+                              handleDelete(permission);
+                            }
+                          }}>
+                          Delete
+                        </Button>
+                      </PermissionTooltip>
                     </div>
                     {deleteErrors[permission.slug] && <p className="text-destructive text-xs">{deleteErrors[permission.slug]}</p>}
                   </div>

@@ -1,29 +1,38 @@
 import { ContentTypeBuilder } from "../ContentTypeBuilder";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "@/test-utils";
 import type { FieldDefinition } from "@/types/cms";
+
+const mockUseAuth = vi.fn();
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
+beforeEach(() => {
+  mockUseAuth.mockReturnValue({ permissions: ["document:update"] });
+});
 
 const noop = () => Promise.resolve();
 
 describe("ContentTypeBuilder — primitives", () => {
   it("renders a text input for type=text", () => {
     const schema: FieldDefinition[] = [{ name: "title", type: "text" }];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     expect(screen.getByLabelText("title")).toBeInTheDocument();
   });
 
   it("renders a number input for type=number", () => {
     const schema: FieldDefinition[] = [{ name: "price", type: "number" }];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     expect(screen.getByLabelText("price")).toBeInTheDocument();
   });
 
   it("renders a boolean switch for type=boolean", () => {
     const schema: FieldDefinition[] = [{ name: "active", type: "boolean" }];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     expect(screen.getByRole("switch", { name: "active" })).toBeInTheDocument();
   });
 });
@@ -35,7 +44,7 @@ describe("ContentTypeBuilder — width", () => {
       { name: "half", type: "text", width: "50%" },
       { name: "third", type: "text", width: "1/3" },
     ];
-    const { container } = renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    const { container } = renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     const grid = container.querySelector(".md\\:grid-cols-6");
     expect(grid).toBeInTheDocument();
     expect(screen.getByLabelText("fullWidth").closest(".md\\:col-span-6")).toBeInTheDocument();
@@ -53,7 +62,7 @@ describe("ContentTypeBuilder — component", () => {
         fields: [{ name: "title", type: "text" }],
       },
     ];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     expect(screen.getByRole("group", { name: "banner" })).toBeInTheDocument();
   });
 
@@ -66,7 +75,7 @@ describe("ContentTypeBuilder — component", () => {
         fields: [{ name: "title", type: "text" }],
       },
     ];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={onSubmit} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={onSubmit} contentTypeSlug="test-type" requiredPermission="update" />);
     const input = screen.getByLabelText("title");
     await userEvent.clear(input);
     await userEvent.type(input, "Hello");
@@ -87,7 +96,7 @@ describe("ContentTypeBuilder — collapsible components", () => {
         fields: [{ name: "title", type: "text" }],
       },
     ];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     const group = screen.getByRole("group", { name: "banner" });
     expect(within(group).getByLabelText("title")).toBeInTheDocument();
     expect(within(group).getByRole("button", { name: /banner/i })).toHaveAttribute("aria-expanded", "true");
@@ -107,7 +116,7 @@ describe("ContentTypeBuilder — collapsible components", () => {
         ],
       },
     ];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     const innerGroup = screen.getByRole("group", { name: "inner" });
     expect(innerGroup).toBeInTheDocument();
     expect(within(innerGroup).queryByLabelText("subtitle")).not.toBeInTheDocument();
@@ -122,7 +131,7 @@ describe("ContentTypeBuilder — collapsible components", () => {
         fields: [{ name: "title", type: "text" }],
       },
     ];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     const group = screen.getByRole("group", { name: "banner" });
     const toggle = within(group).getByRole("button", { name: /banner/i });
 
@@ -149,7 +158,7 @@ describe("ContentTypeBuilder — collapsible components", () => {
         ],
       },
     ];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     const input = screen.getByLabelText("title");
     await userEvent.type(input, "Hello World");
 
@@ -165,7 +174,7 @@ describe("ContentTypeBuilder — collapsible components", () => {
         fields: [{ name: "count", type: "number" }],
       },
     ];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     const group = screen.getByRole("group", { name: "stats" });
     expect(within(group).queryByText("—")).not.toBeInTheDocument();
   });
@@ -181,7 +190,7 @@ describe("ContentTypeBuilder — collapsible components", () => {
         ],
       },
     ];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     await userEvent.type(screen.getByLabelText("title"), "First Field");
     await userEvent.type(screen.getByLabelText("subtitle"), "Flagged Field");
 
@@ -201,7 +210,7 @@ describe("ContentTypeBuilder — collapsible components", () => {
         ],
       },
     ];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     await userEvent.type(screen.getByLabelText("title"), "Title Value");
     await userEvent.type(screen.getByLabelText("subtitle"), "Subtitle Value");
 
@@ -221,10 +230,35 @@ describe("ContentTypeBuilder — collapsible components", () => {
         ],
       },
     ];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     await userEvent.type(screen.getByLabelText("title"), "Fallback Value");
 
     const group = screen.getByRole("group", { name: "banner" });
     expect(within(group).getByText(/Fallback Value/)).toBeInTheDocument();
+  });
+});
+
+describe("ContentTypeBuilder — permission gating", () => {
+  const schema: FieldDefinition[] = [{ name: "title", type: "text" }];
+
+  it("enables Save (once dirty) with a bare grant matching requiredPermission", async () => {
+    mockUseAuth.mockReturnValue({ permissions: ["document:update"] });
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="blog-posts" requiredPermission="update" />);
+    await userEvent.type(screen.getByLabelText("title"), "x");
+    expect(screen.getByRole("button", { name: /save/i })).not.toBeDisabled();
+  });
+
+  it("enables Save (once dirty) with a content-type-scoped grant matching contentTypeSlug", async () => {
+    mockUseAuth.mockReturnValue({ permissions: ["document:update:blog-posts"] });
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="blog-posts" requiredPermission="update" />);
+    await userEvent.type(screen.getByLabelText("title"), "x");
+    expect(screen.getByRole("button", { name: /save/i })).not.toBeDisabled();
+  });
+
+  it("keeps Save disabled even once dirty when the caller lacks a matching grant for this content type", async () => {
+    mockUseAuth.mockReturnValue({ permissions: ["document:update:other-type"] });
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="blog-posts" requiredPermission="update" />);
+    await userEvent.type(screen.getByLabelText("title"), "x");
+    expect(screen.getByRole("button", { name: /save/i })).toBeDisabled();
   });
 });

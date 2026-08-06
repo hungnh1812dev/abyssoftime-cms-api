@@ -1,10 +1,19 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ContentTypeBuilder } from "@/pages/admin/panels/content-type/ContentTypeBuilder";
 import { renderWithProviders } from "@/test-utils";
 import type { FieldDefinition } from "@/types/cms";
+
+const mockUseAuth = vi.fn();
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
+beforeEach(() => {
+  mockUseAuth.mockReturnValue({ permissions: ["document:update"] });
+});
 
 const noop = () => Promise.resolve();
 
@@ -29,12 +38,12 @@ async function addAndExpandEntry() {
 
 describe("RepeatableComponentField", () => {
   it("renders an add button when empty", () => {
-    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     expect(screen.getByRole("button", { name: /add entry/i })).toBeInTheDocument();
   });
 
   it("adds an entry when add button is clicked", async () => {
-    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     await addAndExpandEntry();
 
     expect(screen.getByText("#1")).toBeInTheDocument();
@@ -43,7 +52,7 @@ describe("RepeatableComponentField", () => {
   });
 
   it("removes an entry when remove button is clicked", async () => {
-    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     const addBtn = screen.getByRole("button", { name: /add entry/i });
     await userEvent.click(addBtn);
 
@@ -57,7 +66,7 @@ describe("RepeatableComponentField", () => {
 
   it("submits correct nested data with array indexing", async () => {
     const onSubmit = vi.fn();
-    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={onSubmit} />);
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={onSubmit} contentTypeSlug="test-type" requiredPermission="update" />);
 
     await addAndExpandEntry();
 
@@ -83,7 +92,7 @@ describe("RepeatableComponentField", () => {
         fields: [{ name: "title", type: "text" }],
       },
     ];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     const group = screen.getByRole("group", { name: "banner" });
     expect(group).toBeInTheDocument();
     expect(within(group).getByLabelText("title")).toBeInTheDocument();
@@ -92,7 +101,7 @@ describe("RepeatableComponentField", () => {
 
 describe("RepeatableComponentField — collapsible entries", () => {
   it("newly added entry is collapsed by default", async () => {
-    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     const addBtn = screen.getByRole("button", { name: /add entry/i });
     await userEvent.click(addBtn);
 
@@ -102,7 +111,7 @@ describe("RepeatableComponentField — collapsible entries", () => {
   });
 
   it("clicking entry header expands it", async () => {
-    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     await addAndExpandEntry();
 
     expect(screen.getByLabelText("category")).toBeInTheDocument();
@@ -110,7 +119,7 @@ describe("RepeatableComponentField — collapsible entries", () => {
   });
 
   it("clicking expanded entry header collapses it", async () => {
-    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     await addAndExpandEntry();
 
     expect(screen.getByLabelText("category")).toBeInTheDocument();
@@ -122,7 +131,7 @@ describe("RepeatableComponentField — collapsible entries", () => {
   });
 
   it("move/delete buttons visible when entry is collapsed", async () => {
-    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     const addBtn = screen.getByRole("button", { name: /add entry/i });
     await userEvent.click(addBtn);
 
@@ -132,7 +141,7 @@ describe("RepeatableComponentField — collapsible entries", () => {
   });
 
   it("hint text shows first text field value", async () => {
-    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     await addAndExpandEntry();
 
     const categoryInput = screen.getByLabelText("category");
@@ -156,7 +165,7 @@ describe("RepeatableComponentField — collapsible entries", () => {
         ],
       },
     ];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     await addAndExpandEntry();
 
     await userEvent.type(screen.getByLabelText("category"), "Frontend");
@@ -181,7 +190,7 @@ describe("RepeatableComponentField — collapsible entries", () => {
         ],
       },
     ];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     await addAndExpandEntry();
 
     await userEvent.type(screen.getByLabelText("category"), "Frontend");
@@ -206,7 +215,7 @@ describe("RepeatableComponentField — collapsible entries", () => {
         ],
       },
     ];
-    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={schema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     await addAndExpandEntry();
 
     await userEvent.type(screen.getByLabelText("category"), "Frontend");
@@ -218,7 +227,7 @@ describe("RepeatableComponentField — collapsible entries", () => {
   });
 
   it("collapsed entry card has reduced padding and no header margin", async () => {
-    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     const addBtn = screen.getByRole("button", { name: /add entry/i });
     await userEvent.click(addBtn);
 
@@ -232,7 +241,7 @@ describe("RepeatableComponentField — collapsible entries", () => {
   });
 
   it("expanded entry card keeps the original padding and header margin", async () => {
-    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     await addAndExpandEntry();
 
     const toggle = screen.getByRole("button", { expanded: true });
@@ -245,7 +254,7 @@ describe("RepeatableComponentField — collapsible entries", () => {
   });
 
   it("expanding one entry does not affect others", async () => {
-    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} />);
+    renderWithProviders(<ContentTypeBuilder schema={repeatableSchema} mutationFn={noop} contentTypeSlug="test-type" requiredPermission="update" />);
     const addBtn = screen.getByRole("button", { name: /add entry/i });
     await userEvent.click(addBtn);
     await userEvent.click(addBtn);

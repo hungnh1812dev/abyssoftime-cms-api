@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { groupByResource } from "@/components/permissions/permissionGrouping";
+import { PermissionTooltip } from "@/components/permissions/PermissionTooltip";
 import { PermissionTree } from "@/components/permissions/PermissionTree";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -144,9 +145,11 @@ export function RolesPage() {
           <h1 className="text-xl font-semibold">Roles & Permissions</h1>
           <p className="text-muted-foreground mt-1 text-sm">Manage roles and the permissions assigned to each.</p>
         </div>
-        <Button size="sm" onClick={openCreate}>
-          Create Role
-        </Button>
+        <PermissionTooltip required="role:manager">
+          <Button size="sm" onClick={openCreate}>
+            Create Role
+          </Button>
+        </PermissionTooltip>
       </div>
 
       {isLoading ? (
@@ -177,20 +180,24 @@ export function RolesPage() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => openEdit(role)}>
-                      Edit
-                    </Button>
-                    {!role.isDefault && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => {
-                          if (confirm(`Delete role "${role.name}"?`)) {
-                            deleteRole.mutate(role.documentId);
-                          }
-                        }}>
-                        Delete
+                    <PermissionTooltip required="role:manager">
+                      <Button variant="outline" size="sm" onClick={() => openEdit(role)}>
+                        Edit
                       </Button>
+                    </PermissionTooltip>
+                    {!role.isDefault && (
+                      <PermissionTooltip required="role:manager">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm(`Delete role "${role.name}"?`)) {
+                              deleteRole.mutate(role.documentId);
+                            }
+                          }}>
+                          Delete
+                        </Button>
+                      </PermissionTooltip>
                     )}
                   </div>
                 </TableCell>
