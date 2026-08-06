@@ -10,10 +10,10 @@ each task completes.
 
 ## Phase 1: Settings pages
 - [x] 2. `AccessTokensPage` — gate Revoke/Delete on `api_token:manager`
-- [ ] 3. `RolesPage` — gate Create/Edit/Delete on `role:manager`
-- [ ] 4. `PermissionsPage` — gate Create/Edit/Delete on `permission:manager`
-- [ ] 5. `MediaLibraryPage` — gate Upload/Delete on `media:manager` (new test file)
-- [ ] 6. `MediaLibrary` picker — gate Upload/Delete on `media:manager`
+- [x] 3. `RolesPage` — gate Create/Edit/Delete on `role:manager`
+- [x] 4. `PermissionsPage` — gate Create/Edit/Delete on `permission:manager`
+- [x] 5. `MediaLibraryPage` — gate Upload/Delete on `media:manager` (new test file)
+- [x] 6. `MediaLibrary` picker — gate Upload/Delete on `media:manager`
 - [ ] **Checkpoint** — lint/test/build clean; live walkthrough with a read-only role; commit
 
 ## Phase 2: Content-type / document pages

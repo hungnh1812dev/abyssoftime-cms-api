@@ -10,6 +10,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import { displayFileName } from "@/lib/media";
 
+const mockUseAuth = vi.fn();
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 let mock: MockAdapter;
 
 const mediaItems = [
@@ -31,6 +36,7 @@ const mediaItems = [
 ];
 
 beforeEach(() => {
+  mockUseAuth.mockReturnValue({ permissions: ["media:manager"] });
   mock = new MockAdapter(api);
   mock.onGet("/media").reply(200, mediaItems);
 });

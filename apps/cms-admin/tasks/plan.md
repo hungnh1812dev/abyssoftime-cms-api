@@ -58,22 +58,22 @@ scoped document pages), not because of a real dependency between them.
   **Acceptance:** spec AC 1. **Verify:** `bun run test -- src/pages/admin/settings/__tests__/AccessTokensPage.test.tsx`; add a denied-permission case + an allowed case.
   **Files:** `AccessTokensPage.tsx`, `__tests__/AccessTokensPage.test.tsx`. **Scope:** S.
 
-- [ ] **Task 3: `RolesPage` — Create/Edit/Delete**
+- [x] **Task 3: `RolesPage` — Create/Edit/Delete**
   Wrap "Create Role" (`RolesPage.tsx:147-149`), "Edit" (`:180-182`), "Delete" (`:184-194`) in `<PermissionTooltip required="role:manager">`.
   **Acceptance:** spec AC 2. **Verify:** `bun run test -- src/pages/admin/settings/__tests__/RolesPage.test.tsx`.
   **Files:** `RolesPage.tsx`, `__tests__/RolesPage.test.tsx`. **Scope:** S.
 
-- [ ] **Task 4: `PermissionsPage` — Create/Edit/Delete**
+- [x] **Task 4: `PermissionsPage` — Create/Edit/Delete**
   Wrap "Create Permission" (`:129-131`), "Edit" (`:157-159`), "Delete" (`:160-169`) in `<PermissionTooltip required="permission:manager">`.
   **Acceptance:** spec AC 3. **Verify:** `bun run test -- src/pages/admin/settings/__tests__/PermissionsPage.test.tsx`.
   **Files:** `PermissionsPage.tsx`, `__tests__/PermissionsPage.test.tsx`. **Scope:** S.
 
-- [ ] **Task 5: `MediaLibraryPage` — Upload/Delete**
+- [x] **Task 5: `MediaLibraryPage` — Upload/Delete**
   Gate the Upload button (`:49-51`) and per-asset delete icon-button (`:94-100`) on `media:manager`. The delete icon is a raw `<button>` (not `Button`), so `PermissionTooltip` must accept a raw `<button>` child too — verify/adjust its typing in Task 1 if this surfaces a gap. **No test file exists for this page yet** — create `MediaLibraryPage.test.tsx` (new).
   **Acceptance:** spec AC 4 (page half). **Verify:** `bun run test -- src/pages/admin/settings/__tests__/MediaLibraryPage.test.tsx`.
   **Files:** `MediaLibraryPage.tsx`, new `__tests__/MediaLibraryPage.test.tsx`. **Scope:** M (new test file from scratch).
 
-- [ ] **Task 6: `MediaLibrary` (embedded picker) — Upload/Delete**
+- [x] **Task 6: `MediaLibrary` (embedded picker) — Upload/Delete**
   Same gate (`media:manager`) on the picker's "Upload More"-triggered upload button (`:109-111`) and per-asset delete icon-button (`:135-144`).
   **Acceptance:** spec AC 4 (picker half). **Verify:** `bun run test -- src/components/media/__tests__/MediaLibrary.test.tsx`.
   **Files:** `MediaLibrary.tsx`, `__tests__/MediaLibrary.test.tsx`. **Scope:** S.

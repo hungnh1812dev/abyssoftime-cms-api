@@ -1,6 +1,7 @@
 import { Trash2, X } from "lucide-react";
 import { useState } from "react";
 
+import { PermissionTooltip } from "@/components/permissions/PermissionTooltip";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useDeleteMedia, useMediaList, useUploadMedia } from "@/hooks/useMedia";
@@ -46,9 +47,11 @@ export function MediaLibraryPage() {
             <input type="file" multiple accept="image/*" onChange={(event) => setStagedFiles(Array.from(event.target.files ?? []))} className="sr-only" />
           </label>
           {stagedFiles.length > 0 && (
-            <Button onClick={handleUpload} disabled={upload.isPending} size="sm">
-              {upload.isPending ? "Uploading…" : `Upload ${stagedFiles.length} file${stagedFiles.length !== 1 ? "s" : ""}`}
-            </Button>
+            <PermissionTooltip required="media:manager">
+              <Button onClick={handleUpload} disabled={upload.isPending} size="sm">
+                {upload.isPending ? "Uploading…" : `Upload ${stagedFiles.length} file${stagedFiles.length !== 1 ? "s" : ""}`}
+              </Button>
+            </PermissionTooltip>
           )}
         </div>
       </div>
@@ -91,13 +94,15 @@ export function MediaLibraryPage() {
                 <img src={asset.thumbnailUrl || asset.url} alt={displayFileName(asset)} className="h-full w-full object-contain" />
                 <span className="absolute right-0 bottom-0 left-0 truncate bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{displayFileName(asset)}</span>
               </div>
-              <button
-                type="button"
-                aria-label="Delete asset"
-                className="bg-background/80 text-muted-foreground absolute top-1 right-1 rounded p-1 opacity-0 transition-colors group-hover:opacity-100"
-                onClick={() => setDeleteTarget(asset)}>
-                <Trash2 size={14} />
-              </button>
+              <PermissionTooltip required="media:manager">
+                <button
+                  type="button"
+                  aria-label="Delete asset"
+                  className="bg-background/80 text-muted-foreground absolute top-1 right-1 rounded p-1 opacity-0 transition-colors group-hover:opacity-100"
+                  onClick={() => setDeleteTarget(asset)}>
+                  <Trash2 size={14} />
+                </button>
+              </PermissionTooltip>
             </div>
           ))}
         </div>
