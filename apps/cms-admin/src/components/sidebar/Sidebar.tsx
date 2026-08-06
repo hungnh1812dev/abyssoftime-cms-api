@@ -59,9 +59,9 @@ export function Sidebar() {
         <SidebarGroup icon={Settings} label="Settings" storageKey="settings" defaultOpen>
           {can("media:read") && <SidebarItem to="/admin/settings/media">Media Library</SidebarItem>}
           {can("user:read") && <SidebarItem to="/admin/settings/users">Users</SidebarItem>}
-          {can("api_token:manager") && <SidebarItem to="/admin/settings/access-tokens">Access Tokens</SidebarItem>}
-          {can("role:manager") && <SidebarItem to="/admin/settings/roles">Roles</SidebarItem>}
-          {can("permission:manager") && <SidebarItem to="/admin/settings/permissions">Permissions</SidebarItem>}
+          {can("api_token:read") && <SidebarItem to="/admin/settings/access-tokens">Access Tokens</SidebarItem>}
+          {can("role:read") && <SidebarItem to="/admin/settings/roles">Roles</SidebarItem>}
+          {can("permission:read") && <SidebarItem to="/admin/settings/permissions">Permissions</SidebarItem>}
         </SidebarGroup>
       </nav>
 

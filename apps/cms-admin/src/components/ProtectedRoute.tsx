@@ -4,9 +4,18 @@ import { Navigate } from "react-router-dom";
 
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
+import { hasPermission } from "@/lib/permissions";
 
-export function ProtectedRoute({ children, minLevel }: { children: ReactNode; minLevel?: number }) {
-  const { user, role, loading } = useAuth();
+export function ProtectedRoute({
+  children,
+  minLevel,
+  requiredPermission,
+}: {
+  children: ReactNode;
+  minLevel?: number;
+  requiredPermission?: string;
+}) {
+  const { user, role, permissions, loading } = useAuth();
 
   const { data: hasUsersData, isLoading: hasUsersLoading } = useQuery({
     queryKey: ["auth-has-users"],
@@ -21,6 +30,9 @@ export function ProtectedRoute({ children, minLevel }: { children: ReactNode; mi
     return <Navigate to={hasUsers ? "/login" : "/register"} replace />;
   }
   if (minLevel !== undefined && (role?.level ?? 0) < minLevel) {
+    return <Navigate to="/403" replace />;
+  }
+  if (requiredPermission !== undefined && !hasPermission(permissions, requiredPermission)) {
     return <Navigate to="/403" replace />;
   }
   return <>{children}</>;
