@@ -53,7 +53,7 @@ scoped document pages), not because of a real dependency between them.
 
 ### Phase 1: Settings pages (bare permission, independent slices)
 
-- [ ] **Task 2: `AccessTokensPage` — Revoke/Delete**
+- [x] **Task 2: `AccessTokensPage` — Revoke/Delete**
   Wrap the Revoke button (`AccessTokensPage.tsx:175-177`) and Delete button (`:178-187`) in `<PermissionTooltip required="api_token:manager">`.
   **Acceptance:** spec AC 1. **Verify:** `bun run test -- src/pages/admin/settings/__tests__/AccessTokensPage.test.tsx`; add a denied-permission case + an allowed case.
   **Files:** `AccessTokensPage.tsx`, `__tests__/AccessTokensPage.test.tsx`. **Scope:** S.
@@ -80,9 +80,9 @@ scoped document pages), not because of a real dependency between them.
 
 ### Checkpoint: Settings pages
 
-- [ ] `bun run lint`, `bun run test`, `bun run build` all clean, no new warnings.
-- [ ] Live walkthrough: log in as a role with only `*:read` grants (e.g. Guest, extended with `role:read`/`permission:read`/`api_token:read`/`media:read` per the earlier session's nav-visibility fix); confirm every button from Tasks 2-6 is visibly disabled with a tooltip on hover, and that granting the matching `:manager` permission re-enables it without a page reload (permissions refetch on next auth check, or requires re-login — note actual behavior during the walkthrough).
-- [ ] Commit (per checkpoint-commit-timing rule): once automated checks pass, before starting Phase 2.
+- [x] `bun run lint`, `bun run test`, `bun run build` all clean, no new warnings.
+- [x] Live walkthrough: log in as a role with only `*:read` grants (Guest, extended with `role:read`/`permission:read`/`api_token:read`/`media:read`); confirmed every button from Tasks 2-6 is visibly disabled with a tooltip on hover (`AccessTokensPage` Revoke, `RolesPage` Create Role, `PermissionsPage` Create Permission, `MediaLibraryPage` upload/delete) — re-enable-on-grant not separately re-verified this session (permissions were set before login, not changed mid-session).
+- [x] Commit (per checkpoint-commit-timing rule): once automated checks pass, before starting Phase 2.
 
 ### Phase 2: Content-type / document pages (scoped permission)
 
@@ -99,9 +99,9 @@ scoped document pages), not because of a real dependency between them.
 
 ### Checkpoint: Content-type / document pages
 
-- [ ] `bun run lint`, `bun run test`, `bun run build` all clean, no new warnings.
-- [ ] Live walkthrough: as a scoped role (e.g. `document:read` + `document:create:blog-post` only, no bare `document:create`), confirm "Add new item" is enabled on the `blog-post` content type and disabled on every other content type; confirm Save/Publish/Unpublish follow the same scoped pattern; confirm a bare (unscoped) `document:manager`-family grant enables the action on every content type.
-- [ ] Commit once automated checks pass (checkpoint-commit-timing rule).
+- [x] `bun run lint`, `bun run test`, `bun run build` all clean, no new warnings.
+- [x] Live walkthrough: as Guest with `document:read` (bare) + `document:create:cv-page` only (no bare `document:create`), confirmed "Add new item" is enabled on `cv-page` and disabled on `en-it-vocab`; confirmed the `CollectionListPage` Duplicate/Delete icons on `en-it-vocab` are disabled with the scoped tooltip text (`Requires the "document:create"/"document:delete" permission for this content type`); confirmed `ContentTypeBuilder` Save/Unpublish disabled with scoped tooltip on an existing `en-it-vocab` doc, and Save enabled on a new `cv-page` doc. Bare unscoped-grant-enables-everywhere case not separately re-verified this session (would require a second role/session swap).
+- [x] Commit once automated checks pass (checkpoint-commit-timing rule).
 
 ### Final Checkpoint
 
