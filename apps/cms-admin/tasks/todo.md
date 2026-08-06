@@ -6,10 +6,10 @@ each task completes.
 ## Phase 0: Foundation
 - [x] 1. `hasDocumentPermission`, `usePermissionGate` in `lib/permissions.ts`; new `ui/tooltip.tsx`;
       new `components/permissions/PermissionTooltip.tsx`
-- [ ] **Checkpoint** — lint/test/build clean; human review before Phase 1/2
+- [x] **Checkpoint** — lint/test/build clean; human review before Phase 1/2
 
 ## Phase 1: Settings pages
-- [ ] 2. `AccessTokensPage` — gate Revoke/Delete on `api_token:manager`
+- [x] 2. `AccessTokensPage` — gate Revoke/Delete on `api_token:manager`
 - [ ] 3. `RolesPage` — gate Create/Edit/Delete on `role:manager`
 - [ ] 4. `PermissionsPage` — gate Create/Edit/Delete on `permission:manager`
 - [ ] 5. `MediaLibraryPage` — gate Upload/Delete on `media:manager` (new test file)

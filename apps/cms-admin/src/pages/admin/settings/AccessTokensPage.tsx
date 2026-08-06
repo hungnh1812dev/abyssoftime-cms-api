@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { PermissionTooltip } from "@/components/permissions/PermissionTooltip";
 import { PermissionTree } from "@/components/permissions/PermissionTree";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -172,19 +173,23 @@ export function AccessTokensPage() {
                 <TableCell className="text-muted-foreground text-sm">{token.expiresAt ? new Date(token.expiresAt).toLocaleDateString() : "Never"}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleRevoke(token.documentId, token.name)}>
-                      Revoke
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm(`Delete token "${token.name}"?`)) {
-                          deleteToken.mutate(token.documentId);
-                        }
-                      }}>
-                      Delete
-                    </Button>
+                    <PermissionTooltip required="api_token:manager">
+                      <Button variant="outline" size="sm" onClick={() => handleRevoke(token.documentId, token.name)}>
+                        Revoke
+                      </Button>
+                    </PermissionTooltip>
+                    <PermissionTooltip required="api_token:manager">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm(`Delete token "${token.name}"?`)) {
+                            deleteToken.mutate(token.documentId);
+                          }
+                        }}>
+                        Delete
+                      </Button>
+                    </PermissionTooltip>
                   </div>
                 </TableCell>
               </TableRow>
