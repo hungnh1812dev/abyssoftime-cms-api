@@ -57,15 +57,6 @@ function PanelFallback() {
   return <div className="text-muted-foreground p-4">Loading…</div>;
 }
 
-// Floor thresholds for ProtectedRoute's minLevel gate, matching this API's
-// seeded roles' level values. Roles are a fully dynamic catalog (any custom
-// role can exist at any level 0-100) — these are just the well-known floors
-// this app's own settings routes gate on, not an exhaustive role list.
-const ROLE_LEVEL = {
-  ADMIN: 50,
-  SUPER_ADMIN: 100,
-} as const;
-
 export function AppRouter() {
   return (
     <Routes>
@@ -134,7 +125,7 @@ export function AppRouter() {
         <Route
           path="settings/users"
           element={
-            <ProtectedRoute minLevel={ROLE_LEVEL.ADMIN}>
+            <ProtectedRoute requiredPermission="user:read">
               <Suspense fallback={<PanelFallback />}>
                 <UsersPage />
               </Suspense>
@@ -144,7 +135,7 @@ export function AppRouter() {
         <Route
           path="settings/access-tokens"
           element={
-            <ProtectedRoute minLevel={ROLE_LEVEL.SUPER_ADMIN}>
+            <ProtectedRoute requiredPermission="api_token:read">
               <Suspense fallback={<PanelFallback />}>
                 <AccessTokensPage />
               </Suspense>
@@ -154,7 +145,7 @@ export function AppRouter() {
         <Route
           path="settings/roles"
           element={
-            <ProtectedRoute minLevel={ROLE_LEVEL.SUPER_ADMIN}>
+            <ProtectedRoute requiredPermission="role:read">
               <Suspense fallback={<PanelFallback />}>
                 <RolesPage />
               </Suspense>
@@ -164,7 +155,7 @@ export function AppRouter() {
         <Route
           path="settings/permissions"
           element={
-            <ProtectedRoute minLevel={ROLE_LEVEL.SUPER_ADMIN}>
+            <ProtectedRoute requiredPermission="permission:read">
               <Suspense fallback={<PanelFallback />}>
                 <PermissionsPage />
               </Suspense>
