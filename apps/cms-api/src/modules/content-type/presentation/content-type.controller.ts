@@ -6,7 +6,7 @@ import { UpdateListFieldsService } from "../application/services/update-list-fie
 import { ContentTypeEntity, ContentTypeSummary } from "../domain/entities/content-type.entity";
 
 import { BadRequestException, Body, Controller, Get, Param, Patch, UseGuards } from "@nestjs/common";
-import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
@@ -18,7 +18,7 @@ import { ContentTypeResponseDto, ContentTypeSummaryResponseDto } from "./dto/con
 // content-types/*.json file and rebooting (the sync engine reconciles it). listFields is the one
 // admin-mutable exception, via PATCH :slug/list-fields (content_type:manager only).
 @ApiTags("content-types")
-@ApiCookieAuth()
+@ApiBearerAuth()
 @Controller("content-types")
 export class ContentTypeController {
   constructor(

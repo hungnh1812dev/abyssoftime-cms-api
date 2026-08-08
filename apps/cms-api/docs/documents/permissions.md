@@ -57,7 +57,7 @@ All four services inject `@Inject(PERMISSSION_REPOSITORY)`.
 
 ## Endpoints
 
-`presentation/permission.controller.ts`, `@Controller("/api/v1/permissions")`. Every route is guarded by `JwtAuthGuard` + `PermissionsGuard` (`src/common/guards/`), which validate the `access_token` httpOnly cookie and check `req.user.permissions` against each route's `@RequirePermissions` metadata (read-implies-manager):
+`presentation/permission.controller.ts`, `@Controller("/api/v1/permissions")`. Every route is guarded by `JwtAuthGuard` + `PermissionsGuard` (`src/common/guards/`), which validate the `Authorization: Bearer` access token (or a long-lived API token, see [access-tokens.md](./access-tokens.md)) and check `req.user.permissions` against each route's `@RequirePermissions` metadata (read-implies-manager):
 
 | Method   | Path                         | Service                   | Required permission        |
 | -------- | ---------------------------- | ------------------------- | --------------------------- |

@@ -5,8 +5,8 @@ consumer-facing guide — not an internal architecture doc (see `/docs/documents
 authenticate, call every endpoint, and handle errors from a browser app.
 
 For the machine-readable contract, use the live-exported `nestjs-openapi.json` (repo root) or run the API and
-open `GET /api-docs`. This document explains the parts an OpenAPI file can't: the cookie session model, CORS
-requirements, permission gating, and per-flow gotchas.
+open `GET /api-docs`. This document explains the parts an OpenAPI file can't: the hybrid cookie/Bearer
+authentication model, CORS requirements, permission gating, and per-flow gotchas.
 
 ## 1. Base setup
 
@@ -21,27 +21,35 @@ requirements, permission gating, and per-flow gotchas.
   add it** — there's no wildcard fallback and no way to work around this client-side. `/public/documents/*` (the
   two public read routes, §5.8) is the one exception: it's open to any origin, without credentials, since those
   routes carry no session.
-- Every `fetch`/`axios` call that touches an authenticated route **must** send cookies:
+- Every `fetch`/`axios` call **must** send cookies (for `refresh_token`) **and**, once a session exists,
+  attach the in-memory access token as an `Authorization` header (see §2):
   ```js
-  fetch(url, { credentials: "include", ... })
-  // axios: axios.create({ baseURL, withCredentials: true })
+  fetch(url, { credentials: "include", headers: { Authorization: `Bearer ${accessToken}` }, ... })
+  // axios: axios.create({ baseURL, withCredentials: true }) + a request interceptor adding the header
   ```
 
 ## 2. Authentication model — read this before building the login page
 
-This API is **cookie-session-based, not Bearer-token-based**, despite the Swagger doc also registering a
-`BearerAuth` scheme (that scheme is unused by any route — ignore it). Getting this wrong is the single most
-likely integration mistake.
+This API uses a **hybrid** model (access token moved off cookies on 2026-08-08): the **refresh token** is still
+`httpOnly`-cookie-based, but the **access token** is `Authorization: Bearer`-based — returned in the
+`login`/`refresh` JSON response body, held in memory client-side, and sent back as an `Authorization: Bearer
+<token>` header on every subsequent request. Treating both tokens the same way (e.g. assuming neither is ever
+readable/storable, or assuming both live in cookies) is the single most likely integration mistake.
 
-- Login/refresh set two `httpOnly` cookies server-side: `access_token` (15 min TTL) and `refresh_token` (7 day
-  TTL). JavaScript **cannot read these** (`httpOnly`) — that's by design, don't try to store them in
-  `localStorage`/a JS variable.
-- **None of `login`, `refresh`, or `logout` return a token in the JSON body.** All three return
-  `{ "message": string }` only. If you're looking for `response.data.accessToken`, it doesn't exist — the
-  browser just needs to keep sending the cookie automatically (`credentials: "include"`), nothing to store.
-- Cookie flags (`secure`, `sameSite`) come from `COOKIE_SECURE` / `COOKIE_SAMESITE` env vars — ask the backend
-  team what's set in each environment; `sameSite: "strict"` would block a cross-subdomain admin app even with
-  CORS enabled, `"lax"`/`"none"` would not.
+- `login`/`refresh` set **one** `httpOnly` cookie server-side: `refresh_token` (7 day TTL, or 30 day when
+  `rememberMe: true` was sent on login). JavaScript **cannot read it** (`httpOnly`) — that's by design, don't
+  try to store it yourself.
+- **`login` and `refresh` both return `{ "message": string, "accessToken": string }`.** Capture `accessToken`
+  from the response body and hold it **in memory only** — a module-level variable, not `localStorage`/
+  `sessionStorage`/a cookie — then attach it as `Authorization: Bearer <accessToken>` on every authenticated
+  request. `logout` still returns `{ "message": string }` only and clears the `refresh_token` cookie
+  server-side (there's no access-token cookie left to clear).
+- Cookie flags (`secure`, `sameSite`) for `refresh_token` come from `COOKIE_SECURE` / `COOKIE_SAMESITE` env
+  vars — ask the backend team what's set in each environment; `sameSite: "strict"` would block a
+  cross-subdomain admin app even with CORS enabled, `"lax"`/`"none"` would not.
+- The unrelated API-token mechanism (`Authorization: Bearer cms_<64-hex>`, long-lived, DB-backed, used by
+  third-party integrations) already read the same header before this change and is unaffected — §4 covers how
+  the two share one guard safely.
 
 ### 2.1 Onboarding flow (register → verify → login)
 
@@ -50,7 +58,7 @@ New users are **not usable until email-verified**. The flow is:
 ```
 POST /auth/register  →  201, user created but unverified, OTP emailed
 POST /auth/verify-otp →  200, marks user verified
-POST /auth/login      →  200, sets cookies (fails with 403 if not yet verified)
+POST /auth/login      →  200, returns accessToken + sets refresh_token cookie (fails with 403 if not yet verified)
 ```
 
 `POST /auth/resend-otp` re-sends the code if the user didn't get it / it expired.
@@ -67,27 +75,31 @@ onboarding flow, that doesn't exist server-side yet — flag it rather than buil
 | `POST /auth/register` | none | yes (429 possible) | `RegisterDto` | `201 UserResponseDto` | See fields below. `409` if email/username taken. |
 | `POST /auth/verify-otp` | none | yes | `{ email, otp }` (otp = 6-digit string) | `200 MessageResponseDto` | `400` bad/expired/missing OTP, `404` no account, `409` already verified. |
 | `POST /auth/resend-otp` | none | yes | `{ email }` | `200 MessageResponseDto` | `404`, `409` (already verified). |
-| `POST /auth/login` | none | yes | `{ email, password }` | `200 MessageResponseDto`, sets both cookies | `401` bad credentials (message is intentionally identical for "no such user" vs "wrong password" — don't try to distinguish these in the UI). `403` if email not yet verified. |
-| `POST /auth/refresh` | `refresh_token` cookie (read manually, no guard decorator) | no | — | `200 MessageResponseDto`, rotates both cookies | `401` if cookie missing/invalid/expired — treat as "session ended," send the user to `/login`. |
-| `POST /auth/logout` | none required | no | — | `200 MessageResponseDto`, clears both cookies | Always succeeds even if not logged in. |
+| `POST /auth/login` | none | yes | `{ email, password, rememberMe? }` | `200 { message, accessToken }`, sets `refresh_token` cookie | `401` bad credentials (message is intentionally identical for "no such user" vs "wrong password" — don't try to distinguish these in the UI). `403` if email not yet verified. |
+| `POST /auth/refresh` | `refresh_token` cookie (read via `JwtRefreshGuard`) | no | — | `200 { message, accessToken }` (rotated), rotates `refresh_token` cookie | `401` if cookie missing/invalid/expired — treat as "session ended," send the user to `/login`. |
+| `POST /auth/logout` | none required | no | — | `200 MessageResponseDto`, clears `refresh_token` cookie | Always succeeds even if not logged in. There's no access-token cookie to clear — the client is responsible for discarding its in-memory `accessToken`. |
 | `POST /auth/forgot-password` | none | yes | `{ email }` | `200 MessageResponseDto` | Always returns success regardless of whether the email exists (enumeration prevention) — don't render "email not found" in the UI, just show a generic "check your inbox" message. |
 | `POST /auth/reset-password` | none | yes | `{ token, newPassword }` | `200 MessageResponseDto` | `token` is the plaintext value emailed by forgot-password, 1-hour expiry. `400` if invalid/expired. |
-| `GET /auth/me` | `access_token` cookie (`JwtAuthGuard`) | no | — | `200 MeResponseDto` | Resolves the session cookie into the caller's own identity + resolved `role` (with `permissions`), in one call — see §2.3. `401` if the cookie is missing/invalid/expired, or if the account was deleted after the token was issued. `404` if the user's `roleId` doesn't resolve to an existing role (should not happen in normal operation). No permission requirement. |
+| `GET /auth/me` | `Authorization: Bearer <accessToken>` (`JwtAuthGuard`) | no | — | `200 MeResponseDto` | Resolves the access token into the caller's own identity + resolved `role` (with `permissions`), in one call — see §2.3. `401` if the token is missing/invalid/expired, or if the account was deleted after the token was issued. `404` if the user's `roleId` doesn't resolve to an existing role (should not happen in normal operation). No permission requirement. |
 
 **`RegisterDto` fields** (all required): `email` (string), `name` (string, display name), `username`
 (3–32 chars: letters/numbers/underscore/dot/hyphen), `password` (min 8 chars), `accountType` (boolean).
 
-**Session lifecycle for the frontend**: on app load, don't assume a session exists — call `GET /auth/me`
-(see §2.3) and redirect to login on `401`. On any `401` from *any* authenticated call, attempt
-`POST /auth/refresh` once; if that also 401s, clear local UI state and redirect to `/login`. There's no
-built-in "silent refresh on a timer" — the access cookie just expires and the next request will 401, which is
-the trigger to refresh.
+**Session lifecycle for the frontend**: there's no client-readable cookie to check on app load, so every
+mount does `POST /auth/refresh` first (off the `refresh_token` cookie, no `accessToken` needed to *initiate*
+it), captures the returned `accessToken`, then calls `GET /auth/me` (see §2.3) with it — redirect to login on
+a `401` from either call. On any `401` from *any other* authenticated call, attempt `POST /auth/refresh` once,
+capture the new `accessToken`, and retry the original request; if the refresh also 401s, clear local UI state
+(including the in-memory `accessToken`) and redirect to `/login`. There's no built-in "silent refresh on a
+timer" — the access token just expires (15 min) and the next request will 401, which is the trigger to
+refresh.
 
 ### 2.3 `GET /auth/me` response shape
 
-Call this once on login-success and once on app-mount to resolve the session cookie into "who is logged in
-and what can they do," instead of `GET /users` + `GET /roles` with a client-side email match (which breaks on
-cold reload and requires permissions the caller may not hold just to identify themselves).
+Call this once on login-success and once on app-mount (after the refresh above) to resolve the access token
+into "who is logged in and what can they do," instead of `GET /users` + `GET /roles` with a client-side email
+match (which breaks on cold reload and requires permissions the caller may not hold just to identify
+themselves).
 
 ```json
 {
@@ -144,7 +156,7 @@ media type), `429` (rate limit on auth-mutation routes — see §2.2's "Rate-lim
 
 ## 4. Authorization model (everything except `/auth/*` and public document routes)
 
-Every other module is guarded by `JwtAuthGuard` (reads the `access_token` cookie) and, on most routes,
+Every other module is guarded by `JwtAuthGuard` (reads `Authorization: Bearer <accessToken>`) and, on most routes,
 `PermissionsGuard` (checks the caller's role permissions against a `@RequirePermissions("resource:action")`
 decorator). Two status codes to distinguish in the UI:
 
@@ -164,6 +176,15 @@ media:read  media:manager
 content_type:read
 ```
 
+`document:*` slugs are the one exception to plain `resource:action`: each also exists in a scoped 3-segment
+form, `document:<action>:<content-type-slug>` (e.g. `document:read:cv-page`), auto-synced into the catalog for
+every content type on boot. A grant of the global 2-segment slug still authorizes the action across every
+content type; the 3-segment form narrows it to just that one. Both forms are ordinary entries in
+`GET /api/v1/permissions` — CMS-Admin's picker (`PermissionTree`) renders the `document` group as a per-action
+"All content types" vs. "Specific content types" toggle (backed by `GET /api/v1/content-types` for the
+checkbox list) instead of a flat checkbox list, and builds/parses the 3-segment slug accordingly. No other
+resource has this scoping.
+
 Default seeded roles: `super_admin` (level 100, every permission), `admin` (level 50, read-only across every
 resource), `editor` (level 20, no permissions by default — grant explicitly), `guest` (level 0, no
 permissions). CMS-Admin should fetch `GET /api/v1/permissions` and `GET /api/v1/roles` to build its own
@@ -178,8 +199,8 @@ permission slug."
 
 ## 5. Module reference
 
-All paths below are relative to `/api/v1` unless marked public. `@ApiCookieAuth` = requires the session cookie
-(send `credentials: "include"`).
+All paths below are relative to `/api/v1` unless marked public. `@ApiBearerAuth` = requires
+`Authorization: Bearer <accessToken>`.
 
 ### 5.1 Users — `/users`
 
@@ -389,9 +410,10 @@ Useful for verifying an environment before wiring up real UI:
 ```bash
 curl -s http://localhost:8080/health
 curl -s http://localhost:8080/api/v1/auth/has-users
-curl -s -c cookies.txt -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" -d '{"email":"...","password":"..."}'
-curl -s -b cookies.txt http://localhost:8080/api/v1/auth/me
-curl -s -b cookies.txt http://localhost:8080/api/v1/users
-curl -s -b cookies.txt http://localhost:8080/api/v1/content-types
+TOKEN=$(curl -s -c cookies.txt -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" -d '{"email":"...","password":"..."}' | jq -r .accessToken)
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/auth/me
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/users
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/content-types
+# cookies.txt still carries refresh_token — needed only for a follow-up POST /auth/refresh
 ```

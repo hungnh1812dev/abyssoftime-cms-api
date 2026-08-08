@@ -1,17 +1,19 @@
 import MockAdapter from "axios-mock-adapter";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { api, onSessionExpired } from "@/lib/api";
+import { api, onSessionExpired, setAccessToken } from "@/lib/api";
 
 let mock: MockAdapter;
 
 beforeEach(() => {
   mock = new MockAdapter(api);
   onSessionExpired(null);
+  setAccessToken(null);
 });
 
 afterEach(() => {
   mock.restore();
+  setAccessToken(null);
 });
 
 describe("api baseURL", () => {
@@ -99,5 +101,49 @@ describe("api 401 response interceptor", () => {
 
     await expect(api.get("/protected")).rejects.toMatchObject({ response: { status: 401 } });
     expect(expiredCalled).toBe(true);
+  });
+});
+
+describe("access token request interceptor", () => {
+  it("attaches Authorization: Bearer <token> on a request when a token is held", async () => {
+    setAccessToken("held-token");
+    let capturedAuthHeader: unknown;
+    mock.onGet("/protected").reply((config) => {
+      capturedAuthHeader = config.headers?.Authorization;
+      return [200, {}];
+    });
+
+    await api.get("/protected");
+    expect(capturedAuthHeader).toBe("Bearer held-token");
+  });
+
+  it("sends no Authorization header when no token is held", async () => {
+    let capturedAuthHeader: unknown;
+    mock.onGet("/protected").reply((config) => {
+      capturedAuthHeader = config.headers?.Authorization;
+      return [200, {}];
+    });
+
+    await api.get("/protected");
+    expect(capturedAuthHeader).toBeUndefined();
+  });
+});
+
+describe("access token capture on refresh", () => {
+  it("captures accessToken from the /auth/refresh response and uses it on the retried request, not the stale one", async () => {
+    let protectedCallCount = 0;
+    let capturedAuthHeaderOnRetry: unknown;
+
+    mock.onPost("/auth/refresh").reply(200, { message: "Refresh successful", accessToken: "fresh-token" });
+    mock.onGet("/protected").reply((config) => {
+      protectedCallCount++;
+      if (protectedCallCount === 1) return [401, { message: "Unauthorized" }];
+      capturedAuthHeaderOnRetry = config.headers?.Authorization;
+      return [200, { data: "secret" }];
+    });
+
+    setAccessToken("stale-token");
+    await api.get("/protected");
+    expect(capturedAuthHeaderOnRetry).toBe("Bearer fresh-token");
   });
 });

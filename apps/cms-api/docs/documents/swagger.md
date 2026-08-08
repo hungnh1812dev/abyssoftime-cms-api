@@ -10,19 +10,18 @@ Generated API documentation for the whole app, served at `GET /api-docs` (intera
 new DocumentBuilder()
   .setTitle("Abyssoftime CMS API")
   .setDescription(...)
-  .setVersion("0.0.1") // hardcoded, matches package.json — no tsconfig resolveJsonModule change needed for this
-  .addCookieAuth("access_token", { type: "apiKey", in: "cookie", name: "access_token" })
+  .setVersion(API_VERSION) // matches package.json
   .addBearerAuth()
   .build();
 ```
 
 Kept inline in `configure-app.ts` rather than a separate file — the addition is ~15 lines, well within the file staying readable.
 
-## Auth reality: two schemes registered, one actually used
+## Auth reality: one scheme, shared by two guards
 
-- **`addCookieAuth("access_token", ...)`** — matches `JwtAuthGuard`'s real mechanism (reads the `access_token` httpOnly cookie, see [auth.md](./auth.md)). Every controller/route actually guarded by `JwtAuthGuard` carries `@ApiCookieAuth()` (usually class-level, since every route in a given controller shares the same guard).
-- **`addBearerAuth()`** — registered so the scheme is visible in the UI, but **no route anywhere carries `@ApiBearerAuth()`**. The only bearer-checking guard, `ApiTokenGuard` (see [access-tokens.md](./access-tokens.md)), is built and unit-tested but not wired to any route in this repo — attaching the decorator to a route that isn't actually bearer-gated would misdocument it.
-- `auth`'s own controller and `document`'s `public-document.controller.ts` carry **no** `@ApiCookieAuth()` at all — every route on both is genuinely public (verified live: `GET /api-docs-json` shows `security: "none"` on all 11 of those routes).
+- **`addBearerAuth()`** is the only registered scheme. `JwtAuthGuard = AuthGuard(["jwt", "api-token"])` reads `Authorization: Bearer <token>` for **both** a JWT access token (since the 2026-08-08 cookie→Bearer migration, see [auth.md](./auth.md)) and a long-lived API token (`cms_<64-hex>`, see [access-tokens.md](./access-tokens.md)) — either strategy succeeding authenticates the request, so one scheme correctly documents both paths. Every controller/route guarded by `JwtAuthGuard` carries `@ApiBearerAuth()` (usually class-level, since every route in a given controller shares the same guard).
+- `addCookieAuth("access_token", ...)` was removed along with the migration — the access token is no longer a cookie, so there's nothing left for that scheme to document. `refresh_token` was never Swagger-documented (the refresh flow isn't guarded by `JwtAuthGuard`) and still isn't.
+- `auth`'s own controller and `document`'s `public-document.controller.ts` carry **no** `@ApiBearerAuth()` at all — every route on both is genuinely public.
 
 ## Coverage
 
@@ -39,7 +38,7 @@ All 10 controllers, all 19 request DTOs, full response-shape coverage:
 | `content-type` | `content-types` | `content-type.controller.ts` |
 | `document` | `documents-single-type` / `documents-collection-type` / `documents-public` | 3 controllers |
 
-Live-verified: 36 paths, 47 operations (`POST /api/v1/users` was later removed — see [users.md](./users.md#removed-post-apiv1users); the old boilerplate `GET /` route/`AppService` was later replaced by `GET /health`, net zero — see [Global prefix & health check](#global-prefix--health-check) below), both `cookie`/`bearer` security schemes registered in `components.securitySchemes`.
+Live-verified: 36 paths, 47 operations (`POST /api/v1/users` was later removed — see [users.md](./users.md#removed-post-apiv1users); the old boilerplate `GET /` route/`AppService` was later replaced by `GET /health`, net zero — see [Global prefix & health check](#global-prefix--health-check) below), the `bearer` security scheme registered in `components.securitySchemes` (the `cookie` scheme was removed 2026-08-08, see [Auth reality](#auth-reality-one-scheme-shared-by-two-guards) above).
 
 ## Global prefix & health check
 

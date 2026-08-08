@@ -7,7 +7,7 @@ import { UpdatePermissionService } from "../application/services/update-permissi
 import { PermissionEntity } from "../domain/entities/permission.entity";
 
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, UseGuards } from "@nestjs/common";
-import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
@@ -16,7 +16,7 @@ import { PermissionsGuard } from "@/common/guards/permissions.guard";
 import { PermissionResponseDto } from "./dto/permission-response.dto";
 
 @ApiTags("permissions")
-@ApiCookieAuth()
+@ApiBearerAuth()
 @Controller("permissions")
 export class PermissionController {
   constructor(

@@ -1,8 +1,9 @@
 # Login flow
 
-Scope: `POST /auth/login`, from request to Set-Cookie response. Read directly from
-`src/modules/auth/**` (all layers) and `src/common/guards/*` — not inferred.
-Cross-referenced against `docs/documents/auth.md` for narrative context only.
+Scope: `POST /auth/login`, from request to response (`accessToken` in the JSON body,
+`refresh_token` as a `Set-Cookie`). Read directly from `src/modules/auth/**` (all
+layers) and `src/common/guards/*` — not inferred. Cross-referenced against
+`docs/documents/auth.md` for narrative context only.
 
 ## Diagram — login sequence
 
@@ -62,9 +63,8 @@ sequenceDiagram
     JWT-->>Login: access token, refresh token, refreshTokenMaxAgeMs
     Login-->>Ctl: tokens
 
-    Ctl->>C: Set-Cookie access_token, httpOnly, secure, sameSite, maxAge 15m
-    Ctl->>C: Set-Cookie refresh_token, same flags, maxAge refreshTokenMaxAgeMs
-    Ctl-->>C: 200, message Login successful
+    Ctl->>C: Set-Cookie refresh_token, httpOnly, secure, sameSite, maxAge refreshTokenMaxAgeMs
+    Ctl-->>C: 200, body message Login successful, accessToken
 ```
 
 ## Diagram — where login sits among auth endpoints
@@ -74,8 +74,8 @@ flowchart LR
     Reg["POST /auth/register<br/>creates unverified user, emails OTP"] --> Verify["POST /auth/verify-otp<br/>verifies email, first-user role assignment"]
     Verify --> Login["POST /auth/login<br/>this diagram"]
     Login --> Me["GET /auth/me<br/>JwtAuthGuard"]
-    Login --> Refresh["POST /auth/refresh<br/>JwtRefreshGuard, reads refresh_token cookie,<br/>rotates both tokens"]
-    Login --> Logout["POST /auth/logout<br/>clears both cookies"]
+    Login --> Refresh["POST /auth/refresh<br/>JwtRefreshGuard, reads refresh_token cookie,<br/>returns rotated accessToken in body,<br/>rotates refresh_token cookie"]
+    Login --> Logout["POST /auth/logout<br/>clears refresh_token cookie"]
     Reg --> Forgot["POST /auth/forgot-password"]
     Forgot --> Reset["POST /auth/reset-password"]
 ```
@@ -87,8 +87,11 @@ flowchart LR
   Bun (`docs/documents/auth.md`).
 - `verify-otp` is a one-time email-verification/first-user role-assignment step, not part of
   the login request itself.
-- Cookie names: `access_token` (const in `jwt-auth.guard.ts`), `refresh_token` (const in
+- Only one cookie now: `refresh_token` (const `REFRESH_TOKEN_COOKIE` in
   `jwt-refresh.guard.ts`); flags come from `COOKIE_SECURE` / `COOKIE_SAMESITE` env vars.
+  The access token is returned in the response body (`accessToken`) instead — the client
+  holds it in memory and sends it back as `Authorization: Bearer <token>` on every
+  subsequent request; see `auth-jwt-flow-diagram.md`.
 
 Sources read: `src/modules/auth/presentation/auth.controller.ts`,
 `src/common/strategies/local.strategy.ts`,

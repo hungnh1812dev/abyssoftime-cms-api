@@ -91,7 +91,7 @@ Implementations: `infrastructure/persistence/prisma-role.repository.ts` (`Prisma
 | `PUT`    | `/api/v1/roles/:id`       | `UpdateRoleService`                                              | `JwtAuthGuard`, `PermissionsGuard` + `@RequirePermissions("role:manager")` |
 | `DELETE` | `/api/v1/roles/:id` (204) | `DeleteRoleService` (`dalateRoleService`, typo'd field name)     | `JwtAuthGuard`, `PermissionsGuard` + `@RequirePermissions("role:manager")` |
 
-`JwtAuthGuard` (`src/common/guards/jwt-auth.guard.ts`) validates the `access_token` httpOnly cookie and populates `req.user` (the shared `AuthenticatedRequest`/`AccessTokenPayload` type from `src/common/types/`). `PermissionsGuard` then checks `req.user.permissions` against the route's `@RequirePermissions` metadata (read-implies-manager). No controller method reads `req.user` directly anymore — the previous inline `AuthenticatedRequest` placeholder type and the `callerRoleSlug` extraction helper were removed entirely, since the services no longer need a caller identity at all.
+`JwtAuthGuard` (`src/common/guards/jwt-auth.guard.ts`) validates the `Authorization: Bearer` access token (or a long-lived API token) and populates `req.user` (the shared `AuthenticatedRequest`/`AccessTokenPayload` type from `src/common/types/`). `PermissionsGuard` then checks `req.user.permissions` against the route's `@RequirePermissions` metadata (read-implies-manager). No controller method reads `req.user` directly anymore — the previous inline `AuthenticatedRequest` placeholder type and the `callerRoleSlug` extraction helper were removed entirely, since the services no longer need a caller identity at all.
 
 ## Module wiring
 

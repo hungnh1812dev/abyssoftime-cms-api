@@ -84,7 +84,7 @@ describe("GraphQL (e2e)", () => {
   let accessTokens: IAccessTokenRepository;
   let realDefs: ContentTypeDefinition[];
 
-  let superAdminCookie: string;
+  let superAdminAuthHeader: string;
   let readScopedApiToken: string;
   let createOnlyApiToken: string;
   let updateOnlyApiToken: string;
@@ -178,7 +178,7 @@ describe("GraphQL (e2e)", () => {
       level: superAdminRole.level,
       permissions: superAdminRole.permissions as string[],
     });
-    superAdminCookie = `access_token=${superAdminToken}`;
+    superAdminAuthHeader = `Bearer ${superAdminToken}`;
 
     const readScoped = await createAccessToken.execute({ name: `e2e-graphql-read-${runId}`, permissions: ["document:read"], expiresIn: "1h" }, null);
     readScopedApiToken = readScoped.plaintext;
@@ -205,10 +205,10 @@ describe("GraphQL (e2e)", () => {
     }
 
     for (const documentId of pendingCleanupCvPageIds) {
-      await request(app.getHttpServer()).delete(`/api/v1/documents/collection-type/cv-page/${documentId}`).set("Cookie", [superAdminCookie]);
+      await request(app.getHttpServer()).delete(`/api/v1/documents/collection-type/cv-page/${documentId}`).set("Authorization", superAdminAuthHeader);
     }
     for (const documentId of pendingCleanupMediaTypeIds) {
-      await request(app.getHttpServer()).delete(`/api/v1/documents/collection-type/${mediaSlug}/${documentId}`).set("Cookie", [superAdminCookie]);
+      await request(app.getHttpServer()).delete(`/api/v1/documents/collection-type/${mediaSlug}/${documentId}`).set("Authorization", superAdminAuthHeader);
     }
     if (createdMediaIds.length > 0) {
       await prisma.mediaAsset.deleteMany({ where: { documentId: { in: createdMediaIds } } });
@@ -237,7 +237,7 @@ describe("GraphQL (e2e)", () => {
     beforeAll(async () => {
       const createResponse = await request(app.getHttpServer())
         .post("/api/v1/documents/collection-type/cv-page")
-        .set("Cookie", [superAdminCookie])
+        .set("Authorization", superAdminAuthHeader)
         .send({ data: { position: `GraphQL Engineer ${runId}`, isMain: true, company: `Acme-${runId}`, summary: "<p>Summary</p>" } })
         .expect(201);
       documentId = (createResponse.body as DocumentResponseBody).data.documentId;
@@ -245,7 +245,7 @@ describe("GraphQL (e2e)", () => {
 
       await request(app.getHttpServer())
         .post(`/api/v1/documents/collection-type/cv-page/${documentId}/publish`)
-        .set("Cookie", [superAdminCookie])
+        .set("Authorization", superAdminAuthHeader)
         .expect(200, { status: "published" });
     });
 
@@ -301,7 +301,7 @@ describe("GraphQL (e2e)", () => {
     beforeAll(async () => {
       const createResponse = await request(app.getHttpServer())
         .post("/api/v1/documents/collection-type/cv-page")
-        .set("Cookie", [superAdminCookie])
+        .set("Authorization", superAdminAuthHeader)
         .send({ data: { position: `Scoped Engineer ${runId}`, isMain: true, company: `ScopedCo-${runId}`, summary: "<p>Summary</p>" } })
         .expect(201);
       scopedDocumentId = (createResponse.body as DocumentResponseBody).data.documentId;
@@ -309,7 +309,7 @@ describe("GraphQL (e2e)", () => {
 
       await request(app.getHttpServer())
         .post(`/api/v1/documents/collection-type/cv-page/${scopedDocumentId}/publish`)
-        .set("Cookie", [superAdminCookie])
+        .set("Authorization", superAdminAuthHeader)
         .expect(200, { status: "published" });
 
       const createAccessToken = app.get(CreateAccessTokenService);
@@ -351,13 +351,13 @@ describe("GraphQL (e2e)", () => {
       async function createAndPublish(position: string, isMain: boolean): Promise<string> {
         const createResponse = await request(app.getHttpServer())
           .post("/api/v1/documents/collection-type/cv-page")
-          .set("Cookie", [superAdminCookie])
+          .set("Authorization", superAdminAuthHeader)
           .send({ data: { position, isMain, company: `${filterTag}-Co`, summary: "<p>List test</p>" } })
           .expect(201);
         const documentId = (createResponse.body as DocumentResponseBody).data.documentId;
         pendingCleanupCvPageIds.add(documentId);
 
-        await request(app.getHttpServer()).post(`/api/v1/documents/collection-type/cv-page/${documentId}/publish`).set("Cookie", [superAdminCookie]).expect(200);
+        await request(app.getHttpServer()).post(`/api/v1/documents/collection-type/cv-page/${documentId}/publish`).set("Authorization", superAdminAuthHeader).expect(200);
         return documentId;
       }
 
@@ -574,7 +574,7 @@ describe("GraphQL (e2e)", () => {
     beforeAll(async () => {
       const createResponse = await request(app.getHttpServer())
         .post("/api/v1/documents/collection-type/cv-page")
-        .set("Cookie", [superAdminCookie])
+        .set("Authorization", superAdminAuthHeader)
         .send({
           data: {
             position: `Nested ${runId}`,
@@ -593,7 +593,7 @@ describe("GraphQL (e2e)", () => {
       documentId = (createResponse.body as DocumentResponseBody).data.documentId;
       pendingCleanupCvPageIds.add(documentId);
 
-      await request(app.getHttpServer()).post(`/api/v1/documents/collection-type/cv-page/${documentId}/publish`).set("Cookie", [superAdminCookie]).expect(200);
+      await request(app.getHttpServer()).post(`/api/v1/documents/collection-type/cv-page/${documentId}/publish`).set("Authorization", superAdminAuthHeader).expect(200);
     });
 
     it("resolves nested repeatable components at every level, with a JSON-typed field returning a real array", async () => {
@@ -636,7 +636,7 @@ describe("GraphQL (e2e)", () => {
     beforeAll(async () => {
       const uploadResponse = await request(app.getHttpServer())
         .post("/api/v1/media/upload")
-        .set("Cookie", [superAdminCookie])
+        .set("Authorization", superAdminAuthHeader)
         .attach("file", buildPngBuffer(400, 300), "cover.png")
         .expect(201);
       mediaDocumentId = (uploadResponse.body as MediaUploadResponseBody).documentId;
@@ -644,13 +644,13 @@ describe("GraphQL (e2e)", () => {
 
       const createResponse = await request(app.getHttpServer())
         .post(`/api/v1/documents/collection-type/${mediaSlug}`)
-        .set("Cookie", [superAdminCookie])
+        .set("Authorization", superAdminAuthHeader)
         .send({ data: { title: `Media doc ${runId}`, cover: mediaDocumentId } })
         .expect(201);
       documentId = (createResponse.body as DocumentResponseBody).data.documentId;
       pendingCleanupMediaTypeIds.add(documentId);
 
-      await request(app.getHttpServer()).post(`/api/v1/documents/collection-type/${mediaSlug}/${documentId}/publish`).set("Cookie", [superAdminCookie]).expect(200);
+      await request(app.getHttpServer()).post(`/api/v1/documents/collection-type/${mediaSlug}/${documentId}/publish`).set("Authorization", superAdminAuthHeader).expect(200);
     });
 
     it("resolves the media-typed field's FK to the full MediaAsset", async () => {
@@ -676,13 +676,13 @@ describe("GraphQL (e2e)", () => {
     it("resolves a null media FK to null, never an error", async () => {
       const createResponse = await request(app.getHttpServer())
         .post(`/api/v1/documents/collection-type/${mediaSlug}`)
-        .set("Cookie", [superAdminCookie])
+        .set("Authorization", superAdminAuthHeader)
         .send({ data: { title: `No cover ${runId}` } })
         .expect(201);
       const noCoverDocumentId = (createResponse.body as DocumentResponseBody).data.documentId;
       pendingCleanupMediaTypeIds.add(noCoverDocumentId);
 
-      await request(app.getHttpServer()).post(`/api/v1/documents/collection-type/${mediaSlug}/${noCoverDocumentId}/publish`).set("Cookie", [superAdminCookie]).expect(200);
+      await request(app.getHttpServer()).post(`/api/v1/documents/collection-type/${mediaSlug}/${noCoverDocumentId}/publish`).set("Authorization", superAdminAuthHeader).expect(200);
 
       const response = await gql(`{ ${mediaQueryName}(documentId: "${noCoverDocumentId}") { title cover { documentId } } }`, undefined, readScopedApiToken).expect(200);
 
@@ -696,7 +696,7 @@ describe("GraphQL (e2e)", () => {
         [0, 1, 2].map(async (index) => {
           const uploadResponse = await request(app.getHttpServer())
             .post("/api/v1/media/upload")
-            .set("Cookie", [superAdminCookie])
+            .set("Authorization", superAdminAuthHeader)
             .attach("file", buildPngBuffer(400, 300), `list-cover-${index}-${runId}.png`)
             .expect(201);
           const listMediaDocumentId = (uploadResponse.body as MediaUploadResponseBody).documentId;
@@ -704,13 +704,16 @@ describe("GraphQL (e2e)", () => {
 
           const createResponse = await request(app.getHttpServer())
             .post(`/api/v1/documents/collection-type/${mediaSlug}`)
-            .set("Cookie", [superAdminCookie])
+            .set("Authorization", superAdminAuthHeader)
             .send({ data: { title: `List media doc ${index} ${runId}`, cover: listMediaDocumentId } })
             .expect(201);
           const listDocumentId = (createResponse.body as DocumentResponseBody).data.documentId;
           pendingCleanupMediaTypeIds.add(listDocumentId);
 
-          await request(app.getHttpServer()).post(`/api/v1/documents/collection-type/${mediaSlug}/${listDocumentId}/publish`).set("Cookie", [superAdminCookie]).expect(200);
+          await request(app.getHttpServer())
+            .post(`/api/v1/documents/collection-type/${mediaSlug}/${listDocumentId}/publish`)
+            .set("Authorization", superAdminAuthHeader)
+            .expect(200);
 
           return { listDocumentId, listMediaDocumentId };
         }),
@@ -864,7 +867,7 @@ describe("GraphQL (e2e)", () => {
     it("createMediaSlug/updateMediaSlug persist a submitted media FK that reads back as a full MediaAsset", async () => {
       const uploadResponse = await request(app.getHttpServer())
         .post("/api/v1/media/upload")
-        .set("Cookie", [superAdminCookie])
+        .set("Authorization", superAdminAuthHeader)
         .attach("file", buildPngBuffer(200, 150), "mutation-cover.png")
         .expect(201);
       const mutationMediaDocumentId = (uploadResponse.body as MediaUploadResponseBody).documentId;
