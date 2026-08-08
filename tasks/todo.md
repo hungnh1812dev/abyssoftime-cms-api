@@ -27,7 +27,7 @@ Check off here as each task completes.
       logout
 - [x] 7. Update `api.test.ts` + `AuthContext.test.tsx`; spot-check `RouteGuards.test.tsx` /
       `LoginPage.test.tsx`
-- [ ] **Checkpoint** — lint/test/build clean in `apps/cms-admin`; live browser walkthrough (login,
+- [x] **Checkpoint** — lint/test/build clean in `apps/cms-admin`; live browser walkthrough (login,
       reload, logout); human review before final closeout
 
 ## Final

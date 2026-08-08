@@ -229,8 +229,8 @@ regression test proving both paths still work through the shared header.
   - **Estimated scope:** Small–Medium (2 files edited, 2 spot-checked).
 
 ### Checkpoint: Frontend integration
-- [ ] `bun run lint`, `bun run test`, `bun run build` clean in `apps/cms-admin`.
-- [ ] Manual browser walkthrough against the running backend: login → Network tab shows
+- [x] `bun run lint`, `bun run test`, `bun run build` clean in `apps/cms-admin`.
+- [x] Manual browser walkthrough against the running backend: login → Network tab shows
   `accessToken` in the login response body and no `access_token` cookie; subsequent API calls
   (e.g. loading `/admin`) carry `Authorization: Bearer ...`; hard-reload the page → session
   survives via the refresh-token cookie and a fresh token is re-acquired; logout → subsequent calls
