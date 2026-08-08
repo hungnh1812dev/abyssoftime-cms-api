@@ -4,7 +4,7 @@ import { SaveSingleTypeService } from "../application/services/save-single-type.
 import { UnpublishSingleTypeService } from "../application/services/unpublish-single-type.service";
 
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, Post, Put, Req, UseGuards } from "@nestjs/common";
-import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
 import { DocumentPermissionsGuard } from "@/common/guards/document-permissions.guard";
@@ -19,7 +19,7 @@ import { validateSlugParam } from "./validate-params";
 
 // No DELETE route — single-types are never deleted (at most one entry ever exists).
 @ApiTags("documents-single-type")
-@ApiCookieAuth()
+@ApiBearerAuth()
 @Controller("documents/single-type")
 export class SingleTypeDocumentController {
   constructor(

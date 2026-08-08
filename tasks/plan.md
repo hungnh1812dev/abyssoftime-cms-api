@@ -116,7 +116,7 @@ regression test proving both paths still work through the shared header.
 
 ### Phase 3: Backend docs/Swagger sweep (parallel-safe with Phase 4)
 
-- [ ] **Task 3: Swagger decorators + config**
+- [x] **Task 3: Swagger decorators + config**
   - **Description:** Replace `@ApiCookieAuth()` with `@ApiBearerAuth()` on every route currently
     documenting access-token cookie auth. This is the same one-line substitution repeated across:
     `auth.controller.ts` (`me`), `content-type.controller.ts`, `access-token.controller.ts`,
@@ -126,12 +126,12 @@ regression test proving both paths still work through the shared header.
     `.addCookieAuth("access_token", ...)` from `configureSwagger`, keep the existing
     `.addBearerAuth()`.
   - **Acceptance criteria:**
-    - [ ] No `@ApiCookieAuth()` reference tied to the access token remains (`grep -rn
+    - [x] No `@ApiCookieAuth()` reference tied to the access token remains (`grep -rn
       "ApiCookieAuth"` returns nothing, or only intentional non-access-token uses if any exist).
-    - [ ] Swagger UI at `/api-docs` shows Bearer auth, not cookie auth, for the affected routes.
+    - [x] Swagger UI at `/api-docs` shows Bearer auth, not cookie auth, for the affected routes.
   - **Verify:**
-    - [ ] `bun run build` (Swagger document generation runs at boot — confirm no runtime error).
-    - [ ] `bun run lint`.
+    - [x] `bun run build` (Swagger document generation runs at boot — confirm no runtime error).
+    - [x] `bun run lint`.
   - **Dependencies:** Task 1 (so the docs describe the shipped behavior, not the old one) — can
     start in parallel and land after Task 1 merges.
   - **Files:** the 9 controllers listed above + `apps/cms-api/src/bootstrap/configure-app.ts`.

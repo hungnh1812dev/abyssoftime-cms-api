@@ -18,7 +18,7 @@ import { type Request, type Response } from "express";
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AuthGuard } from "@nestjs/passport";
-import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
 import { JwtRefreshGuard, REFRESH_TOKEN_COOKIE } from "@/common/guards/jwt-refresh.guard";
@@ -133,7 +133,7 @@ export class AuthController {
 
   @Get("me")
   @UseGuards(JwtAuthGuard)
-  @ApiCookieAuth()
+  @ApiBearerAuth()
   @ApiOperation({ summary: "Resolve the caller's own identity and role/permissions from the session cookie" })
   @ApiResponse({ status: 200, type: MeResponseDto })
   @ApiResponse({ status: 401, description: "Missing/invalid/expired access token, or the account was deleted after the token was issued" })

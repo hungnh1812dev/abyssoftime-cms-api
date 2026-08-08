@@ -6,7 +6,7 @@ import { memoryStorage } from "multer";
 
 import { BadRequestException, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { ApiBody, ApiConsumes, ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
@@ -23,7 +23,7 @@ interface UploadedMulterFile {
 }
 
 @ApiTags("media")
-@ApiCookieAuth()
+@ApiBearerAuth()
 @Controller("media")
 export class MediaController {
   constructor(

@@ -7,7 +7,7 @@ import { UpdateRoleService } from "../application/services/update-role.service";
 import { RoleEntity } from "../domain/entities/role.entiry";
 
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, UseGuards } from "@nestjs/common";
-import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
@@ -16,7 +16,7 @@ import { PermissionsGuard } from "@/common/guards/permissions.guard";
 import { RoleResponseDto } from "./dto/role-response.dto";
 
 @ApiTags("roles")
-@ApiCookieAuth()
+@ApiBearerAuth()
 @Controller("roles")
 export class RolesColtroller {
   constructor(

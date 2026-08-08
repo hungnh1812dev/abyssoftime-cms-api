@@ -12,12 +12,11 @@ Check off here as each task completes.
 ## Phase 2: Prove the conflict is resolved
 - [x] 2. New e2e regression test: JWT-as-Bearer succeeds, API-token-as-Bearer still succeeds,
       garbage Bearer 401s — same `JwtAuthGuard`-protected route
-- [ ] **Checkpoint** — lint/test/test:e2e/build clean in `apps/cms-api` (done); manual curl check
-      (login → `accessToken` in body, no `access_token` cookie) (done); human review before
-      Phase 3/4 (pending)
+- [x] **Checkpoint** — lint/test/test:e2e/build clean in `apps/cms-api`; manual curl check
+      (login → `accessToken` in body, no `access_token` cookie); human review before Phase 3/4
 
 ## Phase 3: Backend docs/Swagger sweep (parallel-safe with Phase 4)
-- [ ] 3. `@ApiCookieAuth()` → `@ApiBearerAuth()` across the 9 affected controllers;
+- [x] 3. `@ApiCookieAuth()` → `@ApiBearerAuth()` across the 9 affected controllers;
       `configure-app.ts` drops `addCookieAuth("access_token", ...)`
 - [ ] 4. Update `docs/documents/auth.md` + the 3 `docs/diagrams/*.md` flow diagrams
 
