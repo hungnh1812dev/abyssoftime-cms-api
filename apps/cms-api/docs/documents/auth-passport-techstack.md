@@ -21,6 +21,15 @@ Comparison tables for the choices made integrating `@nestjs/passport` as the aut
 | Behavior parity | Would require moving the token to a header — a client-facing API change | Preserves today's cookie-based contract byte-for-byte; when the cookie is absent the extractor returns `null`, which is what surfaces `passport-jwt`'s `"No auth token"` info that `handleRequest` maps to `"Missing access token"` |
 | **Verdict** | Rejected — no built-in cookie extractor exists, and switching to a header would change the API contract | **Chosen** — the documented, idiomatic approach for cookie tokens |
 
+**Superseded 2026-08-08:** this verdict was later reversed — the access token moved from this custom cookie
+extractor to the built-in `ExtractJwt.fromAuthHeaderAsBearerToken()`, the very option rejected above. The
+"switching to a header would change the API contract" cost is exactly what changed: `cms-admin` needed a
+header-based access token for non-cookie consumers, and the API contract change was accepted deliberately (see
+`docs/documents/auth.md`'s 2026-08-08 changelog entry for the full write-up and git history for the original
+spec/plan). `ACCESS_TOKEN_COOKIE`/`jwtCookieExtractor` no longer exist —
+`refresh_token`'s own cookie extractor (`jwtRefreshCookieExtractor`, see the Refresh-token table below) is
+unaffected and still follows this table's original reasoning.
+
 ## Login: convert to `passport-local` (chosen) vs. leave `LoginService` as a plain method
 
 | Criteria | Leave `LoginService` plain | Convert to `passport-local` + `AuthGuard("local")` (chosen) |

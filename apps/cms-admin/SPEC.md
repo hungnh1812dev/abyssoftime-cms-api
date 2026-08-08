@@ -4,7 +4,7 @@ See `/docs/ENTRYPOINT.md` for the full doc index. This file only orients — mod
 
 ## Objective
 
-The admin web UI for the AbyssOfTime headless CMS: authenticate (cookie-session, self-register + OTP verification, no invites), browse/manage content types (single & collection), edit documents through schema-driven forms, manage media, and administer users/roles/permissions/access-tokens against a fully dynamic, DB-backed catalog. Locale administration has no UI in this app — the backend has no locale/i18n module, so that source is kept but unreachable (see `docs/documents/locales-and-invites.md`). Consumes the `cms-api` backend (sibling app, `apps/cms-api`) over `VITE_API_URL`, every route under `/api/v1/*` except `GET /health`; see that app's `docs/cms-admin-integration.md` for the API contract this frontend is built against.
+The admin web UI for the AbyssOfTime headless CMS: authenticate (hybrid cookie/Bearer session — refresh token in an httpOnly cookie, access token in memory sent as `Authorization: Bearer`; self-register + OTP verification, no invites), browse/manage content types (single & collection), edit documents through schema-driven forms, manage media, and administer users/roles/permissions/access-tokens against a fully dynamic, DB-backed catalog. Locale administration has no UI in this app — the backend has no locale/i18n module, so that source is kept but unreachable (see `docs/documents/locales-and-invites.md`). Consumes the `cms-api` backend (sibling app, `apps/cms-api`) over `VITE_API_URL`, every route under `/api/v1/*` except `GET /health`; see that app's `docs/cms-admin-integration.md` for the API contract this frontend is built against.
 
 ## Tech Stack
 
