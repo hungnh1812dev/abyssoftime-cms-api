@@ -21,7 +21,7 @@ sequenceDiagram
     participant Ctl as Route handler
 
     C->>Guard: request with Authorization Bearer token
-    Guard->>Guard: "jwt" strategy fails, no/invalid cookie
+    Guard->>Guard: "jwt" strategy fails, token doesn't verify as a JWT
     Guard->>AS: fall back to "api-token" strategy, passport-http-bearer
     AS->>AS: extract Bearer token from Authorization header
     AS->>AS: hash token with SHA-256

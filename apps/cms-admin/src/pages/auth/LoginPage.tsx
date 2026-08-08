@@ -34,9 +34,9 @@ export function LoginPage() {
   } = useForm<LoginFields>();
 
   const mutation = useMutation({
-    mutationFn: (data: LoginFields) => api.post("/auth/login", data),
-    onSuccess: async () => {
-      await login();
+    mutationFn: (data: LoginFields) => api.post<{ accessToken: string }>("/auth/login", data),
+    onSuccess: async (response) => {
+      await login(response.data.accessToken);
       navigate("/admin");
     },
     onError: (error: unknown) => {

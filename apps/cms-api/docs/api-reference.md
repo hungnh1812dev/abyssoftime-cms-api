@@ -1,13 +1,14 @@
 # API Reference
 
 Per-endpoint reference for `abyssoftime-cms-api`, for use building the CMS-Admin frontend. Every endpoint is
-listed as **Endpoint / Request / Response / Error** — nothing else. For the surrounding context (cookie-session
-auth model, CORS, permission catalog, pagination/filter syntax, gotchas) see `docs/cms-admin-integration.md`;
-this file is the flat lookup table that guide's §5 tables summarize in prose.
+listed as **Endpoint / Request / Response / Error** — nothing else. For the surrounding context (hybrid
+cookie/Bearer auth model, CORS, permission catalog, pagination/filter syntax, gotchas) see
+`docs/cms-admin-integration.md`; this file is the flat lookup table that guide's §5 tables summarize in prose.
 
-All paths are relative to `/api/v1` unless marked **public**/**unprefixed**. `Auth: cookie` means
-`JwtAuthGuard` (send `credentials: "include"`); a permission slug means `PermissionsGuard` also applies on top
-of the cookie check.
+All paths are relative to `/api/v1` unless marked **public**/**unprefixed**. `Auth: bearer` means
+`JwtAuthGuard` (send `Authorization: Bearer <accessToken>`, plus `credentials: "include"` since `refresh_token`
+still rides along as a cookie); a permission slug means `PermissionsGuard` also applies on top of the bearer
+check.
 
 ## Error envelope (applies to every endpoint below)
 
@@ -61,26 +62,26 @@ that route, not this envelope.
 #### `POST /auth/login`
 - **Auth:** none · rate-limited
 - **Request:** `LoginDto { email: string, password: string }`
-- **Response:** `200 MessageResponseDto`, sets `access_token`/`refresh_token` httpOnly cookies (nothing in the body to store)
+- **Response:** `200 { message: string, accessToken: string }`, sets `refresh_token` httpOnly cookie — hold `accessToken` in memory client-side, attach as `Authorization: Bearer <accessToken>`
 - **Error:** `401` unknown email or wrong password (message intentionally identical for both); `403` email not yet verified; `429`
 
 #### `POST /auth/refresh`
-- **Auth:** `refresh_token` cookie (read manually, no guard decorator)
+- **Auth:** `refresh_token` cookie (read via `JwtRefreshGuard`)
 - **Request:** — (cookie only)
-- **Response:** `200 MessageResponseDto`, rotates both cookies
+- **Response:** `200 { message: string, accessToken: string }` (rotated), rotates `refresh_token` cookie
 - **Error:** `401` cookie missing/invalid/expired — treat as session-ended, redirect to login
 
 #### `POST /auth/logout`
 - **Auth:** none required
 - **Request:** —
-- **Response:** `200 MessageResponseDto`, clears both cookies
+- **Response:** `200 MessageResponseDto`, clears `refresh_token` cookie (no access-token cookie left to clear)
 - **Error:** none — always succeeds even if not logged in
 
 #### `GET /auth/me`
-- **Auth:** cookie (`JwtAuthGuard`), no permission requirement
+- **Auth:** bearer (`JwtAuthGuard`), no permission requirement
 - **Request:** —
 - **Response:** `200 MeResponseDto { documentId, email, name, username, accountType, verified, roleId: string|null, createdAt, updatedAt, role: RoleResponseDto|null }` — `role` embeds `{ documentId, name, slug, permissions: string[], level, isDefault, createdAt, updatedAt, updatedBy }`, read fresh from the DB every call (not decoded from the JWT)
-- **Error:** `401` missing/invalid/expired cookie, or account deleted after token issuance; `404` `roleId` doesn't resolve to an existing role (shouldn't happen in normal operation)
+- **Error:** `401` missing/invalid/expired access token, or account deleted after token issuance; `404` `roleId` doesn't resolve to an existing role (shouldn't happen in normal operation)
 
 #### `POST /auth/forgot-password`
 - **Auth:** none · rate-limited
@@ -105,7 +106,7 @@ that route, not this envelope.
 - **Error:** `403` missing permission
 
 #### `PUT /users/:id`
-- **Auth:** cookie only — no permission slug (self-service; editing someone else additionally requires `user:manager`, checked in the service layer)
+- **Auth:** bearer only — no permission slug (self-service; editing someone else additionally requires `user:manager`, checked in the service layer)
 - **Request:** `UpdateUserDto { name?: string, password?: string }` — ⚠️ `password` is stored **without hashing** by this route (known gap)
 - **Response:** `200 UserResponseDto`
 - **Error:** `403` caller isn't this user and lacks `user:manager` (not a missing-permission-slug 403); `404` unknown id

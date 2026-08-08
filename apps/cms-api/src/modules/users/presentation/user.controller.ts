@@ -6,7 +6,7 @@ import { UpdateUserRoleService } from "../application/services/update-user-role.
 import { UpdateUserService } from "../application/services/update-user.service";
 
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Put, Req, UseGuards } from "@nestjs/common";
-import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
@@ -16,7 +16,7 @@ import { type AuthenticatedRequest } from "@/common/types/authenticated-request"
 import { UserResponseDto } from "./user-response.dto";
 
 @ApiTags("users")
-@ApiCookieAuth()
+@ApiBearerAuth()
 @Controller("users")
 export class UserController {
   constructor(

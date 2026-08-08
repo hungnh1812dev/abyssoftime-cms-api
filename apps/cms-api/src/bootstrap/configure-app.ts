@@ -65,7 +65,6 @@ function configureSwagger(app: NestExpressApplication): void {
     .setTitle("Abyssoftime CMS API")
     .setDescription("REST API for the Abyssoftime schema-as-code CMS: content types, documents, media, and the auth/roles/permissions/users admin surface.")
     .setVersion(API_VERSION)
-    .addCookieAuth("access_token", { type: "apiKey", in: "cookie", name: "access_token" })
     .addBearerAuth()
     .build();
 

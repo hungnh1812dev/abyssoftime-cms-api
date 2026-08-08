@@ -3,7 +3,7 @@ import MockAdapter from "axios-mock-adapter";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, MOUNT_REFRESH_RETRY_DELAYS_MS, type MeUser, useAuth } from "@/context/AuthContext";
-import { api } from "@/lib/api";
+import { api, setAccessToken } from "@/lib/api";
 import { renderWithProviders } from "@/test-utils";
 
 function makeMeUser(overrides: Partial<MeUser> = {}): MeUser {
@@ -38,6 +38,7 @@ afterEach(() => {
   mock.restore();
   vi.clearAllMocks();
   MOUNT_REFRESH_RETRY_DELAYS_MS.splice(0, MOUNT_REFRESH_RETRY_DELAYS_MS.length, ...PROD_RETRY_DELAYS_MS);
+  setAccessToken(null);
 });
 
 // Helper component to inspect auth context values
@@ -130,6 +131,21 @@ describe("AuthProvider — mount-time session hydration", () => {
     expect(screen.getByTestId("permissions")).toHaveTextContent("document:read,document:create");
   });
 
+  it("captures the accessToken from the mount-time refresh and sends it as Authorization: Bearer on GET /auth/me", async () => {
+    mock.onPost("/auth/refresh").reply(200, { message: "Refresh successful", accessToken: "mount-refresh-token" });
+    mock.onGet("/auth/me").reply(200, makeMeUser());
+
+    renderWithProviders(
+      <AuthProvider>
+        <AuthDisplay />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("role")).toHaveTextContent("admin"));
+    const meRequest = mock.history.get.find((request) => request.url === "/auth/me");
+    expect(meRequest?.headers?.Authorization).toBe("Bearer mount-refresh-token");
+  });
+
   it("logs out if GET /auth/me fails even after a successful refresh (no separable identity source)", async () => {
     mock.onPost("/auth/refresh").reply(200, { message: "Refresh successful" });
     mock.onGet("/auth/me").reply(401);
@@ -145,7 +161,7 @@ describe("AuthProvider — mount-time session hydration", () => {
 });
 
 describe("AuthProvider — login()/logout()", () => {
-  it("login() fetches GET /auth/me and updates context", async () => {
+  it("login(accessToken) sets the token, fetches GET /auth/me with it as Authorization: Bearer, and updates context", async () => {
     mock.onPost("/auth/refresh").reply(401);
     mock.onGet("/auth/me").reply(200, makeMeUser({ documentId: "u2", role: { documentId: "r2", name: "Guest", slug: "guest", permissions: [], level: 0, isDefault: true } }));
 
@@ -154,7 +170,7 @@ describe("AuthProvider — login()/logout()", () => {
       return (
         <div>
           <span data-testid="userId">{userId ?? "none"}</span>
-          <button onClick={() => void login()}>login</button>
+          <button onClick={() => void login("login-access-token")}>login</button>
         </div>
       );
     }
@@ -169,16 +185,19 @@ describe("AuthProvider — login()/logout()", () => {
     await act(async () => getByRole("button", { name: "login" }).click());
 
     expect(screen.getByTestId("userId")).toHaveTextContent("u2");
+    const meRequest = mock.history.get.find((request) => request.url === "/auth/me");
+    expect(meRequest?.headers?.Authorization).toBe("Bearer login-access-token");
   });
 
-  it("logout() clears context and calls POST /auth/logout", async () => {
-    mock.onPost("/auth/refresh").reply(200, { message: "Refresh successful" });
+  it("logout() clears context, clears the held access token, and calls POST /auth/logout", async () => {
+    mock.onPost("/auth/refresh").reply(200, { message: "Refresh successful", accessToken: "session-token" });
     mock.onGet("/auth/me").reply(200, makeMeUser());
     let logoutCalled = false;
     mock.onPost("/auth/logout").reply(() => {
       logoutCalled = true;
       return [200, { message: "Logged out" }];
     });
+    mock.onGet("/protected").reply(200, {});
 
     function LogoutTrigger() {
       const { logout, userId } = useAuth();
@@ -201,6 +220,10 @@ describe("AuthProvider — login()/logout()", () => {
 
     await waitFor(() => expect(screen.getByTestId("userId")).toHaveTextContent("none"));
     expect(logoutCalled).toBe(true);
+
+    await api.get("/protected");
+    const protectedRequest = mock.history.get.find((request) => request.url === "/protected");
+    expect(protectedRequest?.headers?.Authorization).toBeUndefined();
   });
 
   it("clears context when onSessionExpired fires mid-session", async () => {

@@ -53,7 +53,7 @@ sequenceDiagram
         CORS-->>C: origin CORS_ORIGINS allowlist, credentials true (strict)
     end
     CORS->>CP: forward request
-    CP->>R: parse access_token / refresh_token cookies
+    CP->>R: parse refresh_token cookie (access token is read from the<br/>Authorization header by the guard stage, not by cookie-parser)
     R->>R: strip /api/v1 prefix, health excluded from prefix
     R->>G: dispatch to matched route
 

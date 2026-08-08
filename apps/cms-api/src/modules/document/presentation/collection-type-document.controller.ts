@@ -10,7 +10,7 @@ import { UnpublishDocumentService } from "../application/services/unpublish-docu
 import { DocumentEntity, DocumentStatus } from "../domain/entities/document.entity";
 
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Inject, Param, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
-import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
 import { DocumentPermissionsGuard } from "@/common/guards/document-permissions.guard";
@@ -35,7 +35,7 @@ interface BulkDeleteResponse {
 }
 
 @ApiTags("documents-collection-type")
-@ApiCookieAuth()
+@ApiBearerAuth()
 @Controller("documents/collection-type")
 export class CollectionTypeDocumentController {
   constructor(

@@ -7,7 +7,7 @@ import { RevokeAccessTokenService } from "../application/services/revoke-access-
 import { AccessTokenEntity } from "../domain/entities/access-token.entity";
 
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Req, UseGuards } from "@nestjs/common";
-import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { RequirePermissions } from "@/common/decorators/require-permissions.decorator";
 import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
@@ -17,7 +17,7 @@ import { type AuthenticatedRequest } from "@/common/types/authenticated-request"
 import { AccessTokenResponseDto, AccessTokenSecretResponseDto } from "./dto/access-token-response.dto";
 
 @ApiTags("access-tokens")
-@ApiCookieAuth()
+@ApiBearerAuth()
 @Controller("access-tokens")
 export class AccessTokenController {
   constructor(
