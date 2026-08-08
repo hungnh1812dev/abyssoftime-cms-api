@@ -137,15 +137,15 @@ regression test proving both paths still work through the shared header.
   - **Files:** the 9 controllers listed above + `apps/cms-api/src/bootstrap/configure-app.ts`.
   - **Estimated scope:** Medium (mechanical, ~10 files, one-line change each).
 
-- [ ] **Task 4: Backend narrative docs**
+- [x] **Task 4: Backend narrative docs**
   - **Description:** Update `docs/documents/auth.md` and the three diagrams in
     `docs/diagrams/` (`login-flow-diagram.md`, `refresh-token-flow-diagram.md`,
     `auth-jwt-flow-diagram.md`) so none of them describe an `access_token` cookie — reflect the
     response-body-then-header flow instead. Keep each diagram's existing scope/structure; just
     correct the parts that reference cookie-set/cookie-read for the access token specifically.
   - **Acceptance criteria:**
-    - [ ] No remaining prose/diagram step says the access token is set or read as a cookie.
-    - [ ] Refresh-token cookie behavior in these docs is left as-is (still accurate, unchanged).
+    - [x] No remaining prose/diagram step says the access token is set or read as a cookie.
+    - [x] Refresh-token cookie behavior in these docs is left as-is (still accurate, unchanged).
   - **Verify:** Manual read-through against the shipped Task 1 behavior.
   - **Dependencies:** Task 1.
   - **Files:**

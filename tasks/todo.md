@@ -18,7 +18,7 @@ Check off here as each task completes.
 ## Phase 3: Backend docs/Swagger sweep (parallel-safe with Phase 4)
 - [x] 3. `@ApiCookieAuth()` → `@ApiBearerAuth()` across the 9 affected controllers;
       `configure-app.ts` drops `addCookieAuth("access_token", ...)`
-- [ ] 4. Update `docs/documents/auth.md` + the 3 `docs/diagrams/*.md` flow diagrams
+- [x] 4. Update `docs/documents/auth.md` + the 3 `docs/diagrams/*.md` flow diagrams
 
 ## Phase 4: Frontend (`cms-admin`)
 - [ ] 5. `lib/api.ts` — in-memory token holder + request interceptor + capture token from
