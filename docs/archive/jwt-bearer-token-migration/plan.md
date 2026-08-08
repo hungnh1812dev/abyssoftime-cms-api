@@ -112,7 +112,7 @@ regression test proving both paths still work through the shared header.
 - [x] `bun run lint`, `bun run test`, `bun run test:e2e`, `bun run build` all clean in `apps/cms-api`.
 - [x] Manual check: `curl` login → response body has `accessToken`, no `access_token` cookie in
   `Set-Cookie`; a follow-up authenticated call with `Authorization: Bearer <that token>` succeeds.
-- [ ] Review with human before proceeding to Phase 3/4 (can run in parallel after this point).
+- [x] Review with human before proceeding to Phase 3/4 (can run in parallel after this point).
 
 ### Phase 3: Backend docs/Swagger sweep (parallel-safe with Phase 4)
 
@@ -235,12 +235,12 @@ regression test proving both paths still work through the shared header.
   (e.g. loading `/admin`) carry `Authorization: Bearer ...`; hard-reload the page → session
   survives via the refresh-token cookie and a fresh token is re-acquired; logout → subsequent calls
   carry no `Authorization` header and protected routes redirect to login.
-- [ ] Review with human before final closeout.
+- [x] Review with human before final closeout.
 
 ### Final Checkpoint: Full regression
 - [x] Both `apps/cms-api` and `apps/cms-admin`: lint, test, build all clean.
 - [x] Re-run the SPEC.md Success Criteria checklist end-to-end.
-- [ ] Per this project's established closeout habit: once merged and verified, confirm with the
+- [x] Per this project's established closeout habit: once merged and verified, confirm with the
   human whether `SPEC.md`/`tasks/plan.md`/`tasks/todo.md` (this initiative's, at repo root) get
   deleted or archived — matching how prior finished initiatives in `apps/cms-api/tasks/` and
   `apps/cms-admin/tasks/` were closed out.

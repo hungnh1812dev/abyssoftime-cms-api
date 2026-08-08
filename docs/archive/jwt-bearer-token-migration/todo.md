@@ -7,7 +7,7 @@ Check off here as each task completes.
 - [x] 1. `JwtStrategy` extractor → `Authorization: Bearer`; `AuthController` login/refresh return
       `accessToken` in body, stop setting `access_token` cookie; `logout` stops clearing it;
       `auth-response.dto.ts` gains `accessToken`; `JwtAuthGuard` load-bearing-order comment
-- [ ] **Checkpoint** — Phase 2 (below) must land before this is considered done
+- [x] **Checkpoint** — Phase 2 (below) must land before this is considered done
 
 ## Phase 2: Prove the conflict is resolved
 - [x] 2. New e2e regression test: JWT-as-Bearer succeeds, API-token-as-Bearer still succeeds,
@@ -32,4 +32,4 @@ Check off here as each task completes.
 
 ## Final
 - [x] Full regression: both apps lint/test/build clean; SPEC.md Success Criteria re-checked
-- [ ] Confirm with human: delete/archive `SPEC.md` + `tasks/plan.md` + `tasks/todo.md` once shipped
+- [x] Confirm with human: delete/archive `SPEC.md` + `tasks/plan.md` + `tasks/todo.md` once shipped
