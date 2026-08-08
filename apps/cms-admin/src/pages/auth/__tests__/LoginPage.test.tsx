@@ -4,7 +4,7 @@ import MockAdapter from "axios-mock-adapter";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/context/AuthContext";
-import { api } from "@/lib/api";
+import { api, setAccessToken } from "@/lib/api";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { renderWithProviders } from "@/test-utils";
 
@@ -19,6 +19,7 @@ beforeEach(() => {
 afterEach(() => {
   mock.restore();
   vi.clearAllMocks();
+  setAccessToken(null);
 });
 
 function renderLogin() {
@@ -73,7 +74,7 @@ describe("LoginPage", () => {
 
   it("calls POST /auth/login and navigates to /admin on success", async () => {
     const user = userEvent.setup();
-    mock.onPost("/auth/login").reply(200, { message: "Login successful" });
+    mock.onPost("/auth/login").reply(200, { message: "Login successful", accessToken: "login-access-token" });
     mock.onGet("/auth/me").reply(200, {
       documentId: "u1",
       email: "user@example.com",
@@ -96,6 +97,35 @@ describe("LoginPage", () => {
 
     await waitFor(() => {
       expect(mock.history.post.some((request) => request.url === "/auth/login")).toBe(true);
+    });
+  });
+
+  it("captures accessToken from the login response and sends it as Authorization: Bearer on the follow-up GET /auth/me", async () => {
+    const user = userEvent.setup();
+    mock.onPost("/auth/login").reply(200, { message: "Login successful", accessToken: "login-access-token" });
+    mock.onGet("/auth/me").reply(200, {
+      documentId: "u1",
+      email: "user@example.com",
+      name: "User",
+      username: "user",
+      accountType: true,
+      verified: true,
+      roleId: null,
+      role: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    renderLogin();
+
+    await waitFor(() => expect(screen.getByLabelText(/email/i)).toBeInTheDocument());
+    await user.type(screen.getByLabelText(/email/i), "user@example.com");
+    await user.type(screen.getByLabelText(/password/i), "password123");
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      const meRequest = mock.history.get.find((request) => request.url === "/auth/me");
+      expect(meRequest?.headers?.Authorization).toBe("Bearer login-access-token");
     });
   });
 

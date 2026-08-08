@@ -179,7 +179,7 @@ regression test proving both paths still work through the shared header.
   - **Files:** `apps/cms-admin/src/lib/api.ts`.
   - **Estimated scope:** Small (1 file).
 
-- [ ] **Task 6: Wire token capture through AuthContext and LoginPage**
+- [x] **Task 6: Wire token capture through AuthContext and LoginPage**
   - **Description:** `AuthContext.tsx`'s mount-time `attemptMountSession` already calls `POST
     /auth/refresh` before `fetchMe()` — capture the returned `accessToken` and hand it to
     `setAccessToken` (from Task 5) before calling `fetchMe()` (which now needs a valid header to
@@ -191,12 +191,12 @@ regression test proving both paths still work through the shared header.
     structure intact). `logout()` should also call `setAccessToken(null)` to clear the in-memory
     token alongside its existing state clear.
   - **Acceptance criteria:**
-    - [ ] After `POST /auth/login` succeeds, `GET /auth/me` (called by `login()`/`fetchMe()`)
+    - [x] After `POST /auth/login` succeeds, `GET /auth/me` (called by `login()`/`fetchMe()`)
       succeeds using the header, not a cookie.
-    - [ ] After a page reload, `attemptMountSession`'s refresh-then-me sequence still works purely
+    - [x] After a page reload, `attemptMountSession`'s refresh-then-me sequence still works purely
       off the httpOnly refresh cookie (no token needed to *initiate* it) and ends with a token held
       in memory.
-    - [ ] `logout()` leaves no token held (verified by the next request having no `Authorization`
+    - [x] `logout()` leaves no token held (verified by the next request having no `Authorization`
       header).
   - **Verify:** Manual browser walkthrough (see Checkpoint below) plus the updated unit tests from
     Task 7.
