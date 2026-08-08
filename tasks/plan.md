@@ -238,8 +238,8 @@ regression test proving both paths still work through the shared header.
 - [ ] Review with human before final closeout.
 
 ### Final Checkpoint: Full regression
-- [ ] Both `apps/cms-api` and `apps/cms-admin`: lint, test, build all clean.
-- [ ] Re-run the SPEC.md Success Criteria checklist end-to-end.
+- [x] Both `apps/cms-api` and `apps/cms-admin`: lint, test, build all clean.
+- [x] Re-run the SPEC.md Success Criteria checklist end-to-end.
 - [ ] Per this project's established closeout habit: once merged and verified, confirm with the
   human whether `SPEC.md`/`tasks/plan.md`/`tasks/todo.md` (this initiative's, at repo root) get
   deleted or archived — matching how prior finished initiatives in `apps/cms-api/tasks/` and

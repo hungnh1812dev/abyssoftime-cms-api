@@ -31,5 +31,5 @@ Check off here as each task completes.
       reload, logout); human review before final closeout
 
 ## Final
-- [ ] Full regression: both apps lint/test/build clean; SPEC.md Success Criteria re-checked
+- [x] Full regression: both apps lint/test/build clean; SPEC.md Success Criteria re-checked
 - [ ] Confirm with human: delete/archive `SPEC.md` + `tasks/plan.md` + `tasks/todo.md` once shipped
