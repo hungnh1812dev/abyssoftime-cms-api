@@ -157,7 +157,7 @@ regression test proving both paths still work through the shared header.
 
 ### Phase 4: Frontend (`cms-admin`) — vertical slice: user logs in and stays authenticated via header
 
-- [ ] **Task 5: In-memory token holder + request interceptor**
+- [x] **Task 5: In-memory token holder + request interceptor**
   - **Description:** In `lib/api.ts`, add a module-level access-token holder with
     `setAccessToken(token: string | null)` / a way for the request interceptor to read it —
     mirroring the existing `onSessionExpired`/`_onSessionExpired` module-variable pattern already
@@ -168,12 +168,12 @@ regression test proving both paths still work through the shared header.
     `setAccessToken(...)` before resolving, so the retried request in the response interceptor
     picks up the new token.
   - **Acceptance criteria:**
-    - [ ] A request made while a token is held carries `Authorization: Bearer <token>`.
-    - [ ] A request made with no token held carries no `Authorization` header.
-    - [ ] After a 401-triggered refresh, the retried request uses the newly-captured token, not the
+    - [x] A request made while a token is held carries `Authorization: Bearer <token>`.
+    - [x] A request made with no token held carries no `Authorization` header.
+    - [x] After a 401-triggered refresh, the retried request uses the newly-captured token, not the
       stale one.
   - **Verify:**
-    - [ ] `bun run test -- api.test` (updated, see Task 7) passes.
+    - [x] `bun run test -- api.test` (updated, see Task 7) passes.
   - **Dependencies:** Task 1 (needs the real response shape to build against, though it can be
     stubbed earlier if desired).
   - **Files:** `apps/cms-admin/src/lib/api.ts`.

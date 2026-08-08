@@ -21,7 +21,7 @@ Check off here as each task completes.
 - [x] 4. Update `docs/documents/auth.md` + the 3 `docs/diagrams/*.md` flow diagrams
 
 ## Phase 4: Frontend (`cms-admin`)
-- [ ] 5. `lib/api.ts` — in-memory token holder + request interceptor + capture token from
+- [x] 5. `lib/api.ts` — in-memory token holder + request interceptor + capture token from
       `/auth/refresh` response
 - [ ] 6. `AuthContext.tsx` + `LoginPage.tsx` — wire token capture on login/mount-refresh, clear on
       logout
