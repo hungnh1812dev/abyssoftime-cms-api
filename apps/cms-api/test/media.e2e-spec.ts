@@ -114,11 +114,7 @@ describe("Media (e2e)", () => {
   it("uploads an image successfully with a media:manager token", async () => {
     const buffer = buildPngBuffer(800, 600);
 
-    const response = await request(app.getHttpServer())
-      .post("/api/v1/media/upload")
-      .set("Cookie", [`access_token=${managerToken}`])
-      .attach("file", buffer, "photo.png")
-      .expect(201);
+    const response = await request(app.getHttpServer()).post("/api/v1/media/upload").set("Authorization", `Bearer ${managerToken}`).attach("file", buffer, "photo.png").expect(201);
 
     expect(response.body).toMatchObject({
       fileName: "photo.png",
@@ -137,11 +133,7 @@ describe("Media (e2e)", () => {
     const buffer = buildPngBuffer(1, 1);
     const oversized = Buffer.concat([buffer, Buffer.alloc(maxUploadBytes - buffer.length + 1)]);
 
-    await request(app.getHttpServer())
-      .post("/api/v1/media/upload")
-      .set("Cookie", [`access_token=${managerToken}`])
-      .attach("file", oversized, "too-big.png")
-      .expect(413);
+    await request(app.getHttpServer()).post("/api/v1/media/upload").set("Authorization", `Bearer ${managerToken}`).attach("file", oversized, "too-big.png").expect(413);
 
     expect(storage.uploads).toHaveLength(uploadsBefore);
   });
@@ -150,11 +142,7 @@ describe("Media (e2e)", () => {
     const uploadsBefore = storage.uploads.length;
     const buffer = Buffer.from("just some plain text, not an image");
 
-    await request(app.getHttpServer())
-      .post("/api/v1/media/upload")
-      .set("Cookie", [`access_token=${managerToken}`])
-      .attach("file", buffer, "note.txt")
-      .expect(422);
+    await request(app.getHttpServer()).post("/api/v1/media/upload").set("Authorization", `Bearer ${managerToken}`).attach("file", buffer, "note.txt").expect(422);
 
     expect(storage.uploads).toHaveLength(uploadsBefore);
   });
@@ -162,18 +150,11 @@ describe("Media (e2e)", () => {
   it("rejects upload from a media:read-only token with 403", async () => {
     const buffer = buildPngBuffer(400, 300);
 
-    await request(app.getHttpServer())
-      .post("/api/v1/media/upload")
-      .set("Cookie", [`access_token=${readOnlyToken}`])
-      .attach("file", buffer, "photo.png")
-      .expect(403);
+    await request(app.getHttpServer()).post("/api/v1/media/upload").set("Authorization", `Bearer ${readOnlyToken}`).attach("file", buffer, "photo.png").expect(403);
   });
 
   it("lists media reachable by a media:read-only token", async () => {
-    const response = await request(app.getHttpServer())
-      .get("/api/v1/media")
-      .set("Cookie", [`access_token=${readOnlyToken}`])
-      .expect(200);
+    const response = await request(app.getHttpServer()).get("/api/v1/media").set("Authorization", `Bearer ${readOnlyToken}`).expect(200);
 
     expect(Array.isArray(response.body)).toBe(true);
   });
@@ -182,15 +163,12 @@ describe("Media (e2e)", () => {
     const buffer = buildPngBuffer(200, 200);
     const uploadResponse = await request(app.getHttpServer())
       .post("/api/v1/media/upload")
-      .set("Cookie", [`access_token=${managerToken}`])
+      .set("Authorization", `Bearer ${managerToken}`)
       .attach("file", buffer, "to-delete.png")
       .expect(201);
     const { documentId, publicId } = uploadResponse.body as MediaUploadResponseBody;
 
-    await request(app.getHttpServer())
-      .delete(`/api/v1/media/${documentId}`)
-      .set("Cookie", [`access_token=${managerToken}`])
-      .expect(204);
+    await request(app.getHttpServer()).delete(`/api/v1/media/${documentId}`).set("Authorization", `Bearer ${managerToken}`).expect(204);
 
     expect(storage.deletes).toContain(publicId);
     const row = await prisma.mediaAsset.findUnique({ where: { documentId } });
@@ -201,30 +179,24 @@ describe("Media (e2e)", () => {
     const buffer = buildPngBuffer(150, 150);
     const uploadResponse = await request(app.getHttpServer())
       .post("/api/v1/media/upload")
-      .set("Cookie", [`access_token=${managerToken}`])
+      .set("Authorization", `Bearer ${managerToken}`)
       .attach("file", buffer, "protected.png")
       .expect(201);
     const documentId = (uploadResponse.body as MediaUploadResponseBody).documentId;
     createdMediaIds.push(documentId);
 
-    await request(app.getHttpServer())
-      .delete(`/api/v1/media/${documentId}`)
-      .set("Cookie", [`access_token=${readOnlyToken}`])
-      .expect(403);
+    await request(app.getHttpServer()).delete(`/api/v1/media/${documentId}`).set("Authorization", `Bearer ${readOnlyToken}`).expect(403);
   });
 
   it("returns 404 when deleting an unknown media asset", async () => {
-    await request(app.getHttpServer())
-      .delete("/api/v1/media/00000000-0000-0000-0000-000000000000")
-      .set("Cookie", [`access_token=${managerToken}`])
-      .expect(404);
+    await request(app.getHttpServer()).delete("/api/v1/media/00000000-0000-0000-0000-000000000000").set("Authorization", `Bearer ${managerToken}`).expect(404);
   });
 
   it("leaves the DB row intact when the storage delete fails", async () => {
     const buffer = buildPngBuffer(100, 100);
     const uploadResponse = await request(app.getHttpServer())
       .post("/api/v1/media/upload")
-      .set("Cookie", [`access_token=${managerToken}`])
+      .set("Authorization", `Bearer ${managerToken}`)
       .attach("file", buffer, "keep.png")
       .expect(201);
     const documentId = (uploadResponse.body as MediaUploadResponseBody).documentId;
@@ -232,10 +204,7 @@ describe("Media (e2e)", () => {
 
     storage.failNextDelete();
 
-    await request(app.getHttpServer())
-      .delete(`/api/v1/media/${documentId}`)
-      .set("Cookie", [`access_token=${managerToken}`])
-      .expect(500);
+    await request(app.getHttpServer()).delete(`/api/v1/media/${documentId}`).set("Authorization", `Bearer ${managerToken}`).expect(500);
 
     const row = await prisma.mediaAsset.findUnique({ where: { documentId } });
     expect(row).not.toBeNull();

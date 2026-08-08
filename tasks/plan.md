@@ -88,7 +88,7 @@ regression test proving both paths still work through the shared header.
 
 ### Phase 2: Prove the conflict is actually resolved
 
-- [ ] **Task 2: Bearer-header conflict regression test**
+- [x] **Task 2: Bearer-header conflict regression test**
   - **Description:** New e2e test (following `test/content-engine.e2e-spec.ts`'s
     `bootTestApp()` + `JwtTokenService`/`CreateAccessTokenService` pattern) that boots the real
     `AppModule` and, against one `JwtAuthGuard`-protected route (e.g. `GET /auth/me`, or
@@ -97,11 +97,11 @@ regression test proving both paths still work through the shared header.
     token minted via `CreateAccessTokenService`/`ACCESS_TOKEN_REPOSITORY` sent the same way
     succeeds, (c) a garbage/opaque non-JWT, non-API-token Bearer value gets 401.
   - **Acceptance criteria:**
-    - [ ] All three cases in the new spec pass.
-    - [ ] Test fails (red) if the extractor change from Task 1 were reverted — i.e. it actually
+    - [x] All three cases in the new spec pass.
+    - [x] Test fails (red) if the extractor change from Task 1 were reverted — i.e. it actually
       exercises the header path, not a stale cookie path.
   - **Verify:**
-    - [ ] The project's e2e test script (confirm exact name in `apps/cms-api/package.json` — likely
+    - [x] The project's e2e test script (confirm exact name in `apps/cms-api/package.json` — likely
       `bun run test:e2e`) passes, including the new spec.
   - **Dependencies:** Task 1.
   - **Files:**
@@ -109,8 +109,8 @@ regression test proving both paths still work through the shared header.
   - **Estimated scope:** Small (1 file).
 
 ### Checkpoint: Backend core + conflict proof
-- [ ] `bun run lint`, `bun run test`, `bun run test:e2e`, `bun run build` all clean in `apps/cms-api`.
-- [ ] Manual check: `curl` login → response body has `accessToken`, no `access_token` cookie in
+- [x] `bun run lint`, `bun run test`, `bun run test:e2e`, `bun run build` all clean in `apps/cms-api`.
+- [x] Manual check: `curl` login → response body has `accessToken`, no `access_token` cookie in
   `Set-Cookie`; a follow-up authenticated call with `Authorization: Bearer <that token>` succeeds.
 - [ ] Review with human before proceeding to Phase 3/4 (can run in parallel after this point).
 
