@@ -25,7 +25,7 @@ Check off here as each task completes.
       `/auth/refresh` response
 - [x] 6. `AuthContext.tsx` + `LoginPage.tsx` — wire token capture on login/mount-refresh, clear on
       logout
-- [ ] 7. Update `api.test.ts` + `AuthContext.test.tsx`; spot-check `RouteGuards.test.tsx` /
+- [x] 7. Update `api.test.ts` + `AuthContext.test.tsx`; spot-check `RouteGuards.test.tsx` /
       `LoginPage.test.tsx`
 - [ ] **Checkpoint** — lint/test/build clean in `apps/cms-admin`; live browser walkthrough (login,
       reload, logout); human review before final closeout

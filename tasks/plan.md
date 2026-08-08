@@ -206,7 +206,7 @@ regression test proving both paths still work through the shared header.
     - `apps/cms-admin/src/pages/auth/LoginPage.tsx`
   - **Estimated scope:** Small (2 files).
 
-- [ ] **Task 7: Frontend test updates**
+- [x] **Task 7: Frontend test updates**
   - **Description:** Update `api.test.ts` to cover: request interceptor attaches the header when a
     token is set via `setAccessToken`; `/auth/refresh` mock response including `accessToken`
     results in the token being captured and used on the retried request. Update
@@ -215,11 +215,11 @@ regression test proving both paths still work through the shared header.
     `useAuth`/`AuthContext` directly rather than hitting `lib/api.ts`, but confirm rather than
     assume).
   - **Acceptance criteria:**
-    - [ ] New/updated tests pass and meaningfully fail if the header-attachment or capture logic is
+    - [x] New/updated tests pass and meaningfully fail if the header-attachment or capture logic is
       reverted (i.e. not just re-asserting mocks).
   - **Verify:**
-    - [ ] `bun run test` (full `cms-admin` suite) passes.
-    - [ ] `bun run lint`.
+    - [x] `bun run test` (full `cms-admin` suite) passes.
+    - [x] `bun run lint`.
   - **Dependencies:** Task 5, Task 6.
   - **Files:**
     - `apps/cms-admin/src/lib/__tests__/api.test.ts`
