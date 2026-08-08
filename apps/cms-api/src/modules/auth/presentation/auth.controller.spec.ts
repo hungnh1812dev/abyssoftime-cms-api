@@ -18,7 +18,6 @@ import { type Request, type Response } from "express";
 import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
 
-import { ACCESS_TOKEN_COOKIE } from "@/common/guards/jwt-auth.guard";
 import { REFRESH_TOKEN_COOKIE } from "@/common/guards/jwt-refresh.guard";
 import { type ValidatedLoginUser } from "@/common/strategies/local.strategy";
 import { type AuthenticatedRefreshRequest, type AuthenticatedRequest } from "@/common/types/authenticated-request";
@@ -120,7 +119,7 @@ describe("AuthController", () => {
     expect(result).toEqual({ hasUsers: false });
   });
 
-  it("login() defaults rememberMe to false when omitted and sets a 7-day refresh cookie", () => {
+  it("login() defaults rememberMe to false when omitted, returns accessToken in the body, and sets only the refresh cookie", () => {
     const dto: LoginDto = { email: "jane@example.com", password: "s3cret" };
     const validatedUser = { user: { documentId: "user-1" }, role: { slug: "admin" } } as unknown as ValidatedLoginUser;
     const req = { user: validatedUser } as unknown as Request & { user: ValidatedLoginUser };
@@ -129,17 +128,13 @@ describe("AuthController", () => {
     const result = controller.login(dto, req, res as unknown as Response);
 
     expect(loginService.execute).toHaveBeenCalledWith(validatedUser, false);
-    expect(res.cookie).toHaveBeenCalledWith(
-      ACCESS_TOKEN_COOKIE,
-      "access-token",
-      expect.objectContaining({ httpOnly: true, secure: true, sameSite: "lax", maxAge: 15 * 60 * 1000 }),
-    );
+    expect(res.cookie).toHaveBeenCalledTimes(1);
     expect(res.cookie).toHaveBeenCalledWith(
       REFRESH_TOKEN_COOKIE,
       "refresh-token",
       expect.objectContaining({ httpOnly: true, secure: true, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000 }),
     );
-    expect(result).toEqual({ message: "Login successful." });
+    expect(result).toEqual({ message: "Login successful.", accessToken: "access-token" });
   });
 
   it("login() passes rememberMe:true through and sets a 30-day refresh cookie", () => {
@@ -148,23 +143,24 @@ describe("AuthController", () => {
     const req = { user: validatedUser } as unknown as Request & { user: ValidatedLoginUser };
     loginService.execute.mockReturnValue({ accessToken: "access-token", refreshToken: "refresh-token", refreshTokenMaxAgeMs: 30 * 24 * 60 * 60 * 1000 });
 
-    controller.login(dto, req, res as unknown as Response);
+    const result = controller.login(dto, req, res as unknown as Response);
 
     expect(loginService.execute).toHaveBeenCalledWith(validatedUser, true);
-    expect(res.cookie).toHaveBeenCalledWith(ACCESS_TOKEN_COOKIE, "access-token", expect.objectContaining({ maxAge: 15 * 60 * 1000 }));
+    expect(res.cookie).toHaveBeenCalledTimes(1);
     expect(res.cookie).toHaveBeenCalledWith(REFRESH_TOKEN_COOKIE, "refresh-token", expect.objectContaining({ maxAge: 30 * 24 * 60 * 60 * 1000 }));
+    expect(result).toEqual({ message: "Login successful.", accessToken: "access-token" });
   });
 
-  it("refresh() delegates to RefreshTokenService with the guard-verified sub/rememberMe and rotates auth cookies with the returned maxAge", async () => {
+  it("refresh() delegates to RefreshTokenService with the guard-verified sub/rememberMe, returns the rotated accessToken in the body, and rotates only the refresh cookie", async () => {
     const req = { user: { sub: "user-1", rememberMe: true } } as unknown as AuthenticatedRefreshRequest;
     refreshTokenService.execute.mockResolvedValue({ accessToken: "new-access-token", refreshToken: "new-refresh-token", refreshTokenMaxAgeMs: 30 * 24 * 60 * 60 * 1000 });
 
     const result = await controller.refresh(req, res as unknown as Response);
 
     expect(refreshTokenService.execute).toHaveBeenCalledWith("user-1", true);
-    expect(res.cookie).toHaveBeenCalledWith(ACCESS_TOKEN_COOKIE, "new-access-token", expect.objectContaining({ maxAge: 15 * 60 * 1000 }));
+    expect(res.cookie).toHaveBeenCalledTimes(1);
     expect(res.cookie).toHaveBeenCalledWith(REFRESH_TOKEN_COOKIE, "new-refresh-token", expect.objectContaining({ maxAge: 30 * 24 * 60 * 60 * 1000 }));
-    expect(result).toEqual({ message: "Token refreshed." });
+    expect(result).toEqual({ message: "Token refreshed.", accessToken: "new-access-token" });
   });
 
   it("refresh() defaults rememberMe to false for a pre-change refresh token that carries no rememberMe field", async () => {
@@ -176,10 +172,10 @@ describe("AuthController", () => {
     expect(refreshTokenService.execute).toHaveBeenCalledWith("user-1", false);
   });
 
-  it("logout() clears both auth cookies", () => {
+  it("logout() clears only the refresh cookie", () => {
     const result = controller.logout(res as unknown as Response);
 
-    expect(res.clearCookie).toHaveBeenCalledWith(ACCESS_TOKEN_COOKIE);
+    expect(res.clearCookie).toHaveBeenCalledTimes(1);
     expect(res.clearCookie).toHaveBeenCalledWith(REFRESH_TOKEN_COOKIE);
     expect(result).toEqual({ message: "Logged out." });
   });

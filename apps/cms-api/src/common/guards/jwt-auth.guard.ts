@@ -5,6 +5,13 @@ import { AuthGuard } from "@nestjs/passport";
 
 export const ACCESS_TOKEN_COOKIE = "access_token";
 
+// Strategy order here is load-bearing: both "jwt" and "api-token" now read the same
+// Authorization header (JwtStrategy switched from a cookie extractor to
+// ExtractJwt.fromAuthHeaderAsBearerToken() — see jwt.strategy.ts). Passport tries "jwt" first
+// and falls through to "api-token" on a fail() (not error()), which is what passport-jwt does
+// on a malformed-JWT decode. API tokens are always `cms_<64-hex>` (from
+// generateAccessTokenSecret), never dot-segmented, so they can never parse as a JWT — but this
+// fallthrough depends on that shape and on "jwt" staying first in the array.
 @Injectable()
 export class JwtAuthGuard extends AuthGuard(["jwt", "api-token"]) {
   // passport-jwt sets info to an Error("No auth token") when jwtCookieExtractor (jwt.strategy.ts)

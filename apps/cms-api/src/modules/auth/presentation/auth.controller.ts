@@ -20,21 +20,19 @@ import { ConfigService } from "@nestjs/config";
 import { AuthGuard } from "@nestjs/passport";
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
-import { ACCESS_TOKEN_COOKIE, JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
+import { JwtAuthGuard } from "@/common/guards/jwt-auth.guard";
 import { JwtRefreshGuard, REFRESH_TOKEN_COOKIE } from "@/common/guards/jwt-refresh.guard";
 import { RateLimitGuard } from "@/common/guards/rate-limit.guard";
 import { type ValidatedLoginUser } from "@/common/strategies/local.strategy";
 import { type AuthenticatedRefreshRequest, type AuthenticatedRequest } from "@/common/types/authenticated-request";
 import { type EnvironmentVariables } from "@/config/env.validation";
 
-import { HasUsersResponseDto, MessageResponseDto } from "./dto/auth-response.dto";
+import { AuthResponseDto, HasUsersResponseDto, MessageResponseDto } from "./dto/auth-response.dto";
 import { MeResponseDto } from "./dto/me-response.dto";
 
-const ACCESS_TOKEN_MAX_AGE_MS = 15 * 60 * 1000;
-
 // Every route here is public by design (this module establishes identity), except `me` — the one
-// route that reads an existing session back. login/refresh set the access_token/refresh_token
-// httpOnly cookies; logout clears them.
+// route that reads an existing session back. login/refresh return the access token in the
+// response body and set the refresh_token httpOnly cookie; logout clears that cookie.
 @ApiTags("auth")
 @Controller("auth")
 export class AuthController {
@@ -97,39 +95,38 @@ export class AuthController {
   @Post("login")
   @HttpCode(HttpStatus.OK)
   @UseGuards(RateLimitGuard, AuthGuard("local"))
-  @ApiOperation({ summary: "Log in — sets access_token/refresh_token httpOnly cookies on success" })
-  @ApiResponse({ status: 200, type: MessageResponseDto })
+  @ApiOperation({ summary: "Log in — returns an access token in the body and sets the refresh_token httpOnly cookie" })
+  @ApiResponse({ status: 200, type: AuthResponseDto })
   @ApiResponse({ status: 401, description: "Unknown email or wrong password (same message either way)" })
   @ApiResponse({ status: 403, description: "Email not verified yet" })
   // dto is unused in the handler body — kept only so Swagger's request-body introspection (which
   // reads the @Body()-decorated parameter's type) still documents the { email, password } shape.
   // The actual credential check now runs in LocalStrategy.validate() via AuthGuard("local").
-  login(@Body() dto: LoginDto, @Req() req: Request & { user: ValidatedLoginUser }, @Res({ passthrough: true }) res: Response): { message: string } {
+  login(@Body() dto: LoginDto, @Req() req: Request & { user: ValidatedLoginUser }, @Res({ passthrough: true }) res: Response): { message: string; accessToken: string } {
     const { accessToken, refreshToken, refreshTokenMaxAgeMs } = this.loginService.execute(req.user, dto.rememberMe ?? false);
-    this.setAuthCookies(res, accessToken, refreshToken, refreshTokenMaxAgeMs);
-    return { message: "Login successful." };
+    this.setRefreshCookie(res, refreshToken, refreshTokenMaxAgeMs);
+    return { message: "Login successful.", accessToken };
   }
 
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtRefreshGuard)
   @ApiOperation({ summary: "Rotate the access/refresh token pair using the refresh_token cookie" })
-  @ApiResponse({ status: 200, type: MessageResponseDto })
+  @ApiResponse({ status: 200, type: AuthResponseDto })
   @ApiResponse({ status: 401, description: "Refresh cookie missing, invalid, or expired" })
-  async refresh(@Req() req: AuthenticatedRefreshRequest, @Res({ passthrough: true }) res: Response): Promise<{ message: string }> {
+  async refresh(@Req() req: AuthenticatedRefreshRequest, @Res({ passthrough: true }) res: Response): Promise<{ message: string; accessToken: string }> {
     const { sub, rememberMe } = req.user;
 
     const { accessToken, refreshToken, refreshTokenMaxAgeMs } = await this.refreshTokenService.execute(sub, rememberMe ?? false);
-    this.setAuthCookies(res, accessToken, refreshToken, refreshTokenMaxAgeMs);
-    return { message: "Token refreshed." };
+    this.setRefreshCookie(res, refreshToken, refreshTokenMaxAgeMs);
+    return { message: "Token refreshed.", accessToken };
   }
 
   @Post("logout")
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Clear both auth cookies" })
+  @ApiOperation({ summary: "Clear the refresh_token cookie" })
   @ApiResponse({ status: 200, type: MessageResponseDto })
   logout(@Res({ passthrough: true }) res: Response): { message: string } {
-    res.clearCookie(ACCESS_TOKEN_COOKIE);
     res.clearCookie(REFRESH_TOKEN_COOKIE);
     return { message: "Logged out." };
   }
@@ -167,11 +164,10 @@ export class AuthController {
     return { message: "Password reset successfully." };
   }
 
-  private setAuthCookies(res: Response, accessToken: string, refreshToken: string, refreshTokenMaxAgeMs: number): void {
+  private setRefreshCookie(res: Response, refreshToken: string, refreshTokenMaxAgeMs: number): void {
     const secure = this.configService.get("COOKIE_SECURE", { infer: true });
     const sameSite = this.configService.get("COOKIE_SAMESITE", { infer: true });
 
-    res.cookie(ACCESS_TOKEN_COOKIE, accessToken, { httpOnly: true, secure, sameSite, maxAge: ACCESS_TOKEN_MAX_AGE_MS });
     res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, { httpOnly: true, secure, sameSite, maxAge: refreshTokenMaxAgeMs });
   }
 }
